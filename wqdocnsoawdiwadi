@@ -1,0 +1,162 @@
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local pattern6872 = "AB0002040000FF7FFEFFFF7FFF7FFEFFFF7FFF7FFEFFFF7FFF7FFF7FFEFFFF7FFF7FFEFFFF7FFF7FFEFF0000FF7FFF7F0000"
+local pattern6835 = "FF7FFEFFFF7FFF7FFEFFFF7FFF7FFF7FFEFFFF7FFF7FFEFFFF7FFF7FFEFF0000FF7FFF7F0000FF7FFF7F0000FF7FFF7FFF7F"
+
+local function getMeshData2Info(captchaGui)
+    for _, child in pairs(captchaGui:GetDescendants()) do
+        if child:IsA("UnionOperation") then
+            local success, meshData2 = pcall(gethiddenproperty, child, "MeshData2")
+            if success and meshData2 and #meshData2 > 0 then
+                local length = #meshData2
+                
+                local bytePattern = nil
+                if length == 6872 then
+                    local startPos = 0x0810 + 1
+                    local endPos = 0x0EC6 + 1
+                    if #meshData2 >= endPos then
+                        local bytes = {}
+                        for i = startPos, endPos do
+                            local byte = string.byte(meshData2, i)
+                            if byte then
+                                table.insert(bytes, string.format("%02X", byte))
+                            end
+                        end
+                        bytePattern = table.concat(bytes, "")
+                    end
+                elseif length == 6835 then
+                    local startPos = 0x0810 + 1
+                    local endPos = 0x0EB0 + 1
+                    if #meshData2 >= endPos then
+                        local bytes = {}
+                        for i = startPos, endPos do
+                            local byte = string.byte(meshData2, i)
+                            if byte then
+                                table.insert(bytes, string.format("%02X", byte))
+                            end
+                        end
+                        bytePattern = table.concat(bytes, "")
+                    end
+                end
+                
+                return length, bytePattern
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function identifyNumber(length, bytePattern)
+    if length == 6872 and bytePattern then
+        local first100 = string.sub(bytePattern, 1, 100)
+        
+        if first100 == pattern6872 then
+            return "3"
+        else
+            return "2"
+        end
+    elseif length == 6835 and bytePattern then
+        local first100 = string.sub(bytePattern, 1, 100)
+        
+        if first100 == pattern6835 then
+            return "3"
+        else
+            return "2"
+        end
+    elseif length > 6000 and length < 7000 then
+        return "2"
+    elseif length > 5000 and length < 6000 then
+        return "1"
+    elseif length > 8000 and length < 9000 then
+        return "4"
+    end
+    
+    return nil
+end
+
+local function findButton(captchaGui, targetText)
+    for _, child in pairs(captchaGui:GetDescendants()) do
+        if (child:IsA("GuiButton") or child:IsA("TextButton")) then
+            if child.Text and string.find(child.Text, targetText) then
+                return child
+            end
+        end
+        
+        if child:IsA("TextLabel") then
+            if child.Text and string.find(child.Text, targetText) then
+                local parent = child.Parent
+                if parent and (parent:IsA("GuiButton") or parent:IsA("TextButton")) then
+                    return parent
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+local function clickButton(button)
+    if not button or not button.Visible then
+        return false
+    end
+    
+    local guiInset = game:GetService("GuiService"):GetGuiInset()
+    
+    local pos = button.AbsolutePosition
+    local size = button.AbsoluteSize
+    local x = pos.X + (size.X / 2) + guiInset.X
+    local y = pos.Y + (size.Y / 2) + guiInset.Y
+    
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait()
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    
+    return true
+end
+
+local function solveCaptcha()
+    local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return false end
+    
+    local captchaGui = playerGui:FindFirstChild("CaptchaGui")
+    if not captchaGui or not captchaGui.Enabled then return false end
+    
+    local length, bytePattern = getMeshData2Info(captchaGui)
+    if not length then return false end
+    
+    local targetNumber = identifyNumber(length, bytePattern)
+    if not targetNumber then
+        print("Unknown pattern - Length: " .. length)
+        return false
+    end
+    
+    print("Pressing " .. targetNumber)
+    
+    local button = findButton(captchaGui, targetNumber)
+    if not button then
+        return false
+    end
+    
+    if clickButton(button) then
+        task.wait(1)
+        
+        if not (captchaGui.Parent and captchaGui.Enabled) then
+            print("Captcha solved")
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function mainLoop()
+    print("hi")
+    
+    while true do
+        pcall(solveCaptcha)
+        task.wait(0.5)
+    end
+end
+
+task.spawn(mainLoop)
