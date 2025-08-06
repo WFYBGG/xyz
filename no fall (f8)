@@ -1,0 +1,46 @@
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer
+
+    local u1 = false
+    local u2 = game:GetService("Players")
+    local u3 = game:GetService("UserInputService")
+    local u4 = game.Workspace:WaitForChild("Living"):WaitForChild(game.Players.LocalPlayer.Name):WaitForChild("Status")
+    local u5 = nil
+
+    local function toggleFallDamageCD()
+        if u1 then
+            if u5 and u5.Parent then
+                u5:Destroy()
+            end
+            u5 = nil
+        else
+            u5 = Instance.new("Folder")
+            u5.Name = "FallDamageCD"
+            u5.Archivable = true
+            u5.Parent = u4
+        end
+        u1 = not u1
+    end
+
+    u3.InputBegan:Connect(function(p6, p7)
+        if p6.KeyCode == Enum.KeyCode.F8 and not p7 then
+            pcall(toggleFallDamageCD)
+        end
+    end)
+
+    game:GetService("RunService").RenderStepped:Connect(function()
+        -- No additional logic needed, toggle handled by InputBegan
+    end)
+
+    -- Cleanup on game exit
+    game:BindToClose(function()
+        if u1 and u5 and u5.Parent then
+            u5:Destroy()
+        end
+    end)
+end)
