@@ -1,0 +1,79 @@
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    local u1 = false
+    local u2 = false
+    local u4 = game:GetService("Players")
+    local u5 = game:GetService("UserInputService")
+    local u6 = game:GetService("RunService")
+
+    local function resetNoClip()
+        if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local character = u4.LocalPlayer.Character
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    pcall(function() part.CanCollide = true end)
+                end
+            end
+        end
+    end
+
+    u4.LocalPlayer.CharacterAdded:Connect(function(character)
+        repeat
+            wait()
+        until character:FindFirstChild("HumanoidRootPart")
+        if u1 then
+            -- No initial change, handled in RenderStepped
+        end
+    end)
+
+    u5.InputBegan:Connect(function(p6, p7)
+        if p6.KeyCode == Enum.KeyCode.F5 and not p7 then
+            u1 = not u1
+            if not u1 then
+                resetNoClip()
+            end
+        end
+    end)
+
+    u6.RenderStepped:Connect(function()
+        pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                u2 = true
+                local character = u4.LocalPlayer.Character
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+                -- Optionally disable collision with workspace parts near player
+                local hrp = u4.LocalPlayer.Character.HumanoidRootPart
+                if hrp then
+                    local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
+                    for _, part in pairs(region) do
+                        if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
+                            pcall(function() part.CanCollide = false end)
+                        end
+                    end
+                end
+            else
+                if u2 then
+                    resetNoClip()
+                    u2 = false
+                end
+            end
+        end)
+    end)
+
+    -- Cleanup on game exit
+    game:BindToClose(function()
+        if u1 then
+            resetNoClip()
+        end
+    end)
+end)
