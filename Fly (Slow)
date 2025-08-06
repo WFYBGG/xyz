@@ -1,0 +1,135 @@
+_G.originalspeed = 350
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    _G.Speed = _G.originalspeed
+    local u1 = false
+    local u2 = false
+    local u4 = game:GetService("Players")
+    local u5 = game:GetService("UserInputService")
+
+    local function resetHumanoidState()
+        if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            local humanoid = u4.LocalPlayer.Character.Humanoid
+            humanoid.JumpPower = 50
+            humanoid.WalkSpeed = 16 -- Restore defaults
+        end
+    end
+
+    -- Create platform
+    local u8 = Instance.new("Part")
+    u8.Name = "OldDebris"
+    u8.Size = Vector3.new(6, 1, 6)
+    u8.Anchored = true
+    u8.CanCollide = true
+    u8.Transparency = 0.75
+    u8.Material = Enum.Material.SmoothPlastic
+    u8.BrickColor = BrickColor.new("Bright blue")
+
+    u4.LocalPlayer.CharacterAdded:Connect(function(character)
+        repeat
+            wait()
+        until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
+        if u1 then
+            if character:FindFirstChild("Humanoid") then
+                character.Humanoid.JumpPower = 0 -- Allow modification
+            end
+            u8.Parent = workspace
+            u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+        else
+            u8.Parent = nil
+        end
+    end)
+
+    u5.InputBegan:Connect(function(p6, p7)
+        if p6.KeyCode == Enum.KeyCode.F4 and not p7 then
+            u1 = not u1
+            if u1 then
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0 -- Allow modification
+                end
+                u8.Parent = workspace
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    u8.CFrame = u4.LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                end
+            else
+                resetHumanoidState()
+                u8.Parent = nil
+            end
+        end
+    end)
+
+    game:GetService("RunService").RenderStepped:Connect(function(u9)
+        pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                u2 = true
+                local v11 = {
+                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
+                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
+                    Left = u5:IsKeyDown(Enum.KeyCode.A),
+                    Right = u5:IsKeyDown(Enum.KeyCode.D),
+                    Up = u5:IsKeyDown(Enum.KeyCode.Space),
+                    Down = u5:IsKeyDown(Enum.KeyCode.LeftControl)
+                }
+                
+                local v10 = u4.LocalPlayer.Character.HumanoidRootPart
+                local moveDirection = Vector3.new(0, 0, 0)
+                if v11.Forward then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Backward then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Left then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
+                elseif v11.Right then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
+                end
+
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit
+                end
+
+                -- Apply subtle velocity boost
+                local maxMove = 49 * u9 -- Stay under 50 studs per frame
+                if moveDirection.Magnitude > 0 then
+                    v10.Velocity = moveDirection * math.min(_G.Speed, maxMove)
+                else
+                    v10.Velocity = Vector3.new(0, v10.Velocity.Y, 0) -- Preserve vertical velocity
+                end
+
+                -- Allow JumpPower modification
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0 -- Keep grounded
+                end
+
+                -- Update platform and flight
+                if v10 then
+                    u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
+                    if v11.Up then
+                        u8.CFrame = u8.CFrame + Vector3.new(0, maxMove, 0)
+                    elseif v11.Down then
+                        u8.CFrame = u8.CFrame - Vector3.new(0, maxMove, 0)
+                    end
+                end
+
+                -- Monitor health to detect kill
+                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
+                    resetHumanoidState()
+                    u1 = false
+                    u2 = false
+                    u8.Parent = nil
+                end
+            else
+                if u2 then
+                    resetHumanoidState()
+                    u2 = false
+                    u8.Parent = nil
+                end
+            end
+        end)
+    end)
+end)
