@@ -1,0 +1,106 @@
+_G.originalspeed = 350
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
+
+    _G.Speed = _G.originalspeed
+    local u1 = false
+    local u2 = false
+    local u4 = game:GetService("Players")
+    local u5 = game:GetService("UserInputService")
+    
+    -- Create BodyVelocity for movement
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    
+    -- Fallback to reset Humanoid state if killed
+    local function resetHumanoidState()
+        if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            local humanoid = u4.LocalPlayer.Character.Humanoid
+            humanoid.JumpPower = 50
+            humanoid.WalkSpeed = 16 -- Default Roblox walk speed
+            bodyVelocity.Parent = nil
+        end
+    end
+
+    u4.LocalPlayer.CharacterAdded:Connect(function(character)
+        repeat
+            wait()
+        until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+        if u1 then
+            bodyVelocity.Parent = character.HumanoidRootPart
+            character.Humanoid.JumpPower = 0
+        end
+    end)
+
+    u5.InputBegan:Connect(function(p6, p7)
+        if p6.KeyCode == Enum.KeyCode.F4 and not p7 then
+            u1 = not u1
+            if u1 then
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0
+                end
+            else
+                resetHumanoidState()
+            end
+        end
+    end)
+
+    game:GetService("RunService").RenderStepped:Connect(function(u9)
+        pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character.HumanoidRootPart and u4.LocalPlayer.Character.Humanoid then
+                u2 = true
+                local v11 = {
+                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
+                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
+                    Left = u5:IsKeyDown(Enum.KeyCode.A),
+                    Right = u5:IsKeyDown(Enum.KeyCode.D)
+                }
+                
+                -- Calculate movement direction
+                local moveDirection = Vector3.new(0, 0, 0)
+                if v11.Forward then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Backward then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Left then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
+                elseif v11.Right then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
+                end
+
+                -- Normalize direction to ensure consistent speed
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit
+                end
+
+                -- Apply BodyVelocity with speed capped to avoid teleport detection
+                local maxSpeedPerFrame = 49 / u9 -- Ensure movement < 50 studs per frame
+                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame)
+
+                -- Monitor Humanoid health to detect kill
+                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
+                    resetHumanoidState()
+                    u1 = false
+                    u2 = false
+                end
+            else
+                if u2 then
+                    resetHumanoidState()
+                    u2 = false
+                end
+            end
+        end)
+    end)
+
+    -- Cleanup on script destruction
+    game:BindToClose(function()
+        bodyVelocity:Destroy()
+    end)
+end)
