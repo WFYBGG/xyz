@@ -1,0 +1,30 @@
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer
+
+    local u1 = false
+    local u2 = game:GetService("RunService")
+
+    local function spoofToxicity()
+        local playerName = game.Players.LocalPlayer.Name
+        local toxicityPath = game.Workspace:WaitForChild("Living"):WaitForChild(playerName):WaitForChild("Values"):WaitForChild("Toxicity")
+        if toxicityPath then
+            pcall(function()
+                toxicityPath.Value = 0
+            end)
+        end
+    end
+
+    u2.RenderStepped:Connect(function()
+        if not u1 then
+            u1 = true
+            while wait(0) do
+                pcall(spoofToxicity)
+            end
+        end
+    end)
+end)
