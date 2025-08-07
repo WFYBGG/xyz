@@ -1,239 +1,172 @@
-pcall(function()
-    -- Services
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
+--[[
+    ⚙️ Unified GUI + Feature Script
+    ✔️ Solara-safe
+    ✔️ Manual GUI dragging
+    ✔️ Keybind toggle
+    ✔️ Speed & Fly Sliders
+--]]
 
-    local LocalPlayer = Players.LocalPlayer
-    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+-- GLOBAL STATE
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
-    -- Settings
-    local guiKeybind = Enum.KeyCode.Insert
-    local featureToggles = {
-        Speed = false,
-        Fly = false,
-        Noclip = false,
-        NoFall = false
-    }
+local featureToggles = {
+    Speed = false,
+    Fly = false,
+    Noclip = false,
+    NoFall = false,
+}
 
-    local keybinds = {
-        Speed = Enum.KeyCode.None,
-        Fly = Enum.KeyCode.None,
-        Noclip = Enum.KeyCode.None,
-    }
+local speedValue = 50
+local flySpeed = 50
+local flyJumpPower = 70
+local flyFallSpeed = 70
+local guiVisible = true
+local guiToggleKey = Enum.KeyCode.RightShift
 
-    local speedValue = 200
-    local flySpeed = 200
-    local flyJumpPower = 50
-    local flyFallSpeed = 50
+-- GUI SETUP
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+ScreenGui.Name = "Rogueblox SolaraV3 Compatible"
 
-    -- GUI
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CustomGUI"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = game.CoreGui
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
 
-    local Main = Instance.new("Frame")
-    Main.Name = "Main"
-    Main.Position = UDim2.new(0.3, 0, 0.2, 0)
-    Main.Size = UDim2.new(0, 400, 0, 450)
-    Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    Main.BorderColor3 = Color3.fromRGB(60, 60, 60)
-    Main.Parent = ScreenGui
+local UICorner = Instance.new("UICorner", MainFrame)
+UICorner.CornerRadius = UDim.new(0, 8)
 
-    local function createLabel(text, parent)
-        local lbl = Instance.new("TextLabel")
-        lbl.Text = text
-        lbl.Size = UDim2.new(1, -20, 0, 25)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-        lbl.Font = Enum.Font.SourceSans
-        lbl.TextSize = 18
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = parent
-        return lbl
-    end
+-- Title
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "ratware.exe"
+Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamSemibold
 
-    local function createToggle(name, parent, callback)
-        local toggle = Instance.new("TextButton")
-        toggle.Size = UDim2.new(0, 150, 0, 25)
-        toggle.Text = "[ OFF ] " .. name
-        toggle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        toggle.Font = Enum.Font.SourceSans
-        toggle.TextSize = 18
-        toggle.Parent = parent
-
-        toggle.MouseButton1Click:Connect(function()
-            featureToggles[name] = not featureToggles[name]
-            toggle.Text = (featureToggles[name] and "[ ON ] " or "[ OFF ] ") .. name
-            if callback then pcall(callback, featureToggles[name]) end
+-- Dragging logic
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
         end)
-
-        return toggle
     end
+end)
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
 
-    local function createTextbox(name, parent, callback)
-        local tb = Instance.new("TextBox")
-        tb.Size = UDim2.new(0, 150, 0, 25)
-        tb.PlaceholderText = name
-        tb.Text = ""
-        tb.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        tb.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tb.Font = Enum.Font.SourceSans
-        tb.TextSize = 18
-        tb.ClearTextOnFocus = false
-        tb.Parent = parent
+-- Utility functions
+local function createToggle(name, posY, toggleCallback)
+    local button = Instance.new("TextButton", MainFrame)
+    button.Size = UDim2.new(0.9, 0, 0, 30)
+    button.Position = UDim2.new(0.05, 0, 0, posY)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 14
+    button.Text = name .. ": OFF"
 
-        tb.FocusLost:Connect(function()
-            pcall(function()
-                local code = Enum.KeyCode[tb.Text]
-                if code then callback(code) end
+    local corner = Instance.new("UICorner", button)
+    corner.CornerRadius = UDim.new(0, 6)
+
+    button.MouseButton1Click:Connect(function()
+        featureToggles[name] = not featureToggles[name]
+        button.Text = name .. ": " .. (featureToggles[name] and "ON" or "OFF")
+        toggleCallback(featureToggles[name])
+    end)
+end
+
+local function createSlider(name, posY, min, max, default, callback)
+    local label = Instance.new("TextLabel", MainFrame)
+    label.Size = UDim2.new(0.9, 0, 0, 20)
+    label.Position = UDim2.new(0.05, 0, 0, posY)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = name .. ": " .. default
+
+    local sliderBack = Instance.new("Frame", MainFrame)
+    sliderBack.Size = UDim2.new(0.9, 0, 0, 10)
+    sliderBack.Position = UDim2.new(0.05, 0, 0, posY + 20)
+    sliderBack.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(0, 4)
+
+    local sliderFill = Instance.new("Frame", sliderBack)
+    sliderFill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+    sliderFill.BorderSizePixel = 0
+    Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(0, 4)
+
+    sliderBack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local conn
+            conn = RunService.RenderStepped:Connect(function()
+                local rel = (UserInputService:GetMouseLocation().X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X
+                rel = math.clamp(rel, 0, 1)
+                sliderFill.Size = UDim2.new(rel, 0, 1, 0)
+                local value = math.floor(min + (max - min) * rel)
+                label.Text = name .. ": " .. value
+                callback(value)
             end)
-        end)
-
-        return tb
-    end
-
-    local function createSlider(name, parent, min, max, default, callback)
-        local lbl = createLabel(name .. ": " .. default, parent)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
-
-        local slider = Instance.new("TextBox")
-        slider.Size = UDim2.new(0, 150, 0, 25)
-        slider.Position = UDim2.new(0, 10, 0, 30)
-        slider.Text = tostring(default)
-        slider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        slider.TextColor3 = Color3.fromRGB(255, 255, 255)
-        slider.Font = Enum.Font.SourceSans
-        slider.TextSize = 18
-        slider.Parent = parent
-
-        slider.FocusLost:Connect(function()
-            pcall(function()
-                local num = tonumber(slider.Text)
-                if num then
-                    num = math.clamp(num, min, max)
-                    slider.Text = tostring(num)
-                    lbl.Text = name .. ": " .. num
-                    callback(num)
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    if conn then conn:Disconnect() end
                 end
             end)
-        end)
-    end
-
-    -- GUI TOGGLE KEYBIND TEXTBOX
-    createLabel("Toggle GUI Key (default: Insert)", Main)
-    local guiBox = createTextbox("Insert", Main, function(code)
-        guiKeybind = code
-    end)
-    guiBox.Text = "Insert"
-
-    -- FEATURES
-    local spacing = 60
-
-    local function section(title)
-        local sep = Instance.new("Frame")
-        sep.Size = UDim2.new(1, -20, 0, 160)
-        sep.Position = UDim2.new(0, 10, 0, spacing)
-        sep.BackgroundTransparency = 1
-        sep.Parent = Main
-
-        createLabel(title, sep)
-        spacing = spacing + 160
-        return sep
-    end
-
-    -- SPEED SECTION
-    local speedSec = section("Speed")
-    local speedKey = createTextbox("Speed Key", speedSec, function(kc)
-        keybinds.Speed = kc
-    end)
-    speedKey.Position = UDim2.new(0, 10, 0, 30)
-
-    local speedToggle = createToggle("Speed", speedSec)
-    speedToggle.Position = UDim2.new(0, 170, 0, 30)
-
-    createSlider("Speed", speedSec, 0, 200, 200, function(val)
-        speedValue = val
-        _G.Speed = val
-    end)
-
-    -- FLY SECTION
-    local flySec = section("Fly")
-    local flyKey = createTextbox("Fly Key", flySec, function(kc)
-        keybinds.Fly = kc
-    end)
-    flyKey.Position = UDim2.new(0, 10, 0, 30)
-
-    local flyToggle = createToggle("Fly", flySec)
-    flyToggle.Position = UDim2.new(0, 170, 0, 30)
-
-    createSlider("Fly Speed", flySec, 0, 200, 200, function(val)
-        flySpeed = val
-        _G.Speed = val
-    end)
-
-    createSlider("Jump Power", flySec, 0, 100, 50, function(val)
-        flyJumpPower = val
-    end)
-
-    createSlider("Fall Speed", flySec, 0, 100, 50, function(val)
-        flyFallSpeed = val
-    end)
-
-    -- NOCLIP SECTION
-    local ncSec = section("Noclip")
-    local ncKey = createTextbox("Noclip Key", ncSec, function(kc)
-        keybinds.Noclip = kc
-    end)
-    ncKey.Position = UDim2.new(0, 10, 0, 30)
-
-    local ncToggle = createToggle("Noclip", ncSec)
-    ncToggle.Position = UDim2.new(0, 170, 0, 30)
-
-    -- NO FALL SECTION
-    local nfSec = section("No Fall")
-    local nfToggle = createToggle("NoFall", nfSec)
-    nfToggle.Position = UDim2.new(0, 10, 0, 30)
-
-    -- UNLOAD BUTTON
-    local unload = Instance.new("TextButton")
-    unload.Text = "Unload Script"
-    unload.Size = UDim2.new(0, 150, 0, 30)
-    unload.Position = UDim2.new(0, 10, 1, -40)
-    unload.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-    unload.TextColor3 = Color3.fromRGB(255, 255, 255)
-    unload.Font = Enum.Font.SourceSansBold
-    unload.TextSize = 18
-    unload.Parent = Main
-    unload.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
-    end)
-
-    -- GUI Toggle
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == guiKeybind then
-            Main.Visible = not Main.Visible
-        end
-
-        for name, key in pairs(keybinds) do
-            if input.KeyCode == key then
-                featureToggles[name] = not featureToggles[name]
-            end
         end
     end)
+end
 
+-- GUI Keybind Toggle
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == guiToggleKey then
+        guiVisible = not guiVisible
+        MainFrame.Visible = guiVisible
+    end
+end)
+
+-- TOGGLES
+createToggle("Speed", 40, function() end)
+createToggle("Fly", 80, function() end)
+createToggle("Noclip", 120, function() end)
+createToggle("NoFall", 160, function() end)
+
+-- SLIDERS
+createSlider("Speed Value", 200, 0, 200, speedValue, function(v) speedValue = v end)
+createSlider("Fly Speed", 240, 0, 200, flySpeed, function(v) flySpeed = v end)
+
+--[[ ========== FEATURE BACKENDS ========== ]]
+
+-- Paste your original backend logic here
 pcall(function()
-    local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
     local player = Players.LocalPlayer
 
+    -- SPEED
     local BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
 
     local function resetSpeed()
         pcall(function()
@@ -257,7 +190,7 @@ pcall(function()
     RunService.RenderStepped:Connect(function(dt)
         pcall(function()
             local char = player.Character
-            if featureToggles.Speed and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+            if featureToggles.Speed and char and char:FindFirstChild("HumanoidRootPart") then
                 local dir = Vector3.zero
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
@@ -274,17 +207,7 @@ pcall(function()
         end)
     end)
 
-    game:BindToClose(function()
-        BodyVelocity:Destroy()
-    end)
-end)
-
-pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
-    local player = Players.LocalPlayer
-
+    -- FLY
     local Platform = Instance.new("Part")
     Platform.Size = Vector3.new(6, 1, 6)
     Platform.Anchored = true
@@ -294,14 +217,13 @@ pcall(function()
     Platform.Material = Enum.Material.SmoothPlastic
     Platform.Name = "OldDebris"
 
-    local BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    BodyVelocity.Velocity = Vector3.zero
+    local FlyVelocity = Instance.new("BodyVelocity")
+    FlyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 
     local function resetFly()
         pcall(function()
             Platform.Parent = nil
-            BodyVelocity.Parent = nil
+            FlyVelocity.Parent = nil
             local char = player.Character
             if char and char:FindFirstChild("Humanoid") then
                 char.Humanoid.WalkSpeed = 16
@@ -313,7 +235,7 @@ pcall(function()
     player.CharacterAdded:Connect(function(char)
         repeat task.wait() until char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")
         if featureToggles.Fly then
-            BodyVelocity.Parent = char.HumanoidRootPart
+            FlyVelocity.Parent = char.HumanoidRootPart
             Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
             Platform.Parent = workspace
             char.Humanoid.JumpPower = 0
@@ -323,7 +245,7 @@ pcall(function()
     RunService.RenderStepped:Connect(function(dt)
         pcall(function()
             local char = player.Character
-            if featureToggles.Fly and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+            if featureToggles.Fly and char and char:FindFirstChild("HumanoidRootPart") then
                 local moveDir = Vector3.zero
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
@@ -335,8 +257,8 @@ pcall(function()
                 if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vert = flyJumpPower end
                 if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vert = -flyFallSpeed end
 
-                BodyVelocity.Velocity = moveDir * math.min(flySpeed, 49 / dt) + Vector3.new(0, vert, 0)
-                BodyVelocity.Parent = char.HumanoidRootPart
+                FlyVelocity.Velocity = moveDir * math.min(flySpeed, 49 / dt) + Vector3.new(0, vert, 0)
+                FlyVelocity.Parent = char.HumanoidRootPart
 
                 Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
                 Platform.Parent = workspace
@@ -346,17 +268,7 @@ pcall(function()
         end)
     end)
 
-    game:BindToClose(function()
-        BodyVelocity:Destroy()
-        Platform:Destroy()
-    end)
-end)
-
-pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local player = Players.LocalPlayer
-
+    -- NOCLIP
     local function setCollision(state)
         pcall(function()
             local char = player.Character
@@ -370,66 +282,14 @@ pcall(function()
         end)
     end
 
-    player.CharacterAdded:Connect(function(char)
-        repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
-    end)
-
     RunService.RenderStepped:Connect(function()
         pcall(function()
-            if featureToggles.Noclip then
-                setCollision(false)
-            else
-                setCollision(true)
-            end
+            setCollision(not featureToggles.Noclip)
         end)
     end)
 
-    game:BindToClose(function()
-        setCollision(true)
-    end)
-end)
-
-pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local player = Players.LocalPlayer
-
-    local function setCollision(state)
-        pcall(function()
-            local char = player.Character
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = state
-                    end
-                end
-            end
-        end)
-    end
-
-    player.CharacterAdded:Connect(function(char)
-        repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        pcall(function()
-            if featureToggles.Noclip then
-                setCollision(false)
-            else
-                setCollision(true)
-            end
-        end)
-    end)
-
-    game:BindToClose(function()
-        setCollision(true)
-    end)
-end)
-
-pcall(function()
-    local Players = game:GetService("Players")
+    -- NO FALL
     local Workspace = game:GetService("Workspace")
-    local player = Players.LocalPlayer
     local fallFolder = nil
 
     local function setNoFall(active)
@@ -453,15 +313,9 @@ pcall(function()
         end
     end)
 
-    game:GetService("RunService").RenderStepped:Connect(function()
+    RunService.RenderStepped:Connect(function()
         pcall(function()
             setNoFall(featureToggles.NoFall)
         end)
     end)
-
-    game:BindToClose(function()
-        if fallFolder then fallFolder:Destroy() end
-    end)
-end)
-
 end)
