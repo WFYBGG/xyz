@@ -72,6 +72,9 @@ distanceBox.FocusLost:Connect(function()
     end
 end)
 
+-- Table to store ESP drawing objects
+local espObjects = {}
+
 -- Create ESP for a player
 local function createESP(player)
     local success, result = pcall(function()
