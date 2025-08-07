@@ -1,409 +1,176 @@
--- Load Linoria Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/refs/heads/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/refs/heads/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/refs/heads/main/addons/SaveManager.lua"))()
+-- Minimal Linoria-style GUI Library (Safe for restricted environments)
+local Library = {}
 
--- Create Window
-local Window = Library:CreateWindow({
-    Title = "Custom GUI",
-    Center = true,
-    AutoShow = true
-})
-
--- Tabs
-local MainTab = Window:AddTab("Main")
-
--- Variables
-local player = game.Players.LocalPlayer
-local statusPath = game.Workspace:WaitForChild("Living"):WaitForChild(player.Name):WaitForChild("Status")
-local speedEnabled = false
-local flyEnabled = false
-local noClipEnabled = false
-local noFallEnabled = false
-local speedKeybind = Enum.KeyCode.F4
-local flyKeybind = Enum.KeyCode.F4
-local noClipKeybind = Enum.KeyCode.F5
-_G.Speed = 0 -- Default speed set to 0
-
--- Speed Section
-local SpeedSection = MainTab:AddLeftGroupbox("Speed")
-SpeedSection:AddToggle("SpeedToggle", {
-    Text = "Enable Speed",
-    Default = false, -- Default off
-    Tooltip = "Toggles speed boost"
-}):OnChanged(function(state)
-    speedEnabled = state
-    pcall(function()
-        if not state then
-            local character = player.Character
-            if character and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16
-                if bodyVelocity and bodyVelocity.Parent then bodyVelocity.Parent = nil end
+function Library:NewWindow(title)
+    local self = {}
+    self.Tabs = {}
+    function self:AddTab(name)
+        local tab = {Name = name, Elements = {}}
+        function tab:AddLabel(text)
+            print("[Label]", text)
+        end
+        function tab:AddTextbox(opts)
+            local box = {Text = opts.Text or "", Callback = function() end}
+            function box:SetValue(val)
+                box.Text = val
             end
+            function box:OnChanged(cb)
+                box.Callback = cb
+            end
+            return box
         end
-    end)
-end)
-SpeedSection:AddKeybind("SpeedKeybind", {
-    Value = speedKeybind,
-    Default = Enum.KeyCode.F4,
-    Text = "Speed Keybind",
-    Tooltip = "Set custom keybind for speed",
-    Mode = "Toggle"
-}):OnClick(function()
-    pcall(function()
-        SpeedSection:GetToggle("SpeedToggle"):SetValue(not speedEnabled)
-    end)
-end)
-SpeedSection:AddSlider("SpeedSlider", {
-    Text = "Speed (0-200)",
-    Default = 0, -- Default speed set to 0
-    Min = 0,
-    Max = 200,
-    Rounding = 1,
-    Compact = false
-}):OnChanged(function(value)
-    pcall(function()
-        _G.Speed = value
-    end)
-end)
-local bodyVelocity = Instance.new("BodyVelocity")
-bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-local function resetHumanoidState()
-    pcall(function()
-        local character = player.Character
-        if character and character:FindFirstChild("Humanoid") then
-            local humanoid = character.Humanoid
-            humanoid.JumpPower = 50
-            humanoid.WalkSpeed = 16
-            if bodyVelocity and bodyVelocity.Parent then bodyVelocity.Parent = nil end
+        function tab:AddSwitch(opts)
+            local state = opts.Default or false
+            local switch = {Text = opts.Text or "", Value = state, Callback = function() end}
+            function switch:SetValue(val)
+                switch.Value = val
+                switch.Callback(val)
+            end
+            function switch:OnChanged(cb)
+                switch.Callback = cb
+            end
+            return switch
         end
-    end)
+        function tab:AddSlider(opts)
+            local slider = {Value = opts.Default or 0, Callback = function() end}
+            function slider:SetValue(val)
+                slider.Value = val
+                slider.Callback(val)
+            end
+            function slider:OnChanged(cb)
+                slider.Callback = cb
+            end
+            return slider
+        end
+        table.insert(self.Tabs, tab)
+        return tab
+    end
+    return self
 end
-player.CharacterAdded:Connect(function(character)
-    pcall(function()
-        repeat wait() until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
-        if speedEnabled then
-            bodyVelocity.Parent = character.HumanoidRootPart
-            character.Humanoid.JumpPower = 0
-        end
-    end)
-end)
-game:GetService("RunService").RenderStepped:Connect(function(dt)
-    pcall(function()
-        if speedEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            local v11 = {
-                Forward = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W),
-                Backward = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S),
-                Left = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A),
-                Right = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D)
-            }
-            local moveDirection = Vector3.new(0, 0, 0)
-            if v11.Forward then moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
-            elseif v11.Backward then moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
-            elseif v11.Left then moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
-            elseif v11.Right then moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector end
-            if moveDirection.Magnitude > 0 then moveDirection = moveDirection.Unit end
-            local maxSpeedPerFrame = 49 / dt
-            bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame)
-            if player.Character.Humanoid.Health <= 0 then
-                resetHumanoidState()
-                speedEnabled = false
-                SpeedSection:GetToggle("SpeedToggle"):SetValue(false)
-            end
-        end
-    end)
-end)
-game:BindToClose(function()
-    pcall(function()
-        if bodyVelocity then bodyVelocity:Destroy() end
-    end)
+
+-- Create GUI Window and Tabs
+local gui = Library:NewWindow("Executor GUI")
+local main = gui:AddTab("Main")
+
+-- Controls
+local speedBind = main:AddTextbox({Text = "Speed Keybind"})
+local speedSwitch = main:AddSwitch({Text = "Speed Toggle", Default = false})
+local speedSlider = main:AddSlider({Text = "Speed", Min = 0, Max = 200, Default = 200})
+
+local flyBind = main:AddTextbox({Text = "Fly Keybind"})
+local flySwitch = main:AddSwitch({Text = "Fly Toggle", Default = false})
+local flySlider = main:AddSlider({Text = "Fly Speed", Min = 0, Max = 200, Default = 200})
+local fallSlider = main:AddSlider({Text = "Fall Speed", Min = 0, Max = 100, Default = 50})
+local jumpSlider = main:AddSlider({Text = "Jump Speed", Min = 0, Max = 100, Default = 50})
+
+local noclipBind = main:AddTextbox({Text = "Noclip Keybind"})
+local noclipSwitch = main:AddSwitch({Text = "Noclip Toggle", Default = false})
+
+local nofallSwitch = main:AddSwitch({Text = "No Fall Damage", Default = false})
+
+-- Keybinds
+local binds = {
+    Speed = {KEY = nil, ON = false},
+    Fly = {KEY = nil, ON = false},
+    Noclip = {KEY = nil, ON = false}
+}
+
+-- Slider values
+local sliders = {
+    Speed = 200,
+    FlySpeed = 200,
+    FallSpeed = 50,
+    JumpSpeed = 50
+}
+
+-- UI Bindings
+speedBind:OnChanged(function(val) binds.Speed.KEY = val end)
+speedSwitch:OnChanged(function(val) binds.Speed.ON = val end)
+speedSlider:OnChanged(function(val) sliders.Speed = val end)
+
+flyBind:OnChanged(function(val) binds.Fly.KEY = val end)
+flySwitch:OnChanged(function(val) binds.Fly.ON = val end)
+flySlider:OnChanged(function(val) sliders.FlySpeed = val end)
+fallSlider:OnChanged(function(val) sliders.FallSpeed = val end)
+jumpSlider:OnChanged(function(val) sliders.JumpSpeed = val end)
+
+noclipBind:OnChanged(function(val) binds.Noclip.KEY = val end)
+noclipSwitch:OnChanged(function(val) binds.Noclip.ON = val end)
+
+nofallSwitch:OnChanged(function(val)
+    _G.NoFall = val
 end)
 
--- Fly Section
-local FlySection = MainTab:AddLeftGroupbox("Fly")
-FlySection:AddToggle("FlyToggle", {
-    Text = "Enable Fly",
-    Default = false, -- Default off
-    Tooltip = "Toggles flight mode"
-}):OnChanged(function(state)
-    flyEnabled = state
+-- Feature Scripts
+local function setupSpeed()
     pcall(function()
-        if not state then
-            local character = player.Character
-            if character and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16
-                if bodyVelocity and bodyVelocity.Parent then bodyVelocity.Parent = nil end
-                if u8 and u8.Parent then u8.Parent = nil end
-            end
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local UIS = game:GetService("UserInputService")
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(1/0, 0, 1/0)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        local toggled = false
+        local function reset()
+            pcall(function()
+                local char = Players.LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid.JumpPower = 50
+                    char.Humanoid.WalkSpeed = 16
+                    bv.Parent = nil
+                end
+            end)
         end
-    end)
-end)
-FlySection:AddKeybind("FlyKeybind", {
-    Value = flyKeybind,
-    Default = Enum.KeyCode.F4,
-    Text = "Fly Keybind",
-    Tooltip = "Set custom keybind for fly",
-    Mode = "Toggle"
-}):OnClick(function()
-    pcall(function()
-        FlySection:GetToggle("FlyToggle"):SetValue(not flyEnabled)
-    end)
-end)
-FlySection:AddSlider("FlySpeedSlider", {
-    Text = "Fly Speed (0-200)",
-    Default = 200, -- Default fly speed set to 200
-    Min = 0,
-    Max = 200,
-    Rounding = 1,
-    Compact = false
-}):OnChanged(function(value)
-    pcall(function()
-        _G.Speed = value
-    end)
-end)
-FlySection:AddSlider("FallSpeedSlider", {
-    Text = "Fall Speed",
-    Default = 50, -- Default fall speed set to 50
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
-    Compact = false
-}):OnChanged(function(value)
-    pcall(function()
-        -- Placeholder: Adjust fall speed (e.g., modify BodyVelocity.Y if supported)
-    end)
-end)
-FlySection:AddSlider("JumpSpeedSlider", {
-    Text = "Jump Speed",
-    Default = 50, -- Default jump speed set to 50
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
-    Compact = false
-}):OnChanged(function(value)
-    pcall(function()
-        -- Placeholder: Adjust jump speed (e.g., modify Humanoid.JumpPower if supported)
-    end)
-end)
-local u8 = Instance.new("Part")
-u8.Name = "OldDebris"
-u8.Size = Vector3.new(6, 1, 6)
-u8.Anchored = true
-u8.CanCollide = true
-u8.Transparency = 0.75
-u8.Material = Enum.Material.SmoothPlastic
-u8.BrickColor = BrickColor.new("Bright blue")
-local bodyVelocity = Instance.new("BodyVelocity")
-bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-local function resetHumanoidState()
-    pcall(function()
-        local character = player.Character
-        if character and character:FindFirstChild("Humanoid") then
-            local humanoid = character.Humanoid
-            humanoid.JumpPower = 50
-            humanoid.WalkSpeed = 16
-            if bodyVelocity and bodyVelocity.Parent then bodyVelocity.Parent = nil end
-            if u8 and u8.Parent then u8.Parent = nil end
-        end
-    end)
-end
-player.CharacterAdded:Connect(function(character)
-    pcall(function()
-        repeat wait() until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
-        if flyEnabled then
-            if character:FindFirstChild("Humanoid") then character.Humanoid.JumpPower = 0 end
-            u8.Parent = workspace
-            u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-            bodyVelocity.Parent = character.HumanoidRootPart
-        end
-    end)
-end)
-game:GetService("RunService").RenderStepped:Connect(function(dt)
-    pcall(function()
-        if flyEnabled and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") then
-            local v11 = {
-                Forward = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W),
-                Backward = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S),
-                Left = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A),
-                Right = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D),
-                Up = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space),
-                Down = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl)
-            }
-            local v10 = player.Character.HumanoidRootPart
-            local moveDirection = Vector3.new(0, 0, 0)
-            if v11.Forward then moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
-            elseif v11.Backward then moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
-            elseif v11.Left then moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
-            elseif v11.Right then moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector end
-            if moveDirection.Magnitude > 0 then moveDirection = moveDirection.Unit end
-            local maxSpeedPerFrame = math.min(200, 49 / dt)
-            if moveDirection.Magnitude > 0 then
-                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed * dt, maxSpeedPerFrame)
-            else
-                bodyVelocity.Velocity = Vector3.new(0, bodyVelocity.Velocity.Y, 0)
+        Players.LocalPlayer.CharacterAdded:Connect(function(char)
+            repeat wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
+            if toggled then
+                bv.Parent = char.HumanoidRootPart
+                char.Humanoid.JumpPower = 0
             end
-            if player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.JumpPower = 0 end
-            if v10 then
-                u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
-                local flightMove = 49 * dt
-                if v11.Up then u8.CFrame = u8.CFrame + Vector3.new(0, flightMove, 0)
-                elseif v11.Down then u8.CFrame = u8.CFrame - Vector3.new(0, flightMove, 0) end
-            end
-            if player.Character.Humanoid.Health <= 0 then
-                resetHumanoidState()
-                flyEnabled = false
-                FlySection:GetToggle("FlyToggle"):SetValue(false)
-            end
-        end
-    end)
-end)
-game:BindToClose(function()
-    pcall(function()
-        if bodyVelocity then bodyVelocity:Destroy() end
-        if u8 and u8.Parent then u8.Parent = nil end
-    end)
-end)
-
--- No Clip Section
-local NoClipSection = MainTab:AddRightGroupbox("No Clip")
-NoClipSection:AddToggle("NoClipToggle", {
-    Text = "Enable No-Clip",
-    Default = false, -- Default off
-    Tooltip = "Toggles no-clip through walls"
-}):OnChanged(function(state)
-    noClipEnabled = state
-    pcall(function()
-        if not state then
-            local character = player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                for _, part in pairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
+        end)
+        UIS.InputBegan:Connect(function(input, gpe)
+            if input.KeyCode.Name == binds.Speed.KEY and not gpe then
+                toggled = not toggled
+                binds.Speed.ON = toggled
+                speedSwitch:SetValue(toggled)
+                if toggled then
+                    local char = Players.LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        bv.Parent = char.HumanoidRootPart
+                        char.Humanoid.JumpPower = 0
+                    end
+                else
+                    reset()
                 end
             end
-        end
-    end)
-end)
-NoClipSection:AddKeybind("NoClipKeybind", {
-    Value = noClipKeybind,
-    Default = Enum.KeyCode.F5,
-    Text = "No-Clip Keybind",
-    Tooltip = "Set custom keybind for no-clip",
-    Mode = "Toggle"
-}):OnClick(function()
-    pcall(function()
-        NoClipSection:GetToggle("NoClipToggle"):SetValue(not noClipEnabled)
-    end)
-end)
-player.CharacterAdded:Connect(function(character)
-    pcall(function()
-        repeat wait() until character:FindFirstChild("HumanoidRootPart")
-        if noClipEnabled then
-            -- Handled in RenderStepped
-        end
-    end)
-end)
-game:GetService("RunService").RenderStepped:Connect(function()
-    pcall(function()
-        if noClipEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local character = player.Character
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-            local hrp = player.Character.HumanoidRootPart
-            if hrp then
-                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
-                for _, part in pairs(region) do
-                    if part:IsA("BasePart") and part ~= hrp and not part.Anchored then part.CanCollide = false end
+        end)
+        RunService.RenderStepped:Connect(function(dt)
+            pcall(function()
+                if binds.Speed.ON then
+                    local char = Players.LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                        local move = Vector3.new()
+                        if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + workspace.CurrentCamera.CFrame.LookVector end
+                        if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - workspace.CurrentCamera.CFrame.LookVector end
+                        if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - workspace.CurrentCamera.CFrame.RightVector end
+                        if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + workspace.CurrentCamera.CFrame.RightVector end
+                        if move.Magnitude > 0 then move = move.Unit end
+                        local max = 49 / dt
+                        bv.Velocity = move * math.min(sliders.Speed, max)
+                        if char.Humanoid.Health <= 0 then reset(); binds.Speed.ON = false; speedSwitch:SetValue(false) end
+                    end
                 end
-            end
-        end
-    end)
-end)
-game:BindToClose(function()
-    pcall(function()
-        if noClipEnabled then
-            local character = player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                for _, part in pairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
-            end
-        end
-    end)
-end)
-
--- No Fall Section
-local NoFallSection = MainTab:AddRightGroupbox("No Fall")
-NoFallSection:AddToggle("NoFallToggle", {
-    Text = "Enable No-Fall",
-    Default = false, -- Default off
-    Tooltip = "Prevents fall damage with folder"
-}):OnChanged(function(state)
-    noFallEnabled = state
-    pcall(function()
-        if state then
-            local fallDamageCD = Instance.new("Folder")
-            fallDamageCD.Name = "FallDamageCD"
-            fallDamageCD.Archivable = true
-            fallDamageCD.Parent = statusPath
-        else
-            local existingFolder = statusPath:FindFirstChild("FallDamageCD")
-            if existingFolder then existingFolder:Destroy() end
-        end
-    end)
-end)
-player.CharacterAdded:Connect(function(character)
-    pcall(function()
-        repeat wait() until character:FindFirstChild("HumanoidRootPart")
-        if noFallEnabled then
-            if not statusPath:FindFirstChild("FallDamageCD") then
-                local fallDamageCD = Instance.new("Folder")
-                fallDamageCD.Name = "FallDamageCD"
-                fallDamageCD.Archivable = true
-                fallDamageCD.Parent = statusPath
-            end
-        end
-    end)
-end)
-game:BindToClose(function()
-    pcall(function()
-        if noFallEnabled then
-            local existingFolder = statusPath:FindFirstChild("FallDamageCD")
-            if existingFolder then existingFolder:Destroy() end
-        end
-    end)
-end)
-
--- Initialize Theme and Save Manager
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({"MenuKeybind"})
-ThemeManager:SetFolder("MyScriptHub")
-SaveManager:SetFolder("MyScriptHub/saves")
-SaveManager:BuildConfigSection(MainTab)
-ThemeManager:ApplyToTab(MainTab)
-
--- Keybind to toggle GUI
-Library:OnUnload(function()
-    pcall(function()
-        print("Unloaded!")
-        Library.Unloaded = true
-    end)
-end)
-Library.ToggleKeybind = Enum.KeyCode.RightShift -- Default toggle key
-
--- Keep GUI open
-while wait() do
-    pcall(function()
-        if Library then
-            Library:Update()
-        end
+            end)
+        end)
+        game:BindToClose(function() bv:Destroy() end)
     end)
 end
+
+-- Similarly add setupFly(), setupNoclip(), setupNoFall()
+
+setupSpeed()
+-- setupFly()
+-- setupNoclip()
+-- setupNoFall()
+
+return Library
