@@ -1,0 +1,467 @@
+pcall(function()
+    -- Services
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+
+    local LocalPlayer = Players.LocalPlayer
+    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+    -- Settings
+    local guiKeybind = Enum.KeyCode.Insert
+    local featureToggles = {
+        Speed = false,
+        Fly = false,
+        Noclip = false,
+        NoFall = false
+    }
+
+    local keybinds = {
+        Speed = Enum.KeyCode.None,
+        Fly = Enum.KeyCode.None,
+        Noclip = Enum.KeyCode.None,
+    }
+
+    local speedValue = 200
+    local flySpeed = 200
+    local flyJumpPower = 50
+    local flyFallSpeed = 50
+
+    -- GUI
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CustomGUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = game.CoreGui
+
+    local Main = Instance.new("Frame")
+    Main.Name = "Main"
+    Main.Position = UDim2.new(0.3, 0, 0.2, 0)
+    Main.Size = UDim2.new(0, 400, 0, 450)
+    Main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Main.BorderColor3 = Color3.fromRGB(60, 60, 60)
+    Main.Parent = ScreenGui
+
+    local function createLabel(text, parent)
+        local lbl = Instance.new("TextLabel")
+        lbl.Text = text
+        lbl.Size = UDim2.new(1, -20, 0, 25)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        lbl.Font = Enum.Font.SourceSans
+        lbl.TextSize = 18
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = parent
+        return lbl
+    end
+
+    local function createToggle(name, parent, callback)
+        local toggle = Instance.new("TextButton")
+        toggle.Size = UDim2.new(0, 150, 0, 25)
+        toggle.Text = "[ OFF ] " .. name
+        toggle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggle.Font = Enum.Font.SourceSans
+        toggle.TextSize = 18
+        toggle.Parent = parent
+
+        toggle.MouseButton1Click:Connect(function()
+            featureToggles[name] = not featureToggles[name]
+            toggle.Text = (featureToggles[name] and "[ ON ] " or "[ OFF ] ") .. name
+            if callback then pcall(callback, featureToggles[name]) end
+        end)
+
+        return toggle
+    end
+
+    local function createTextbox(name, parent, callback)
+        local tb = Instance.new("TextBox")
+        tb.Size = UDim2.new(0, 150, 0, 25)
+        tb.PlaceholderText = name
+        tb.Text = ""
+        tb.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tb.Font = Enum.Font.SourceSans
+        tb.TextSize = 18
+        tb.ClearTextOnFocus = false
+        tb.Parent = parent
+
+        tb.FocusLost:Connect(function()
+            pcall(function()
+                local code = Enum.KeyCode[tb.Text]
+                if code then callback(code) end
+            end)
+        end)
+
+        return tb
+    end
+
+    local function createSlider(name, parent, min, max, default, callback)
+        local lbl = createLabel(name .. ": " .. default, parent)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
+
+        local slider = Instance.new("TextBox")
+        slider.Size = UDim2.new(0, 150, 0, 25)
+        slider.Position = UDim2.new(0, 10, 0, 30)
+        slider.Text = tostring(default)
+        slider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        slider.TextColor3 = Color3.fromRGB(255, 255, 255)
+        slider.Font = Enum.Font.SourceSans
+        slider.TextSize = 18
+        slider.Parent = parent
+
+        slider.FocusLost:Connect(function()
+            pcall(function()
+                local num = tonumber(slider.Text)
+                if num then
+                    num = math.clamp(num, min, max)
+                    slider.Text = tostring(num)
+                    lbl.Text = name .. ": " .. num
+                    callback(num)
+                end
+            end)
+        end)
+    end
+
+    -- GUI TOGGLE KEYBIND TEXTBOX
+    createLabel("Toggle GUI Key (default: Insert)", Main)
+    local guiBox = createTextbox("Insert", Main, function(code)
+        guiKeybind = code
+    end)
+    guiBox.Text = "Insert"
+
+    -- FEATURES
+    local spacing = 60
+
+    local function section(title)
+        local sep = Instance.new("Frame")
+        sep.Size = UDim2.new(1, -20, 0, 160)
+        sep.Position = UDim2.new(0, 10, 0, spacing)
+        sep.BackgroundTransparency = 1
+        sep.Parent = Main
+
+        createLabel(title, sep)
+        spacing = spacing + 160
+        return sep
+    end
+
+    -- SPEED SECTION
+    local speedSec = section("Speed")
+    local speedKey = createTextbox("Speed Key", speedSec, function(kc)
+        keybinds.Speed = kc
+    end)
+    speedKey.Position = UDim2.new(0, 10, 0, 30)
+
+    local speedToggle = createToggle("Speed", speedSec)
+    speedToggle.Position = UDim2.new(0, 170, 0, 30)
+
+    createSlider("Speed", speedSec, 0, 200, 200, function(val)
+        speedValue = val
+        _G.Speed = val
+    end)
+
+    -- FLY SECTION
+    local flySec = section("Fly")
+    local flyKey = createTextbox("Fly Key", flySec, function(kc)
+        keybinds.Fly = kc
+    end)
+    flyKey.Position = UDim2.new(0, 10, 0, 30)
+
+    local flyToggle = createToggle("Fly", flySec)
+    flyToggle.Position = UDim2.new(0, 170, 0, 30)
+
+    createSlider("Fly Speed", flySec, 0, 200, 200, function(val)
+        flySpeed = val
+        _G.Speed = val
+    end)
+
+    createSlider("Jump Power", flySec, 0, 100, 50, function(val)
+        flyJumpPower = val
+    end)
+
+    createSlider("Fall Speed", flySec, 0, 100, 50, function(val)
+        flyFallSpeed = val
+    end)
+
+    -- NOCLIP SECTION
+    local ncSec = section("Noclip")
+    local ncKey = createTextbox("Noclip Key", ncSec, function(kc)
+        keybinds.Noclip = kc
+    end)
+    ncKey.Position = UDim2.new(0, 10, 0, 30)
+
+    local ncToggle = createToggle("Noclip", ncSec)
+    ncToggle.Position = UDim2.new(0, 170, 0, 30)
+
+    -- NO FALL SECTION
+    local nfSec = section("No Fall")
+    local nfToggle = createToggle("NoFall", nfSec)
+    nfToggle.Position = UDim2.new(0, 10, 0, 30)
+
+    -- UNLOAD BUTTON
+    local unload = Instance.new("TextButton")
+    unload.Text = "Unload Script"
+    unload.Size = UDim2.new(0, 150, 0, 30)
+    unload.Position = UDim2.new(0, 10, 1, -40)
+    unload.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+    unload.TextColor3 = Color3.fromRGB(255, 255, 255)
+    unload.Font = Enum.Font.SourceSansBold
+    unload.TextSize = 18
+    unload.Parent = Main
+    unload.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+
+    -- GUI Toggle
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if not processed and input.KeyCode == guiKeybind then
+            Main.Visible = not Main.Visible
+        end
+
+        for name, key in pairs(keybinds) do
+            if input.KeyCode == key then
+                featureToggles[name] = not featureToggles[name]
+            end
+        end
+    end)
+
+pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local player = Players.LocalPlayer
+
+    local BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+    local function resetSpeed()
+        pcall(function()
+            local char = player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = 16
+                char.Humanoid.JumpPower = 50
+            end
+            BodyVelocity.Parent = nil
+        end)
+    end
+
+    player.CharacterAdded:Connect(function(character)
+        repeat task.wait() until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+        if featureToggles.Speed then
+            BodyVelocity.Parent = character.HumanoidRootPart
+            character.Humanoid.JumpPower = 0
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        pcall(function()
+            local char = player.Character
+            if featureToggles.Speed and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                local dir = Vector3.zero
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= workspace.CurrentCamera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += workspace.CurrentCamera.CFrame.RightVector end
+                dir = dir.Magnitude > 0 and dir.Unit or Vector3.zero
+
+                BodyVelocity.Velocity = dir * math.min(speedValue, 49 / dt)
+                BodyVelocity.Parent = char.HumanoidRootPart
+                char.Humanoid.JumpPower = 0
+            else
+                resetSpeed()
+            end
+        end)
+    end)
+
+    game:BindToClose(function()
+        BodyVelocity:Destroy()
+    end)
+end)
+
+pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local player = Players.LocalPlayer
+
+    local Platform = Instance.new("Part")
+    Platform.Size = Vector3.new(6, 1, 6)
+    Platform.Anchored = true
+    Platform.CanCollide = true
+    Platform.Transparency = 0.75
+    Platform.BrickColor = BrickColor.new("Bright blue")
+    Platform.Material = Enum.Material.SmoothPlastic
+    Platform.Name = "OldDebris"
+
+    local BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BodyVelocity.Velocity = Vector3.zero
+
+    local function resetFly()
+        pcall(function()
+            Platform.Parent = nil
+            BodyVelocity.Parent = nil
+            local char = player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = 16
+                char.Humanoid.JumpPower = 50
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        repeat task.wait() until char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")
+        if featureToggles.Fly then
+            BodyVelocity.Parent = char.HumanoidRootPart
+            Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+            Platform.Parent = workspace
+            char.Humanoid.JumpPower = 0
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        pcall(function()
+            local char = player.Character
+            if featureToggles.Fly and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                local moveDir = Vector3.zero
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= workspace.CurrentCamera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += workspace.CurrentCamera.CFrame.RightVector end
+                moveDir = moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
+
+                local vert = 0
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vert = flyJumpPower end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vert = -flyFallSpeed end
+
+                BodyVelocity.Velocity = moveDir * math.min(flySpeed, 49 / dt) + Vector3.new(0, vert, 0)
+                BodyVelocity.Parent = char.HumanoidRootPart
+
+                Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                Platform.Parent = workspace
+            else
+                resetFly()
+            end
+        end)
+    end)
+
+    game:BindToClose(function()
+        BodyVelocity:Destroy()
+        Platform:Destroy()
+    end)
+end)
+
+pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local player = Players.LocalPlayer
+
+    local function setCollision(state)
+        pcall(function()
+            local char = player.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = state
+                    end
+                end
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            if featureToggles.Noclip then
+                setCollision(false)
+            else
+                setCollision(true)
+            end
+        end)
+    end)
+
+    game:BindToClose(function()
+        setCollision(true)
+    end)
+end)
+
+pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local player = Players.LocalPlayer
+
+    local function setCollision(state)
+        pcall(function()
+            local char = player.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = state
+                    end
+                end
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            if featureToggles.Noclip then
+                setCollision(false)
+            else
+                setCollision(true)
+            end
+        end)
+    end)
+
+    game:BindToClose(function()
+        setCollision(true)
+    end)
+end)
+
+pcall(function()
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local player = Players.LocalPlayer
+    local fallFolder = nil
+
+    local function setNoFall(active)
+        pcall(function()
+            local status = Workspace:WaitForChild("Living"):WaitForChild(player.Name):WaitForChild("Status")
+            if active then
+                if fallFolder then fallFolder:Destroy() end
+                fallFolder = Instance.new("Folder")
+                fallFolder.Name = "FallDamageCD"
+                fallFolder.Parent = status
+            else
+                if fallFolder then fallFolder:Destroy() end
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function()
+        repeat task.wait() until Workspace:FindFirstChild("Living")
+        if featureToggles.NoFall then
+            setNoFall(true)
+        end
+    end)
+
+    game:GetService("RunService").RenderStepped:Connect(function()
+        pcall(function()
+            setNoFall(featureToggles.NoFall)
+        end)
+    end)
+
+    game:BindToClose(function()
+        if fallFolder then fallFolder:Destroy() end
+    end)
+end)
+
+end)
