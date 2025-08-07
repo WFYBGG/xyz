@@ -1,0 +1,312 @@
+-- === Linoria Loader Template ===
+local linoria_code = [[
+-- <<< PASTE Library.lua HERE >>>
+-- <<< PASTE addons/ThemeManager.lua HERE >>>
+-- <<< PASTE addons/SaveManager.lua HERE >>>
+
+return Library, ThemeManager, SaveManager
+]]
+
+-- Attempt to load via loadstring or newcclosure(loadstring)
+local loader = loadstring
+if not loader and newcclosure then
+    loader = function(s)
+        return newcclosure(loadstring)(s)
+    end
+end
+assert(loader, "Neither loadstring nor newcclosure available")
+
+-- Load the modules
+local Library, ThemeManager, SaveManager = loader(linoria_code)()
+assert(Library and ThemeManager and SaveManager, "Failed to load Linoria modules")
+
+-- === GUI & Feature Logic ===
+
+local Window = Library:CreateWindow({
+    Title = "Custom GUI",
+    Center = true,
+    AutoShow = true
+})
+local MainTab = Window:AddTab("Main")
+
+local player = game.Players.LocalPlayer
+local statusPath = game.Workspace:WaitForChild("Living")
+                   :WaitForChild(player.Name):WaitForChild("Status")
+
+local speedEnabled, flyEnabled, noClipEnabled, noFallEnabled = false, false, false, false
+local speedKeybind = Enum.KeyCode.F4
+local flyKeybind = Enum.KeyCode.F4
+local noClipKeybind = Enum.KeyCode.F5
+_G.Speed = 0
+
+--** Speed Section **--
+local SpeedSection = MainTab:AddLeftGroupbox("Speed")
+SpeedSection:AddToggle("SpeedToggle", {
+    Text = "Enable Speed",
+    Default = false,
+    Tooltip = "Toggles speed boost"
+}):OnChanged(function(state)
+    speedEnabled = state
+    if not state then
+        resetHumanoidState()
+    end
+end)
+SpeedSection:AddKeybind("SpeedKeybind", {
+    Value = speedKeybind,
+    Default = speedKeybind,
+    Text = "Speed Keybind",
+    Mode = "Toggle"
+}):OnClick(function()
+    SpeedSection:GetToggle("SpeedToggle"):SetValue(not speedEnabled)
+end)
+SpeedSection:AddSlider("SpeedSlider", {
+    Text = "Speed (0–200)",
+    Default = 0,
+    Min = 0, Max = 200, Rounding = 1
+}):OnChanged(function(value)
+    _G.Speed = value
+end)
+
+local bodyVelocity = Instance.new("BodyVelocity")
+bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+local function resetHumanoidState()
+    pcall(function()
+        local char = player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local h = char.Humanoid
+            h.JumpPower = 50
+            h.WalkSpeed = 16
+            if bodyVelocity.Parent then
+                bodyVelocity.Parent = nil
+            end
+        end
+    end)
+end
+
+player.CharacterAdded:Connect(function(char)
+    pcall(function()
+        repeat wait() until char:FindFirstChild("HumanoidRootPart")
+            and char:FindFirstChild("Humanoid")
+        if speedEnabled then
+            bodyVelocity.Parent = char.HumanoidRootPart
+            char.Humanoid.JumpPower = 0
+        end
+    end)
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function(dt)
+    pcall(function()
+        if speedEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local cam = workspace.CurrentCamera.CFrame
+            local ui = game:GetService("UserInputService")
+            local dir = Vector3.new(
+                (ui:IsKeyDown(Enum.KeyCode.D) and cam.RightVector or ui:IsKeyDown(Enum.KeyCode.A) and -cam.RightVector or 0).X,
+                0,
+                (ui:IsKeyDown(Enum.KeyCode.W) and cam.LookVector or ui:IsKeyDown(Enum.KeyCode.S) and -cam.LookVector or 0).Z
+            )
+            if dir.Magnitude > 0 then dir = dir.Unit end
+            local maxSpeed = 49 / dt
+            bodyVelocity.Velocity = dir * math.min(_G.Speed, maxSpeed)
+
+            if player.Character.Humanoid.Health <= 0 then
+                resetHumanoidState()
+                speedEnabled = false
+                SpeedSection:GetToggle("SpeedToggle"):SetValue(false)
+            end
+        end
+    end)
+end)
+
+game:BindToClose(function()
+    pcall(resetHumanoidState)
+end)
+
+--** Fly Section **--
+local FlySection = MainTab:AddLeftGroupbox("Fly")
+FlySection:AddToggle("FlyToggle", {
+    Text = "Enable Fly",
+    Default = false,
+    Tooltip = "Toggles flight mode"
+}):OnChanged(function(state)
+    flyEnabled = state
+    if not state then
+        resetHumanoidState()
+        if u8 and u8.Parent then u8.Parent = nil end
+    end
+end)
+FlySection:AddKeybind("FlyKeybind", {
+    Value = flyKeybind,
+    Default = flyKeybind,
+    Text = "Fly Keybind",
+    Mode = "Toggle"
+}):OnClick(function()
+    FlySection:GetToggle("FlyToggle"):SetValue(not flyEnabled)
+end)
+FlySection:AddSlider("FlySpeedSlider", {
+    Text = "Fly Speed (0–200)", Default = 200, Min = 0, Max = 200, Rounding = 1
+}):OnChanged(function(v) _G.Speed = v end)
+FlySection:AddSlider("FallSpeedSlider", {
+    Text = "Fall Speed", Default = 50, Min = 0, Max = 100, Rounding = 1
+})
+FlySection:AddSlider("JumpSpeedSlider", {
+    Text = "Jump Speed", Default = 50, Min = 0, Max = 100, Rounding = 1
+})
+
+local u8 = Instance.new("Part")
+u8.Name = "OldDebris"
+u8.Size = Vector3.new(6,1,6)
+u8.Anchored = true
+u8.CanCollide = true
+u8.Transparency = 0.75
+u8.Material = Enum.Material.SmoothPlastic
+u8.BrickColor = BrickColor.new("Bright blue")
+
+player.CharacterAdded:Connect(function(char)
+    repeat wait() until char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")
+    if flyEnabled then
+        char.Humanoid.JumpPower = 0
+        u8.Parent = workspace
+        u8.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0,3.499,0)
+        bodyVelocity.Parent = char.HumanoidRootPart
+    end
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function(dt)
+    pcall(function()
+        if flyEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local ui = game:GetService("UserInputService")
+            local cam = workspace.CurrentCamera.CFrame
+            local up = ui:IsKeyDown(Enum.KeyCode.Space)
+            local down = ui:IsKeyDown(Enum.KeyCode.LeftControl)
+            local move = Vector3.new(
+                (ui:IsKeyDown(Enum.KeyCode.D) and cam.RightVector or ui:IsKeyDown(Enum.KeyCode.A) and -cam.RightVector or 0).X,
+                0,
+                (ui:IsKeyDown(Enum.KeyCode.W) and cam.LookVector or ui:IsKeyDown(Enum.KeyCode.S) and -cam.LookVector or 0).Z
+            )
+            move = move.Magnitude > 0 and move.Unit or Vector3.new(0,0,0)
+            local maxPerFrame = math.min(200, 49/dt)
+
+            if move.Magnitude > 0 then
+                bodyVelocity.Velocity = move * math.min(_G.Speed * dt, maxPerFrame)
+            else
+                bodyVelocity.Velocity = Vector3.new(0, bodyVelocity.Velocity.Y, 0)
+            end
+
+            if up then u8.CFrame = u8.CFrame + Vector3.new(0,49*dt,0)
+            elseif down then u8.CFrame = u8.CFrame - Vector3.new(0,49*dt,0) end
+
+            u8.CFrame = player.Character.HumanoidRootPart.CFrame - Vector3.new(0,3.499,0)
+
+            if player.Character.Humanoid.Health <= 0 then
+                resetHumanoidState()
+                flyEnabled = false
+                FlySection:GetToggle("FlyToggle"):SetValue(false)
+            end
+        end
+    end)
+end)
+
+game:BindToClose(function()
+    pcall(function()
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if u8 and u8.Parent then u8.Parent = nil end
+    end)
+end)
+
+--** No Clip Section **--
+local NoClipSection = MainTab:AddRightGroupbox("No Clip")
+NoClipSection:AddToggle("NoClipToggle", {
+    Text = "Enable No‑Clip", Default = false, Tooltip = "Toggles no‑clip"
+}):OnChanged(function(state)
+    noClipEnabled = state
+    if not state then
+        for _, p in ipairs(player.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = true end
+        end
+    end
+end)
+NoClipSection:AddKeybind("NoClipKeybind", {
+    Value = noClipKeybind, Default = noClipKeybind, Text = "No‑Clip Keybind", Mode = "Toggle"
+}):OnClick(function()
+    NoClipSection:GetToggle("NoClipToggle"):SetValue(not noClipEnabled)
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if noClipEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        for _, p in ipairs(player.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+        local hrp = player.Character.HumanoidRootPart
+        local region = Region3.new(hrp.Position - Vector3.new(5,5,5), hrp.Position + Vector3.new(5,5,5))
+        for _, part in ipairs(workspace:FindPartsInRegion3(region)) do
+            if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+game:BindToClose(function()
+    if noClipEnabled and player.Character then
+        for _, p in ipairs(player.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = true end
+        end
+    end
+end)
+
+--** No Fall Section **--
+local NoFallSection = MainTab:AddRightGroupbox("No Fall")
+NoFallSection:AddToggle("NoFallToggle", {
+    Text = "Enable No‑Fall", Default = false, Tooltip = "Prevents fall damage"
+}):OnChanged(function(state)
+    noFallEnabled = state
+    if state then
+        local f = Instance.new("Folder")
+        f.Name = "FallDamageCD"
+        f.Archivable = true
+        f.Parent = statusPath
+    else
+        local ef = statusPath:FindFirstChild("FallDamageCD")
+        if ef then ef:Destroy() end
+    end
+end)
+player.CharacterAdded:Connect(function(char)
+    repeat wait() until char:FindFirstChild("HumanoidRootPart")
+    if noFallEnabled and not statusPath:FindFirstChild("FallDamageCD") then
+        local f = Instance.new("Folder")
+        f.Name = "FallDamageCD"
+        f.Archivable = true
+        f.Parent = statusPath
+    end
+end)
+game:BindToClose(function()
+    if noFallEnabled then
+        local ef = statusPath:FindFirstChild("FallDamageCD")
+        if ef then ef:Destroy() end
+    end
+end)
+
+--** Final GUI Setup **--
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+ThemeManager:SetFolder("MyScriptHub")
+SaveManager:SetFolder("MyScriptHub/saves")
+SaveManager:BuildConfigSection(MainTab)
+ThemeManager:ApplyToTab(MainTab)
+
+Library:OnUnload(function()
+    pcall(function()
+        print("Unloaded!")
+        Library.Unloaded = true
+    end)
+end)
+Library.ToggleKeybind = Enum.KeyCode.RightShift
+
+-- Main loop
+while wait() do
+    pcall(function() if Library then Library:Update() end end)
+end
