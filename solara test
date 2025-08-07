@@ -1,0 +1,7 @@
+Failed Tests:
+
+cache.invalidate, cache.iscached, cache.replace, cloneref, compareinstances, checkcaller, getcallingscript, getscriptclosure, hookfunction, hookmetamethod, isreadonly, isclosure, isexecutorclosure, newcclosure, rconsolecreate, rconsoleprint, rconsolename, rconsoleinput, debug.getconstant, debug.getproto, debug.getstack, debug.setconstant, debug.setstack, getgenv, getthreadidentity, setthreadidentity, setidentity, Drawing.new, isrenderobj, getrenderproperty, setrenderproperty, clearrawcache, websocket, crypt.generatekey, crypt.encrypt, loadstring, makefolder, gethiddenproperty, lz4compress, lz4decompress, getcustomasset, readfile, isfile, setfolder, defillfile, request, writefile, loadfile, listfiles, setfpscap.
+
+
+Missing Aliases: Several globals and functions are missing aliases, which restricts access to certain Roblox APIs or executor-specific utilities.
+Successful Tests: Functions like mouse.move, mouse.wheel, mousescroll, fireclickdetector, getconnections, getinstances, isscriptable, getrawmetatable, isreadonly, identifyexecutor, messagebox, queue_on_teleport, getgc, getloadedmodules, getrenv, getrunningscripts, getscripts, getscriptshash, getthreadcontext, Drawing_fonts, isrenderproperty, websocketcache, crypt.hash, crypt.decrypt, crypt.generatebytes are available.
