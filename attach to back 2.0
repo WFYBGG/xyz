@@ -1,0 +1,307 @@
+--[[
+Attach To Back (Original Logic Restore)
+- Dropdown for player selection
+- Toggle: Attach ON/OFF (green/red)
+- Fully restores your original Tween, Noclip, Nofall logic
+- Nofall, Noclip, Tween all robust/respawn safe
+--]]
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Internal state
+local targetPlayer = nil
+local isAttached = false
+local attachConn = nil
+local isTweening = false
+
+-- Noclip/Nofall state
+local noclipEnabled = false
+local nofallEnabled = false
+local nofallFolder = nil
+
+-- Utility: Safe get
+local function safeGet(obj, ...)
+    local args = {...}
+    for i,v in ipairs(args) do
+        local ok,res = pcall(function() return obj[v] end)
+        if not ok then return nil end
+        obj = res
+        if not obj then return nil end
+    end
+    return obj
+end
+
+-- Nofall logic (original style)
+local function enableNofall()
+    if nofallEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local status = safeGet(char, "Status")
+    if not status then
+        status = Instance.new("Folder")
+        status.Name = "Status"
+        status.Parent = char
+    end
+    if not status:FindFirstChild("FallDamageCD") then
+        nofallFolder = Instance.new("Folder")
+        nofallFolder.Name = "FallDamageCD"
+        nofallFolder.Parent = status
+    else
+        nofallFolder = status:FindFirstChild("FallDamageCD")
+    end
+    nofallEnabled = true
+end
+
+local function disableNofall()
+    if not nofallEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local status = safeGet(char, "Status")
+    if status then
+        local fd = status:FindFirstChild("FallDamageCD")
+        if fd then fd:Destroy() end
+    end
+    nofallEnabled = false
+    nofallFolder = nil
+end
+
+-- Noclip logic (original style)
+local function enableNoclip()
+    if noclipEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    noclipEnabled = true
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            pcall(function() part.CanCollide = false end)
+        end
+    end
+end
+
+local function disableNoclip()
+    if not noclipEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    noclipEnabled = false
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            pcall(function() part.CanCollide = true end)
+        end
+    end
+end
+
+-- Tween logic (original style)
+local originalSpeed = 150
+local function tweenToBack(callback)
+    if isTweening then return end
+    isTweening = true
+    local char = LocalPlayer.Character
+    local targetChar = targetPlayer and targetPlayer.Character
+    local hrp = char and safeGet(char, "HumanoidRootPart")
+    local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+    if not (hrp and targetHrp) then isTweening = false return end
+
+    enableNoclip()
+    enableNofall()
+
+    local speed = originalSpeed
+
+    -- Go up
+    local upGoal = hrp.CFrame.Position + Vector3.new(0, 1000 - hrp.CFrame.Position.Y, 0)
+    local upTime = (upGoal - hrp.Position).Magnitude / speed
+    local upTween = TweenService:Create(hrp, TweenInfo.new(upTime, Enum.EasingStyle.Linear), {CFrame = CFrame.new(upGoal)})
+    upTween:Play()
+    upTween.Completed:Wait()
+
+    -- Go horizontally above target
+    local targetTop = targetHrp.Position + Vector3.new(0, 1000 - targetHrp.Position.Y, 0)
+    local horizTime = (targetTop - hrp.Position).Magnitude / speed
+    local horizTween = TweenService:Create(hrp, TweenInfo.new(horizTime, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetTop)})
+    horizTween:Play()
+    horizTween.Completed:Wait()
+
+    -- Go down to back of target
+    local backGoal = targetHrp.CFrame * CFrame.new(0, 0, 2)
+    local downTime = (backGoal.Position - hrp.Position).Magnitude / speed
+    local downTween = TweenService:Create(hrp, TweenInfo.new(downTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
+    downTween:Play()
+    downTween.Completed:Wait()
+
+    disableNoclip()
+    isTweening = false
+    if callback then callback() end
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AttachToBackDropdownGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 140)
+frame.Position = UDim2.new(0, 15, 0, 15)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -20, 0, 24)
+label.Position = UDim2.new(0, 10, 0, 10)
+label.BackgroundTransparency = 1
+label.Text = "Select Player:"
+label.TextColor3 = Color3.fromRGB(230, 230, 255)
+label.Font = Enum.Font.SourceSansSemibold
+label.TextSize = 18
+label.Parent = frame
+
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(1, -20, 0, 28)
+dropdownBtn.Position = UDim2.new(0, 10, 0, 38)
+dropdownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+dropdownBtn.TextColor3 = Color3.fromRGB(255,255,255)
+dropdownBtn.Text = "Select..."
+dropdownBtn.Font = Enum.Font.SourceSans
+dropdownBtn.TextSize = 16
+dropdownBtn.Parent = frame
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(1, -20, 0, 28)
+toggle.Position = UDim2.new(0, 10, 0, 74)
+toggle.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+toggle.TextColor3 = Color3.fromRGB(255,255,255)
+toggle.Text = "Attach: OFF"
+toggle.Font = Enum.Font.SourceSansSemibold
+toggle.TextSize = 18
+toggle.Parent = frame
+
+-- Dropdown List
+local dropdownList = Instance.new("Frame")
+dropdownList.Size = UDim2.new(1, 0, 0, 0)
+dropdownList.Position = UDim2.new(0, 10, 0, 66)
+dropdownList.BackgroundColor3 = Color3.fromRGB(60,60,90)
+dropdownList.BorderSizePixel = 0
+dropdownList.Visible = false
+dropdownList.Parent = frame
+dropdownList.ZIndex = 10
+dropdownBtn.ZIndex = 11
+
+local uilist = Instance.new("UIListLayout")
+uilist.Parent = dropdownList
+uilist.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Dropdown update
+local function refreshDropdown()
+    for _, child in ipairs(dropdownList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    local players = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(players, player)
+        end
+    end
+    local visibleCount = math.min(#players, 8)
+    dropdownList.Size = UDim2.new(1, 0, 0, visibleCount * 24)
+    for _, player in ipairs(players) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 24)
+        btn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Text = player.Name
+        btn.Font = Enum.Font.SourceSans
+        btn.TextSize = 16
+        btn.BorderSizePixel = 0
+        btn.Parent = dropdownList
+        btn.ZIndex = 11
+        btn.MouseButton1Click:Connect(function()
+            dropdownBtn.Text = player.Name
+            dropdownList.Visible = false
+            targetPlayer = player
+        end)
+    end
+end
+
+-- Show/hide dropdown
+dropdownBtn.MouseButton1Click:Connect(function()
+    dropdownList.Visible = not dropdownList.Visible
+    refreshDropdown()
+end)
+
+-- Attach/Detach logic
+local function stopAttach()
+    isAttached = false
+    if attachConn then attachConn:Disconnect() attachConn = nil end
+    disableNofall()
+    disableNoclip()
+    toggle.Text = "Attach: OFF"
+    toggle.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+end
+
+local function startAttach()
+    stopAttach()
+    isAttached = true
+    enableNofall()
+    toggle.Text = "Attach: ON"
+    toggle.BackgroundColor3 = Color3.fromRGB(36, 185, 91)
+    attachConn = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer and targetPlayer.Character
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+        if not (hrp and targetHrp) then return end
+        pcall(function()
+            hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
+        end)
+    end)
+end
+
+toggle.MouseButton1Click:Connect(function()
+    if not targetPlayer then
+        toggle.Text = "Select a player first!"
+        wait(1)
+        toggle.Text = "Attach: OFF"
+        return
+    end
+    if isTweening then return end
+
+    if isAttached then
+        stopAttach()
+    else
+        tweenToBack(function()
+            if not isAttached and targetPlayer then
+                startAttach()
+            end
+        end)
+    end
+end)
+
+-- Refresh on join/leave
+Players.PlayerAdded:Connect(refreshDropdown)
+Players.PlayerRemoving:Connect(function(player)
+    if player == targetPlayer then
+        targetPlayer = nil
+        stopAttach()
+        dropdownBtn.Text = "Select..."
+    end
+    refreshDropdown()
+end)
+
+-- Re-apply nofall/noclip on respawn if needed
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if isAttached then
+        enableNofall()
+    end
+end)
+
+game:BindToClose(function()
+    stopAttach()
+    if gui then gui:Destroy() end
+end)
+
+refreshDropdown()
+stopAttach()
