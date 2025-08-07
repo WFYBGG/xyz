@@ -31,7 +31,7 @@ local Tabs = {
 
 -- Groupbox and Tabbox inherit the same functions
 -- except Tabboxes you have to call the functions on a tab (Tabbox:AddTab(name))
-local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Groupbox')
+local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Movement')
 
 -- We can also get our Main tab via the following code:
 -- local LeftGroupBox = Window.Tabs.Main:AddLeftGroupbox('Groupbox')
@@ -49,16 +49,15 @@ local Tab2 = TabBox:AddTab('Tab 2')
 
 -- Groupbox:AddToggle
 -- Arguments: Index, Options
-LeftGroupBox:AddToggle('MyToggle', {
-    Text = 'This is a toggle',
-    Default = true, -- Default value (true / false)
-    Tooltip = 'This is a tooltip', -- Information shown when you hover over the toggle
+LeftGroupBox:AddToggle('Speedhack', {
+    Text = 'Speedhack',
+    Default = false, -- Default value (true / false)
+    Tooltip = 'Spoof humanoid speed', -- Information shown when you hover over the toggle
 
     Callback = function(Value)
-        print('[cb] MyToggle changed to:', Value)
+        print('[cb] Speedhack changed to:', Value)
     end
 })
-
 
 -- Fetching a toggle object for later use:
 -- Toggles.MyToggle.Value
@@ -68,14 +67,44 @@ LeftGroupBox:AddToggle('MyToggle', {
 -- To get the state of the toggle you do toggle.Value
 
 -- Calls the passed function when the toggle is updated
-Toggles.MyToggle:OnChanged(function()
+Toggles.Speedhack:OnChanged(function()
     -- here we get our toggle object & then get its value
-    print('MyToggle changed to:', Toggles.MyToggle.Value)
+    print('Speedhack changed to:', Toggles.Speedhack.Value)
 end)
 
 -- This should print to the console: "My toggle state changed! New value: false"
-Toggles.MyToggle:SetValue(false)
+Toggles.Speedhack:SetValue(false)
 
+--[
+--NEW BELOW [MOD BY ME]
+
+LeftGroupBox:AddToggle('Flight', {
+    Text = 'Flight',
+    Default = false, -- Default value (true / false)
+    Tooltip = 'WARNING: Enables platform fly, turn ON "No Clip" [Auto Anti-AA]', -- Information shown when you hover over the toggle
+
+    Callback = function(Value)
+        print('[cb] Flight changed to:', Value)
+    end
+})
+
+-- Calls the passed function when the toggle is updated
+Toggles.Flight:OnChanged(function()
+    -- here we get our toggle object & then get its value
+    print('Flight changed to:', Toggles.Flight.Value)
+end)
+
+-- This should print to the console: "My toggle state changed! New value: false"
+Toggles.Flight:SetValue(false)
+
+-- Fetching a toggle object for later use:
+-- Toggles.MyToggle.Value
+
+-- Toggles is a table added to getgenv() by the library
+-- You index Toggles with the specified index, in this case it is 'MyToggle'
+-- To get the state of the toggle you do toggle.Value
+--]
+--************************************************************************--
 -- 1/15/23
 -- Deprecated old way of creating buttons in favor of using a table
 -- Added DoubleClick button functionality
