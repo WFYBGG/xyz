@@ -1,96 +1,46 @@
--- GUI Control Variables
-local showName = true
-local showDistance = true
-local showHealth = true
-local showBox = true
-local espDistance = 20000
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
--- Create GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ESPSettingsGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 220)
-frame.Position = UDim2.new(0, 20, 0, 100)
-frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-frame.BackgroundTransparency = 0.3
-frame.BorderSizePixel = 0
-frame.Parent = ScreenGui
-
-local function createToggle(name, yPos, stateGetter, stateSetter)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 30)
-    button.Position = UDim2.new(0, 5, 0, yPos)
-    button.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.TextScaled = true
-    button.Text = name .. ": " .. (stateGetter() and "On" or "Off")
-    button.Parent = frame
-
-    button.MouseButton1Click:Connect(function()
-        stateSetter(not stateGetter())
-        button.Text = name .. ": " .. (stateGetter() and "On" or "Off")
-    end)
-end
-
--- Toggle buttons
-createToggle("Show Name", 5, function() return showName end, function(v) showName = v end)
-createToggle("Show Distance", 40, function() return showDistance end, function(v) showDistance = v end)
-createToggle("Show Health", 75, function() return showHealth end, function(v) showHealth = v end)
-createToggle("Show Box", 110, function() return showBox end, function(v) showBox = v end)
-
--- Distance slider label
-local distanceLabel = Instance.new("TextLabel")
-distanceLabel.Size = UDim2.new(1, -10, 0, 30)
-distanceLabel.Position = UDim2.new(0, 5, 0, 145)
-distanceLabel.BackgroundTransparency = 1
-distanceLabel.TextColor3 = Color3.new(1, 1, 1)
-distanceLabel.TextScaled = true
-distanceLabel.Text = "ESP Distance: " .. tostring(espDistance)
-distanceLabel.Parent = frame
-
--- Distance slider (uses TextBox for simplicity)
-local distanceBox = Instance.new("TextBox")
-distanceBox.Size = UDim2.new(1, -10, 0, 30)
-distanceBox.Position = UDim2.new(0, 5, 0, 180)
-distanceBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-distanceBox.TextColor3 = Color3.new(1, 1, 1)
-distanceBox.TextScaled = true
-distanceBox.Text = tostring(espDistance)
-distanceBox.ClearTextOnFocus = false
-distanceBox.Parent = frame
-
-distanceBox.FocusLost:Connect(function()
-    local val = tonumber(distanceBox.Text)
-    if val and val >= 0 and val <= 20000 then
-        espDistance = val
-        distanceLabel.Text = "ESP Distance: " .. tostring(espDistance)
-    else
-        distanceBox.Text = tostring(espDistance)
-    end
-end)
-
--- Table to store ESP drawing objects
+-- Globals
+local LocalPlayer = Players.LocalPlayer
 local espObjects = {}
 
--- Create ESP for a player
+-- Utility: Safe wait for character model
+local function getCharacterModel(player)
+    local model = nil
+    pcall(function()
+        local container = Workspace:FindFirstChild("Living") or Workspace
+        model = container:FindFirstChild(player.Name)
+    end)
+    return model
+end
+
+-- Cleanup ESP safely
+local function cleanupESP(player)
+    local data = espObjects[player]
+    if data then
+        pcall(function() data.box:Remove() end)
+        pcall(function() data.text:Remove() end)
+        espObjects[player] = nil
+    end
+end
+
+-- Create ESP for a single player
 local function createESP(player)
-    local success, result = pcall(function()
-        if player == LocalPlayer or not Workspace:FindFirstChild("Living") then
-            return false
-        end
+    if player == LocalPlayer then return end
 
-        local playerModel = Workspace.Living:FindFirstChild(player.Name)
-        if not playerModel or not playerModel:FindFirstChild("Humanoid") or not playerModel:FindFirstChild("HumanoidRootPart") then
-            return false
-        end
+    local success, _ = pcall(function()
+        -- Initial character reference
+        local model = getCharacterModel(player)
+        if not model then return end
 
-        local humanoid = playerModel.Humanoid
-        local rootPart = playerModel.HumanoidRootPart
+        local humanoid = model:FindFirstChild("Humanoid")
+        local rootPart = model:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not rootPart then return end
 
-        -- Create Drawing objects
+        -- Drawing objects
         local box = Drawing.new("Square")
         box.Visible = false
         box.Color = Color3.fromRGB(255, 255, 255)
@@ -104,19 +54,37 @@ local function createESP(player)
         text.Center = true
         text.Outline = true
 
-        espObjects[player] = {box = box, text = text, humanoid = humanoid, rootPart = rootPart}
+        espObjects[player] = {
+            box = box,
+            text = text,
+            humanoid = humanoid,
+            rootPart = rootPart
+        }
 
-        return true
+        -- Respawn handler to update Humanoid/RootPart
+        player.CharacterAdded:Connect(function()
+            task.wait(1)
+            local newModel = getCharacterModel(player)
+            if newModel then
+                local newHumanoid = newModel:FindFirstChild("Humanoid")
+                local newRootPart = newModel:FindFirstChild("HumanoidRootPart")
+                if newHumanoid and newRootPart then
+                    local data = espObjects[player]
+                    if data then
+                        pcall(function()
+                            data.humanoid = newHumanoid
+                            data.rootPart = newRootPart
+                        end)
+                    end
+                end
+            end
+        end)
     end)
-    if not success then
-        warn("Failed to create ESP for " .. tostring(player.Name) .. ": " .. tostring(result))
-    end
-    return success and result
 end
 
--- Update ESP
+-- Update ESP per frame
 local function updateESP()
-    local success, result = pcall(function()
+    local success, _ = pcall(function()
         local localChar = LocalPlayer.Character
         local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
         if not localRoot then
@@ -124,131 +92,78 @@ local function updateESP()
                 data.box.Visible = false
                 data.text.Visible = false
             end
-            return false
+            return
         end
 
         for player, data in pairs(espObjects) do
-            local success, _ = pcall(function()
+            pcall(function()
                 if player and player.Parent and data.humanoid and data.humanoid.Parent and data.rootPart and data.rootPart.Parent then
-                    local humanoid = data.humanoid
-                    local rootPart = data.rootPart
-
-                    -- Calculate screen position and distance
                     local camera = Workspace.CurrentCamera
-                    local worldPoint = rootPart.Position
-                    local vector, onScreen = camera:WorldToViewportPoint(worldPoint)
+                    local worldPoint = data.rootPart.Position
+                    local screenPos, onScreen = camera:WorldToViewportPoint(worldPoint)
                     local distance = (localRoot.Position - worldPoint).Magnitude
 
-                    if onScreen and distance <= espDistance then
-                        -- Calculate bounding box for HumanoidRootPart
-                        local size = rootPart.Size * 1.5
+                    if onScreen then
+                        local size = data.rootPart.Size * 1.5
                         local topLeft = camera:WorldToViewportPoint(worldPoint - size / 2)
                         local bottomRight = camera:WorldToViewportPoint(worldPoint + size / 2)
-                    
-                        -- Update box
                         local boxSize = Vector2.new(bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y)
+
                         data.box.Size = boxSize
                         data.box.Position = Vector2.new(topLeft.X, topLeft.Y)
-                        data.box.Visible = showBox
-                    
-                        -- Update text based on toggles
-                        local parts = {}
-                        if showName then table.insert(parts, '"' .. player.Name .. '"') end
-                        if showDistance then table.insert(parts, string.format("Distance: %.1f", distance)) end
-                        if showHealth then table.insert(parts, string.format("Health: %d/%d", humanoid.Health, humanoid.MaxHealth)) end
-                    
-                        data.text.Text = table.concat(parts, " | ")
+                        data.box.Visible = true
+
+                        local hp = data.humanoid.Health
+                        local max = data.humanoid.MaxHealth
+                        data.text.Text = string.format('"%s" | Distance: %.1f | Health: %d/%d', player.Name, distance, hp, max)
                         data.text.Position = Vector2.new(topLeft.X + boxSize.X / 2, topLeft.Y - 50)
-                        data.text.Visible = (#parts > 0)
+                        data.text.Visible = true
                     else
                         data.box.Visible = false
                         data.text.Visible = false
                     end
                 else
-                    -- Clean up if player or model is gone
-                    data.box:Remove()
-                    data.text:Remove()
-                    espObjects[player] = nil
+                    cleanupESP(player)
                 end
             end)
-            if not success then
-                warn("Failed to update ESP for " .. tostring(player.Name))
-                if data.box and data.text then
-                    data.box:Remove()
-                    data.text:Remove()
-                    espObjects[player] = nil
-                end
-            end
         end
-        return true
     end)
-    if not success then
-        warn("ESP update failed: " .. tostring(result))
-    end
-    return success and result
-end
 
--- Cleanup function
-local function cleanupESP()
-    local success, result = pcall(function()
-        for _, data in pairs(espObjects) do
-            local success, _ = pcall(function()
-                data.box:Remove()
-                data.text:Remove()
-                return true
-            end)
-            if not success then
-                warn("Failed to clean up ESP object")
-            end
-        end
-        espObjects = {}
-        return true
-    end)
     if not success then
-        warn("ESP cleanup failed: " .. tostring(result))
+        warn("ESP update failed.")
     end
 end
 
--- Main setup
-local success, result = pcall(function()
-    -- Initialize ESP for existing players
-    for _, player in ipairs(Players:GetPlayers()) do
-        createESP(player)
-    end
+-- Main ESP setup
+local function setupESP()
+    local ok, err = pcall(function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            createESP(player)
+        end
 
-    -- Handle player added
-    Players.PlayerAdded:Connect(function(player)
-        createESP(player)
-    end)
-
-    -- Handle player removed
-    Players.PlayerRemoving:Connect(function(player)
-        local success, _ = pcall(function()
-            if espObjects[player] then
-                espObjects[player].box:Remove()
-                espObjects[player].text:Remove()
-                espObjects[player] = nil
-            end
-            return true
+        Players.PlayerAdded:Connect(function(player)
+            createESP(player)
         end)
-        if not success then
-            warn("Failed to clean up ESP for " .. tostring(player.Name))
-        end
+
+        Players.PlayerRemoving:Connect(function(player)
+            cleanupESP(player)
+        end)
+
+        LocalPlayer.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                for player in pairs(espObjects) do
+                    cleanupESP(player)
+                end
+            end
+        end)
+
+        RunService.RenderStepped:Connect(updateESP)
     end)
 
-    -- Cleanup when local player leaves
-    LocalPlayer.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            cleanupESP()
-        end
-    end)
-
-    -- Update ESP every frame
-    RunService.RenderStepped:Connect(updateESP)
-
-    return true
-end)
-
-if not success then
-    warn("ESP setup failed: " .. tostring(result))
+    if not ok then
+        warn("ESP setup failed: " .. tostring(err))
+    end
 end
+
+setupESP()
+
