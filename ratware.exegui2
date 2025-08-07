@@ -1,0 +1,321 @@
+pcall(function()
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local player = Players.LocalPlayer
+
+    -- GLOBAL STATE
+    local featureToggles = {
+        Speed = false,
+        Fly = false,
+        Noclip = false,
+        NoFall = false,
+    }
+
+    local speedValue = 50
+    local flySpeed = 50
+    local flyJumpPower = 50
+    local flyFallSpeed = 50
+
+    local guiKeybind = Enum.KeyCode.F5
+
+    -- GUI SETUP
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CustomHub"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = game.CoreGui
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 320, 0, 420)
+    Frame.Position = UDim2.new(0.5, -160, 0.5, -210)
+    Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Frame.BorderSizePixel = 0
+    Frame.Active = true
+    Frame.Draggable = false
+    Frame.Parent = ScreenGui
+
+    local dragging, dragInput, dragStart, startPos
+    Frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    Frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    local function createLabel(text, position)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 300, 0, 20)
+        label.Position = position
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = Enum.Font.SourceSans
+        label.TextSize = 18
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Text = text
+        label.Parent = Frame
+        return label
+    end
+
+    local function createToggle(name, y)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0, 140, 0, 30)
+        button.Position = UDim2.new(0, 10, 0, y)
+        button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.SourceSans
+        button.TextSize = 18
+        button.Text = name .. ": OFF"
+        button.Parent = Frame
+
+        button.MouseButton1Click:Connect(function()
+            featureToggles[name] = not featureToggles[name]
+            button.Text = name .. ": " .. (featureToggles[name] and "ON" or "OFF")
+        end)
+    end
+
+    local function createSlider(labelText, min, max, default, y, onChange)
+        local label = createLabel(labelText .. ": " .. tostring(default), UDim2.new(0, 10, 0, y - 20))
+        local slider = Instance.new("TextButton")
+        slider.Size = UDim2.new(0, 300, 0, 20)
+        slider.Position = UDim2.new(0, 10, 0, y)
+        slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        slider.Text = ""
+        slider.Parent = Frame
+
+        local fill = Instance.new("Frame")
+        fill.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        fill.BorderSizePixel = 0
+        fill.Parent = slider
+
+        local draggingSlider = false
+        slider.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                draggingSlider = true
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                draggingSlider = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local rel = input.Position.X - slider.AbsolutePosition.X
+                local pct = math.clamp(rel / slider.AbsoluteSize.X, 0, 1)
+                fill.Size = UDim2.new(pct, 0, 1, 0)
+                local val = math.floor(min + (max - min) * pct)
+                label.Text = labelText .. ": " .. tostring(val)
+                onChange(val)
+            end
+        end)
+    end
+
+    local function createTextbox(y)
+        local label = createLabel("GUI Toggle Keybind:", UDim2.new(0, 10, 0, y - 20))
+        local box = Instance.new("TextBox")
+        box.Size = UDim2.new(0, 300, 0, 30)
+        box.Position = UDim2.new(0, 10, 0, y)
+        box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        box.TextColor3 = Color3.new(1, 1, 1)
+        box.Font = Enum.Font.SourceSans
+        box.TextSize = 18
+        box.Text = "F5"
+        box.Parent = Frame
+
+        box.FocusLost:Connect(function()
+            local newKey = Enum.KeyCode[box.Text:upper()]
+            if newKey then
+                guiKeybind = newKey
+            else
+                box.Text = guiKeybind.Name
+            end
+        end)
+    end
+
+    local function createUnloadButton(y)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 300, 0, 30)
+        btn.Position = UDim2.new(0, 10, 0, y)
+        btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.SourceSansBold
+        btn.TextSize = 18
+        btn.Text = "Unload GUI"
+        btn.Parent = Frame
+
+        btn.MouseButton1Click:Connect(function()
+            pcall(function()
+                ScreenGui:Destroy()
+                script:Destroy()
+            end)
+        end)
+    end
+
+    -- Construct UI
+    local y = 10
+    for _, toggle in ipairs({"Speed", "Fly", "Noclip", "NoFall"}) do
+        createToggle(toggle, y)
+        y = y + 40
+    end
+
+    createSlider("Speed", 0, 200, speedValue, y, function(val) speedValue = val end)
+    y = y + 50
+    createSlider("Fly Speed", 0, 200, flySpeed, y, function(val) flySpeed = val end)
+    y = y + 50
+    createSlider("Jump Power", 0, 200, flyJumpPower, y, function(val) flyJumpPower = val end)
+    y = y + 50
+    createSlider("Fall Speed", 0, 200, flyFallSpeed, y, function(val) flyFallSpeed = val end)
+    y = y + 50
+
+    createTextbox(y)
+    y = y + 50
+
+    createUnloadButton(y)
+
+    -- Toggle GUI visibility
+    UserInputService.InputBegan:Connect(function(input)
+        if input.KeyCode == guiKeybind then
+            Frame.Visible = not Frame.Visible
+        end
+    end)
+
+    -- === BEGIN MODULES (UNCHANGED LOGIC, HOOKED TO GUI) ===
+    -- === SPEED MODULE ===
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if featureToggles.Speed then
+                    if player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = speedValue
+                    end
+                elseif player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                    player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+                end
+            end)
+        end
+    end)
+
+    -- === FLY MODULE ===
+    local flying = false
+    local bodyGyro, bodyVel
+
+    local function startFly()
+        pcall(function()
+            local char = player.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            bodyGyro = Instance.new("BodyGyro")
+            bodyVel = Instance.new("BodyVelocity")
+            bodyGyro.P = 9e4
+            bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro.cframe = hrp.CFrame
+            bodyGyro.Parent = hrp
+
+            bodyVel.velocity = Vector3.new(0, 0, 0)
+            bodyVel.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyVel.Parent = hrp
+        end)
+    end
+
+    local function stopFly()
+        pcall(function()
+            if bodyGyro then bodyGyro:Destroy() end
+            if bodyVel then bodyVel:Destroy() end
+        end)
+    end
+
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if featureToggles.Fly then
+                    if not flying then
+                        flying = true
+                        startFly()
+                    end
+                    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local dir = Vector3.new(0, 0, 0)
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                            dir = dir + workspace.CurrentCamera.CFrame.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                            dir = dir - workspace.CurrentCamera.CFrame.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                            dir = dir - workspace.CurrentCamera.CFrame.RightVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                            dir = dir + workspace.CurrentCamera.CFrame.RightVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                            dir = dir + Vector3.new(0, flyJumpPower/25, 0)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                            dir = dir - Vector3.new(0, flyFallSpeed/25, 0)
+                        end
+
+                        if bodyVel then
+                            bodyVel.Velocity = dir.Unit * flySpeed
+                        end
+                        if bodyGyro and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+                        end
+                    end
+                elseif flying then
+                    flying = false
+                    stopFly()
+                end
+            end)
+        end
+    end)
+
+    -- === NOCLIP MODULE ===
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if featureToggles.Noclip and player.Character then
+                    for _, v in pairs(player.Character:GetDescendants()) do
+                        if v:IsA("BasePart") and v.CanCollide == true then
+                            v.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    -- === NO FALL MODULE ===
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if featureToggles.NoFall and player.Character then
+                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        end
+    end)
+end)
