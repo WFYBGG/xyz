@@ -1,0 +1,201 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+-- Player
+local LocalPlayer = Players.LocalPlayer
+
+-- Configuration (Defaults)
+local maxESPDistance = 20000
+local showBox = true
+local showName = true
+local showDistance = true
+local showHealth = true
+
+-- GUI Setup
+local function createGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ESP_Settings"
+    screenGui.ResetOnSpawn = false
+    pcall(function() screenGui.Parent = game:GetService("CoreGui") end)
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 220, 0, 220)
+    frame.Position = UDim2.new(0, 10, 0.5, -110)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+
+    local title = Instance.new("TextLabel")
+    title.Text = "ESP Settings"
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundTransparency = 1
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 20
+    title.Parent = frame
+
+    local function createToggle(text, order, flag)
+        local toggle = Instance.new("TextButton")
+        toggle.Size = UDim2.new(1, -10, 0, 25)
+        toggle.Position = UDim2.new(0, 5, 0, 35 + (order * 30))
+        toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggle.Text = text .. ": ON"
+        toggle.Font = Enum.Font.SourceSans
+        toggle.TextSize = 18
+        toggle.Parent = frame
+
+        toggle.MouseButton1Click:Connect(function()
+            _G[flag] = not _G[flag]
+            toggle.Text = text .. ": " .. (_G[flag] and "ON" or "OFF")
+        end)
+
+        _G[flag] = true
+    end
+
+    createToggle("Show Boxes", 0, "showBox")
+    createToggle("Show Names", 1, "showName")
+    createToggle("Show Distance", 2, "showDistance")
+    createToggle("Show Health", 3, "showHealth")
+
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, -10, 0, 20)
+    distanceLabel.Position = UDim2.new(0, 5, 1, -45)
+    distanceLabel.Text = "Max Distance: " .. tostring(maxESPDistance)
+    distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Font = Enum.Font.SourceSans
+    distanceLabel.TextSize = 16
+    distanceLabel.Parent = frame
+
+    local slider = Instance.new("TextButton")
+    slider.Size = UDim2.new(1, -10, 0, 20)
+    slider.Position = UDim2.new(0, 5, 1, -25)
+    slider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    slider.Text = "Set Distance"
+    slider.TextColor3 = Color3.fromRGB(255, 255, 255)
+    slider.Font = Enum.Font.SourceSans
+    slider.TextSize = 16
+    slider.Parent = frame
+
+    slider.MouseButton1Click:Connect(function()
+        local new = tonumber(string.match(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Chat"):WaitForChild("Frame"):WaitForChild("ChatBar").Text, "%d+"))
+        if new then
+            maxESPDistance = math.clamp(new, 0, 20000)
+            distanceLabel.Text = "Max Distance: " .. tostring(maxESPDistance)
+        end
+    end)
+end
+
+pcall(createGUI)
+
+-- ESP Logic
+local espObjects = {}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    pcall(function()
+        local function updateCharacter()
+            local model = (Workspace:FindFirstChild("Living") or Workspace):FindFirstChild(player.Name)
+            if model and model:FindFirstChild("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
+                if not espObjects[player] then
+                    local box = Drawing.new("Square")
+                    box.Thickness = 1
+                    box.Filled = false
+                    box.Color = Color3.fromRGB(255, 255, 255)
+                    box.Visible = false
+
+                    local text = Drawing.new("Text")
+                    text.Size = 16
+                    text.Color = Color3.fromRGB(255, 255, 255)
+                    text.Center = true
+                    text.Outline = true
+                    text.Visible = false
+
+                    espObjects[player] = {box = box, text = text}
+                end
+                espObjects[player].humanoid = model.Humanoid
+                espObjects[player].rootPart = model.HumanoidRootPart
+            end
+        end
+
+        updateCharacter()
+        player.CharacterAdded:Connect(function()
+            wait(1)
+            pcall(updateCharacter)
+        end)
+    end)
+end
+
+local function updateESP()
+    pcall(function()
+        local cam = Workspace.CurrentCamera
+        local localChar = LocalPlayer.Character
+        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+        if not localRoot then return end
+
+        for player, data in pairs(espObjects) do
+            pcall(function()
+                local human = data.humanoid
+                local root = data.rootPart
+                if not human or not root then return end
+
+                local pos = root.Position
+                local screenPos = cam:WorldToViewportPoint(pos)
+                local dist = (localRoot.Position - pos).Magnitude
+
+                if dist <= maxESPDistance and screenPos.Z > 0 then
+                    local size = root.Size * 1.5
+                    local topLeft = cam:WorldToViewportPoint(pos - size / 2)
+                    local bottomRight = cam:WorldToViewportPoint(pos + size / 2)
+                    local boxSize = Vector2.new(bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y)
+
+                    data.box.Size = boxSize
+                    data.box.Position = Vector2.new(topLeft.X, topLeft.Y)
+                    data.box.Visible = _G["showBox"]
+
+                    local segments = {}
+                    if _G["showName"] then table.insert(segments, player.Name) end
+                    if _G["showDistance"] then table.insert(segments, string.format("Dist: %.0f", dist)) end
+                    if _G["showHealth"] and human and human.Health then
+                        table.insert(segments, string.format("HP: %d", human.Health))
+                    end
+
+                    data.text.Text = table.concat(segments, " | ")
+                    data.text.Position = Vector2.new(topLeft.X + boxSize.X / 2, topLeft.Y - 16)
+                    data.text.Visible = true
+                else
+                    data.box.Visible = false
+                    data.text.Visible = false
+                end
+            end)
+        end
+    end)
+end
+
+-- Initialize
+pcall(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        createESP(player)
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+        wait(1)
+        pcall(function() createESP(player) end)
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        pcall(function()
+            if espObjects[player] then
+                espObjects[player].box:Remove()
+                espObjects[player].text:Remove()
+                espObjects[player] = nil
+            end
+        end)
+    end)
+
+    RunService.RenderStepped:Connect(updateESP)
+end)
