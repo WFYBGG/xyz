@@ -151,7 +151,7 @@ MainGroup6:AddToggle("AttachtobackToggle", {
 -- Visuals Tab
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 VisualsGroup:AddToggle("PlayerESP", {
-    Text = "ESP",
+    Text = "Player ESP",
     Default = false
 })
 local VisualsGroup2 = Tabs.Visuals:AddRightGroupbox("World Visuals")
