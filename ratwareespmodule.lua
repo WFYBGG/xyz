@@ -1,15 +1,3 @@
---[[
-    Universal ESP with robust cleanup, Drawing API skeleton, and 2D chams effect.
-    Integrated with Linoria GUI (Toggles.PlayerESP).
-    - Toggles ESP for all players (excluding LocalPlayer) via Toggles.PlayerESP.
-    - Cleans up ESP for all players including those who leave or disconnect.
-    - Skeleton ESP (lines between limbs) with Drawing API.
-    - 2D chams: draws a filled rectangle behind the ESP box.
-    - All object access wrapped in pcall for anti-crash/anti-flag safety.
-    - No range limit, works for all streamed characters.
-    - Health/MaxHealth via Workspace.Living[Model.Name==Player.Name].Humanoid.
---]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
