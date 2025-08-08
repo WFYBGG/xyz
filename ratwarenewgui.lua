@@ -233,322 +233,277 @@ local LocalPlayer = Players.LocalPlayer
 
 
 --Speedhack Module
-_G.originalspeed = 100 -- Match GUI default
 pcall(function()
-    repeat
-        wait()
-    until game:IsLoaded()
-    repeat
-        wait()
-    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local player = Players.LocalPlayer
 
-    _G.Speed = _G.originalspeed
-    local u1 = false
-    local u2 = false
-    local u4 = game:GetService("Players")
-    local u5 = game:GetService("UserInputService")
-    
-    -- Create BodyVelocity for movement
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    
-    -- Fallback to reset Humanoid state
-    local function resetHumanoidState()
-        local success, err = pcall(function()
-            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local humanoid = u4.LocalPlayer.Character.Humanoid
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16 -- Default Roblox walk speed
-                bodyVelocity.Parent = nil
+    local BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+
+    local function resetSpeed()
+        pcall(function()
+            local char = player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = 16
+                char.Humanoid.JumpPower = 50
             end
+            BodyVelocity.Parent = nil
         end)
-        if not success then
-            warn("Reset humanoid state failed: " .. tostring(err))
-        end
     end
 
-    -- Handle character respawn
-    u4.LocalPlayer.CharacterAdded:Connect(function(character)
-        local success, err = pcall(function()
-            repeat
-                wait()
-            until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
-            if u1 then
-                bodyVelocity.Parent = character.HumanoidRootPart
+    local function cleanupSpeed()
+        pcall(function()
+            resetSpeed()
+            BodyVelocity:Destroy()
+        end)
+    end
+
+    player.CharacterAdded:Connect(function(character)
+        pcall(function()
+            repeat task.wait() until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+            if Toggles.SpeedhackToggle.Value then
+                BodyVelocity.Parent = character.HumanoidRootPart
                 character.Humanoid.JumpPower = 0
             end
         end)
-        if not success then
-            warn("CharacterAdded handler failed: " .. tostring(err))
-        end
     end)
 
-    -- Connect to GUI toggle
-    Toggles.SpeedhackToggle:OnChanged(function(value)
-        local success, err = pcall(function()
-            u1 = value
-            if u1 then
-                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
-                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0
+    local renderConnection
+    pcall(function()
+        renderConnection = RunService.RenderStepped:Connect(function(dt)
+            pcall(function()
+                local char = player.Character
+                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
+                    local dir = Vector3.zero
+                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= workspace.CurrentCamera.CFrame.RightVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += workspace.CurrentCamera.CFrame.RightVector end
+                    dir = dir.Magnitude > 0 and dir.Unit or Vector3.zero
+
+                    BodyVelocity.Velocity = dir * math.min(Options.SpeedhackSpeed.Value, 49 / dt)
+                    BodyVelocity.Parent = char.HumanoidRootPart
+                    char.Humanoid.JumpPower = 0
+                else
+                    resetSpeed()
                 end
-            else
-                resetHumanoidState()
-            end
+            end)
         end)
-        if not success then
-            warn("Speedhack toggle failed: " .. tostring(err))
-        end
     end)
 
-    -- Connect to GUI slider
-    Options.SpeedhackSpeed:OnChanged(function(value)
-        local success, err = pcall(function()
-            _G.Speed = value
-        end)
-        if not success then
-            warn("Speedhack speed update failed: " .. tostring(err))
-        end
-    end)
-
-    -- Main movement loop
-    game:GetService("RunService").RenderStepped:Connect(function(u9)
+    -- Handle Flight toggle-off when both are active
+    Toggles.FlightToggle:OnChanged(function(value)
         pcall(function()
-            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character.HumanoidRootPart and u4.LocalPlayer.Character.Humanoid then
-                u2 = true
-                local v11 = {
-                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
-                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
-                    Left = u5:IsKeyDown(Enum.KeyCode.A),
-                    Right = u5:IsKeyDown(Enum.KeyCode.D)
-                }
-                
-                -- Calculate movement direction
-                local moveDirection = Vector3.new(0, 0, 0)
-                if v11.Forward then
-                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
-                elseif v11.Backward then
-                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
-                elseif v11.Left then
-                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
-                elseif v11.Right then
-                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
-                end
-
-                -- Normalize direction to ensure consistent speed
-                if moveDirection.Magnitude > 0 then
-                    moveDirection = moveDirection.Unit
-                end
-
-                -- Apply BodyVelocity with speed capped to avoid teleport detection
-                local maxSpeedPerFrame = 49 / u9 -- Ensure movement < 50 studs per frame
-                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame)
-
-                -- Monitor Humanoid health to detect kill
-                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
-                    resetHumanoidState()
-                    u1 = false
-                    u2 = false
-                end
-            else
-                if u2 then
-                    resetHumanoidState()
-                    u2 = false
-                end
+            if not value and Toggles.SpeedhackToggle.Value then
+                Toggles.SpeedhackToggle:SetValue(false)
+                task.wait(0.1)
+                Toggles.SpeedhackToggle:SetValue(true)
             end
         end)
     end)
 
-    -- Cleanup on script destruction
-    game:BindToClose(function()
-        local success, err = pcall(function()
-            bodyVelocity:Destroy()
+    -- Cleanup on GUI unload
+    Library:OnUnload(function()
+        pcall(function()
+            if renderConnection then renderConnection:Disconnect() end
+            cleanupSpeed()
         end)
-        if not success then
-            warn("Cleanup failed: " .. tostring(err))
-        end
     end)
 end)
 
 
 --Fly/Flight Module
-_G.originalspeed = 200 -- Match GUI default
 pcall(function()
-    repeat
-        wait()
-    until game:IsLoaded()
-    repeat
-        wait()
-    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local player = Players.LocalPlayer
 
-    _G.Speed = _G.originalspeed
-    local u4 = game:GetService("Players")
-    local u5 = game:GetService("UserInputService")
+    local Platform = Instance.new("Part")
+    Platform.Size = Vector3.new(6, 1, 6)
+    Platform.Anchored = true
+    Platform.CanCollide = true
+    Platform.Transparency = 1.00
+    Platform.BrickColor = BrickColor.new("Bright blue")
+    Platform.Material = Enum.Material.SmoothPlastic
+    Platform.Name = "OldDebris"
 
-    local function resetHumanoidState()
-        local success, err = pcall(function()
-            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local humanoid = u4.LocalPlayer.Character.Humanoid
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16 -- Restore defaults
+    local FlyVelocity = Instance.new("BodyVelocity")
+    FlyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+    local function resetFly()
+        pcall(function()
+            Platform.Parent = nil
+            FlyVelocity.Parent = nil
+            local char = player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = 16
+                char.Humanoid.JumpPower = 50
             end
         end)
-        if not success then
-            warn("Reset humanoid state failed: " .. tostring(err))
-        end
     end
 
-    -- Create platform
-    local u8 = Instance.new("Part")
-    u8.Name = "OldDebris"
-    u8.Size = Vector3.new(6, 1, 6)
-    u8.Anchored = true
-    u8.CanCollide = true
-    u8.Transparency = 0.75
-    u8.Material = Enum.Material.SmoothPlastic
-    u8.BrickColor = BrickColor.new("Bright blue")
-
-    -- Create BodyVelocity for flight
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "FlightBodyVelocity"
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- All axes for smooth flight
-
-    -- Handle character respawn
-    u4.LocalPlayer.CharacterAdded:Connect(function(character)
-        local success, err = pcall(function()
-            repeat
-                wait()
-            until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
-            if Toggles.FlightToggle.Value then
-                if character:FindFirstChild("Humanoid") then
-                    character.Humanoid.JumpPower = 0
-                end
-                u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-                u8.Parent = workspace
-                bodyVelocity.Parent = character.HumanoidRootPart
-            else
-                u8.Parent = nil
-                bodyVelocity.Parent = nil
-            end
-        end)
-        if not success then
-            warn("CharacterAdded handler failed: " .. tostring(err))
-        end
-    end)
-
-    -- Connect to GUI toggle
-    Toggles.FlightToggle:OnChanged(function(value)
-        local success, err = pcall(function()
-            if value then
-                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
-                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0
-                end
-                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    u8.CFrame = u4.LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-                    u8.Parent = workspace
-                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
-                end
-            else
-                resetHumanoidState()
-                u8.Parent = nil
-                bodyVelocity.Parent = nil
-            end
-        end)
-        if not success then
-            warn("Flight toggle failed: " .. tostring(err))
-        end
-    end)
-
-    -- Connect to GUI slider
-    Options.FlightSpeed:OnChanged(function(value)
-        local success, err = pcall(function()
-            _G.Speed = value
-        end)
-        if not success then
-            warn("Flight speed update failed: " .. tostring(err))
-        end
-    end)
-
-    -- Main movement loop
-    game:GetService("RunService").RenderStepped:Connect(function(u9)
+    local function cleanupFly()
         pcall(function()
-            local char = u4.LocalPlayer.Character
-            if Toggles.FlightToggle.Value and char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
-                local v11 = {
-                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
-                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
-                    Left = u5:IsKeyDown(Enum.KeyCode.A),
-                    Right = u5:IsKeyDown(Enum.KeyCode.D),
-                    Up = u5:IsKeyDown(Enum.KeyCode.Space),
-                    Down = u5:IsKeyDown(Enum.KeyCode.LeftControl)
-                }
-                
-                local v10 = char.HumanoidRootPart
-                local moveDirection = Vector3.new(0, 0, 0)
-                if v11.Forward then
-                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
-                elseif v11.Backward then
-                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
-                elseif v11.Left then
-                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
-                elseif v11.Right then
-                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
-                end
+            resetFly()
+            Platform:Destroy()
+            FlyVelocity:Destroy()
+        end)
+    end
 
-                if moveDirection.Magnitude > 0 then
-                    moveDirection = moveDirection.Unit
-                end
-
-                local vert = 0
-                if v11.Up then
-                    vert = 70 -- Match unified script's flyJumpPower
-                elseif v11.Down then
-                    vert = -70 -- Match unified script's flyFallSpeed
-                end
-
-                -- Apply BodyVelocity with speed capped
-                local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 or 49 per frame
-                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame) + Vector3.new(0, vert, 0)
-                bodyVelocity.Parent = v10
-
-                -- Update platform
-                u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
-                u8.Parent = workspace
-
-                -- Keep grounded
-                if char:FindFirstChild("Humanoid") then
-                    char.Humanoid.JumpPower = 0
-                end
-
-                -- Monitor health
-                if char.Humanoid.Health <= 0 then
-                    resetHumanoidState()
-                    Toggles.FlightToggle:SetValue(false)
-                    u8.Parent = nil
-                    bodyVelocity.Parent = nil
-                end
-            else
-                if u8.Parent or bodyVelocity.Parent then
-                    resetHumanoidState()
-                    u8.Parent = nil
-                    bodyVelocity.Parent = nil
-                end
+    player.CharacterAdded:Connect(function(char)
+        pcall(function()
+            repeat task.wait() until char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")
+            if Toggles.FlightToggle.Value then
+                FlyVelocity.Parent = char.HumanoidRootPart
+                Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                Platform.Parent = workspace
+                char.Humanoid.JumpPower = 0
             end
         end)
     end)
 
-    -- Cleanup on script destruction
-    game:BindToClose(function()
-        local success, err = pcall(function()
-            bodyVelocity:Destroy()
-            u8:Destroy()
+    local renderConnection
+    pcall(function()
+        renderConnection = RunService.RenderStepped:Connect(function(dt)
+            pcall(function()
+                local char = player.Character
+                if Toggles.FlightToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
+                    local moveDir = Vector3.zero
+                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= workspace.CurrentCamera.CFrame.RightVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += workspace.CurrentCamera.CFrame.RightVector end
+                    moveDir = moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
+
+                    local vert = 0
+                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vert = 70 end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vert = -70 end
+
+                    FlyVelocity.Velocity = moveDir * math.min(Options.FlightSpeed.Value, 49 / dt) + Vector3.new(0, vert, 0)
+                    FlyVelocity.Parent = char.HumanoidRootPart
+
+                    Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                    Platform.Parent = workspace
+                else
+                    resetFly()
+                end
+            end)
         end)
-        if not success then
-            warn("Cleanup failed: " .. tostring(err))
-        end
+    end)
+
+    -- Handle Speedhack toggle-off when both are active
+    Toggles.SpeedhackToggle:OnChanged(function(value)
+        pcall(function()
+            if not value and Toggles.FlightToggle.Value then
+                Toggles.FlightToggle:SetValue(false)
+                task.wait(0.1)
+                Toggles.FlightToggle:SetValue(true)
+            end
+        end)
+    end)
+
+    -- Cleanup on GUI unload
+    Library:OnUnload(function()
+        pcall(function()
+            if renderConnection then renderConnection:Disconnect() end
+            cleanupFly()
+        end)
     end)
 end)
+
+
+--Noclip Module
+pcall(function()
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+
+    local function setCollision(state)
+        pcall(function()
+            local char = player.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = state
+                    end
+                end
+            end
+        end)
+    end
+
+    local renderConnection
+    pcall(function()
+        renderConnection = RunService.RenderStepped:Connect(function()
+            pcall(function()
+                setCollision(not Toggles.NoclipToggle.Value)
+            end)
+        end)
+    end)
+
+    -- Cleanup on GUI unload
+    Library:OnUnload(function()
+        pcall(function()
+            if renderConnection then renderConnection:Disconnect() end
+            setCollision(true) -- Restore collision
+        end)
+    end)
+end)
+
+
+--No fall module
+pcall(function()
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local player = Players.LocalPlayer
+
+    local fallFolder = nil
+
+    local function setNoFall(active)
+        pcall(function()
+            local status = Workspace:WaitForChild("Living"):WaitForChild(player.Name):WaitForChild("Status")
+            if active then
+                if fallFolder then fallFolder:Destroy() end
+                fallFolder = Instance.new("Folder")
+                fallFolder.Name = "FallDamageCD"
+                fallFolder.Parent = status
+            else
+                if fallFolder then fallFolder:Destroy() end
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function()
+        pcall(function()
+            repeat task.wait() until Workspace:FindFirstChild("Living")
+            if Toggles.NoFallDamage.Value then
+                setNoFall(true)
+            end
+        end)
+    end)
+
+    local renderConnection
+    pcall(function()
+        renderConnection = RunService.RenderStepped:Connect(function()
+            pcall(function()
+                setNoFall(Toggles.NoFallDamage.Value)
+            end)
+        end)
+    end)
+
+    -- Cleanup on GUI unload
+    Library:OnUnload(function()
+        pcall(function()
+            if renderConnection then renderConnection:Disconnect() end
+            setNoFall(false) -- Remove fallFolder
+        end)
+    end)
+end)
+
+
 --END MODULES
 --END MODULES
 --END MODULES
