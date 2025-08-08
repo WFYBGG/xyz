@@ -215,6 +215,28 @@ VisualsGroup2:AddToggle("NoShadows", {
 })
 
 
+-- UI Settings Tab
+local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
+MenuGroup:AddButton("Unload", function() Library:Unload() end)
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
+    Default = "Insert",
+    NoUI = true,
+    Text = "Menu keybind"
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+ThemeManager:SetFolder("Ratware")
+SaveManager:SetFolder("Ratware/Rogueblox")
+SaveManager:BuildConfigSection(Tabs.UI)
+ThemeManager:ApplyToTab(Tabs.UI)
+SaveManager:LoadAutoloadConfig()
+
+Library:Init()
 
 
 --BEGIN MODULES
@@ -597,7 +619,7 @@ local function getCharacterModel(player)
         living = workspace:FindFirstChild("Living")
     end)
     if not living then return nil end
-    return safeGet(living, player.Name)
+    return safeGet(living, player.Name) or nil
 end
 
 local function getHealthInfo(character)
@@ -609,7 +631,7 @@ local function getHealthInfo(character)
             maxHealth = humanoid.MaxHealth
         end
     end)
-    return health, maxHealth
+    return health > 0 and health or 0, maxHealth > 0 and maxHealth or 100
 end
 
 local function cleanupESP(player)
@@ -629,58 +651,53 @@ local function cleanupESP(player)
         end
     end)
     if not success then
-        warn("Cleanup ESP failed for player " .. tostring(player) .. ": " .. tostring(err))
+        warn("Cleanup ESP failed for player " .. tostring(player) .. " at cleanupESP: " .. tostring(err))
     end
 end
 
 local function createESP(player)
     if player == LocalPlayer then return end
-    pcall(function()
+    local success, err = pcall(function()
         if ESPObjects[player] then cleanupESP(player) end
 
         local box, nameText, healthText, distText, chamBox
-
-        pcall(function()
+        local drawingSupported = pcall(function()
             box = Drawing.new("Line")
             box.Visible = false
             box.Thickness = 2
             box.Color = Color3.fromRGB(255, 25, 25)
-        end)
 
-        pcall(function()
             nameText = Drawing.new("Text")
             nameText.Size = 14
             nameText.Center = true
             nameText.Outline = true
             nameText.Color = Color3.fromRGB(255, 255, 255)
             nameText.Visible = false
-        end)
 
-        pcall(function()
             healthText = Drawing.new("Text")
             healthText.Size = 13
             healthText.Center = true
             healthText.Outline = true
             healthText.Color = Color3.fromRGB(0, 255, 0)
             healthText.Visible = false
-        end)
 
-        pcall(function()
             distText = Drawing.new("Text")
             distText.Size = 13
             distText.Center = true
             distText.Outline = true
             distText.Color = Color3.fromRGB(200, 200, 200)
             distText.Visible = false
-        end)
 
-        pcall(function()
             chamBox = Drawing.new("Square")
             chamBox.Visible = false
             chamBox.Color = Color3.fromRGB(255, 0, 0)
             chamBox.Transparency = 0.2
             chamBox.Filled = true
         end)
+        if not drawingSupported then
+            warn("Drawing API not supported, skipping ESP creation for " .. tostring(player))
+            return
+        end
 
         ESPObjects[player] = {
             Box = box,
@@ -691,6 +708,9 @@ local function createESP(player)
             Skeleton = {},
         }
     end)
+    if not success then
+        warn("Create ESP failed for player " .. tostring(player) .. " at createESP: " .. tostring(err))
+    end
 end
 
 local function drawSkeleton(player, char, color, thickness)
@@ -761,6 +781,23 @@ pcall(function()
     end
 end)
 
+-- Wait for GUI initialization
+local function waitForGUI()
+    local maxWait = 10 -- Increased to 10 seconds for robustness
+    local waitTime = 0
+    while waitTime < maxWait do
+        local success, result = pcall(function() return Toggles.PlayerESP end)
+        if success and result then
+            return true
+        end
+        wait(0.1)
+        waitTime = waitTime + 0.1
+    end
+    warn("Failed to initialize Toggles.PlayerESP after " .. maxWait .. " seconds")
+    return false
+end
+if not waitForGUI() then return end
+
 -- Toggle ESP with GUI
 pcall(function()
     Toggles.PlayerESP:OnChanged(function(value)
@@ -772,14 +809,19 @@ pcall(function()
             end
         end)
         if not success then
-            warn("PlayerESP toggle cleanup failed: " .. tostring(err))
+            warn("PlayerESP toggle cleanup failed at OnChanged: " .. tostring(err))
         end
     end)
 end)
 
 RunService.RenderStepped:Connect(function()
     local success, err = pcall(function()
-        if not Toggles.PlayerESP.Value then
+        local espToggle = Toggles.PlayerESP
+        if not espToggle then
+            warn("Toggles.PlayerESP is nil, skipping ESP rendering")
+            return
+        end
+        if not espToggle.Value then
             for player, tbl in pairs(ESPObjects) do
                 pcall(function()
                     if tbl.Box then tbl.Box.Visible = false end
@@ -927,22 +969,9 @@ RunService.RenderStepped:Connect(function()
         end
     end)
     if not success then
-        warn("RenderStepped failed: " .. tostring(err))
+        warn("RenderStepped failed at RenderStepped: " .. tostring(err))
     end
 end)
-
--- Cleanup on script destruction
-game:BindToClose(function()
-    local success, err = pcall(function()
-        for player, _ in pairs(ESPObjects) do
-            cleanupESP(player)
-        end
-    end)
-    if not success then
-        warn("BindToClose cleanup failed: " .. tostring(err))
-    end
-end)
-
 
 --Attach to back Module [TESTING STILL]
 local RunService = game:GetService("RunService")
@@ -1063,27 +1092,3 @@ end)
 --END MODULES
 --END MODULES
 --END MODULES
-
-
--- UI Settings Tab
-local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
-MenuGroup:AddButton("Unload", function() Library:Unload() end)
-MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-    Default = "Insert",
-    NoUI = true,
-    Text = "Menu keybind"
-})
-
-Library.ToggleKeybind = Options.MenuKeybind
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({"MenuKeybind"})
-ThemeManager:SetFolder("Ratware")
-SaveManager:SetFolder("Ratware/Rogueblox")
-SaveManager:BuildConfigSection(Tabs.UI)
-ThemeManager:ApplyToTab(Tabs.UI)
-SaveManager:LoadAutoloadConfig()
-
-Library:Init()
