@@ -68,15 +68,15 @@ MainGroup:AddToggle("NoclipToggle", {
     end
 })
 
-local MainGroup2 = Tabs.Main:AddRightGroupbox("Automation")
-MainGroup2:AddToggle("AutoTrinket", {
-    Text = "Auto Trinket Pickup",
-    Default = false
-})
-MainGroup2:AddToggle("AutoIngredient", {
-    Text = "Auto Ingredient Pickup",
-    Default = false
-})
+--local MainGroup2 = Tabs.Main:AddRightGroupbox("Automation")
+--MainGroup2:AddToggle("AutoTrinket", {
+--    Text = "Auto Trinket Pickup",
+--    Default = false
+--})
+--MainGroup2:AddToggle("AutoIngredient", {
+--    Text = "Auto Ingredient Pickup",
+--    Default = false
+--})
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Tween to Locations")
 MainGroup3:AddDropdown("Areas", {
     Text = "Area Selection",
