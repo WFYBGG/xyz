@@ -185,6 +185,25 @@ pcall(function()
 end)
 
 RunService.RenderStepped:Connect(function()
+    if not ESP_Enabled then
+        -- ESP is off: hide all ESP visuals
+        for player, tbl in pairs(ESPObjects) do
+            pcall(function()
+                if tbl.Box then tbl.Box.Visible = false end
+                if tbl.Name then tbl.Name.Visible = false end
+                if tbl.Health then tbl.Health.Visible = false end
+                if tbl.Distance then tbl.Distance.Visible = false end
+                if tbl.ChamBox then tbl.ChamBox.Visible = false end
+                if tbl.Skeleton then
+                    for _, line in pairs(tbl.Skeleton) do
+                        line.Visible = false
+                    end
+                end
+            end)
+        end
+        return
+    end
+
     local streamedPlayers = {}
     for player, tbl in pairs(ESPObjects) do
         streamedPlayers[player] = true
@@ -299,6 +318,7 @@ RunService.RenderStepped:Connect(function()
             end
         end)
     end
+
     -- Robust cleanup: remove ESP for any player no longer in Players
     for playerRef in pairs(ESPObjects) do
         local found = false
@@ -314,14 +334,7 @@ RunService.RenderStepped:Connect(function()
             cleanupESP(playerRef)
         end
     end
-end)  -- <<< This closes the RunService.RenderStepped:Connect
-
--- Define ClearESP to cleanup all ESP drawings
-local function ClearESP()
-    for player, _ in pairs(ESPObjects) do
-        cleanupESP(player)
-    end
-end
+end)
 
 -- Grab the toggle from Linora UI groupbox
 local playerESPToggle = VisualsGroup.PlayerESP
