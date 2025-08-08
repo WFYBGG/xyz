@@ -124,15 +124,7 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "ESP",
     Default = false
 })
-local VisualsGroup2 = Tabs.Visuals:AddRightGroupbox("World Visual")
-VisualsGroup2:AddToggle("NoFog", {
-    Text = "No Fog",
-    Default = false
-})
-VisualsGroup2:AddToggle("NoShadows", {
-    Text = "No Shadows",
-    Default = false
-})
+local VisualsGroup2 = Tabs.Visuals:AddRightGroupbox("World Visuals")
 VisualsGroup2:AddToggle("FullBright", {
     Text = "FullBright",
     Default = false
@@ -145,6 +137,15 @@ VisualsGroup2:AddSlider("FullBrightIntensity", {
     Rounding = 0,
     Compact = true
 })
+VisualsGroup2:AddToggle("NoFog", {
+    Text = "No Fog",
+    Default = false
+})
+VisualsGroup2:AddToggle("NoShadows", {
+    Text = "No Shadows",
+    Default = false
+})
+
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
