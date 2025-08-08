@@ -192,11 +192,6 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "Player ESP",
     Default = false
 })
-Options.PlayerESPColor = VisualsGroup:AddColorpicker({
-    Text = "ESP Color",
-    Default = Color3.fromRGB(255, 0, 0),
-    Callback = function(value) end
-})
 local VisualsGroup2 = Tabs.Visuals:AddRightGroupbox("World Visuals")
 VisualsGroup2:AddToggle("FullBright", {
     Text = "FullBright",
