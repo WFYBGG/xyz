@@ -239,6 +239,12 @@ pcall(function()
     local UserInputService = game:GetService("UserInputService")
     local player = Players.LocalPlayer
 
+    -- Check if GUI is initialized
+    if not Toggles or not Toggles.SpeedhackToggle or not Options or not Options.SpeedhackSpeed then
+        print("[Speedhack] Error: GUI toggles or options not initialized")
+        return
+    end
+
     local BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
 
@@ -248,6 +254,8 @@ pcall(function()
             if char and char:FindFirstChild("Humanoid") then
                 char.Humanoid.WalkSpeed = 16
                 char.Humanoid.JumpPower = 50
+            else
+                print("[Speedhack] Warning: No character or Humanoid found for reset")
             end
             BodyVelocity.Parent = nil
         end)
@@ -257,17 +265,39 @@ pcall(function()
         pcall(function()
             resetSpeed()
             BodyVelocity:Destroy()
+            print("[Speedhack] Cleaned up")
         end)
     end
 
     player.CharacterAdded:Connect(function(character)
         pcall(function()
-            repeat task.wait() until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+            -- Wait for HumanoidRootPart and Humanoid with timeout
+            local timeout = tick() + 5
+            while not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) and tick() < timeout do
+                task.wait()
+            end
+            if not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) then
+                print("[Speedhack] Error: Character initialization failed")
+                return
+            end
             if Toggles.SpeedhackToggle.Value then
                 BodyVelocity.Parent = character.HumanoidRootPart
                 character.Humanoid.JumpPower = 0
+                print("[Speedhack] Enabled for new character")
             end
         end)
+    end)
+
+    -- Check if character exists on script start
+    pcall(function()
+        if player.Character then
+            local char = player.Character
+            if char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and Toggles.SpeedhackToggle.Value then
+                BodyVelocity.Parent = char.HumanoidRootPart
+                char.Humanoid.JumpPower = 0
+                print("[Speedhack] Enabled for existing character")
+            end
+        end
     end)
 
     local renderConnection
@@ -275,7 +305,7 @@ pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function(dt)
             pcall(function()
                 local char = player.Character
-                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
+                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
                     local dir = Vector3.zero
                     if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
                     if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
@@ -289,18 +319,25 @@ pcall(function()
                 else
                     resetSpeed()
                 end
+            end, function(err)
+                print("[Speedhack] RenderStepped error: " .. tostring(err))
             end)
         end)
+    end, function(err)
+        print("[Speedhack] Error connecting RenderStepped: " .. tostring(err))
     end)
 
     -- Handle Flight toggle-off when both are active
-    Toggles.FlightToggle:OnChanged(function(value)
-        pcall(function()
-            if not value and Toggles.SpeedhackToggle.Value then
-                Toggles.SpeedhackToggle:SetValue(false)
-                task.wait(0.1)
-                Toggles.SpeedhackToggle:SetValue(true)
-            end
+    pcall(function()
+        Toggles.FlightToggle:OnChanged(function(value)
+            pcall(function()
+                if not value and Toggles.SpeedhackToggle.Value then
+                    Toggles.SpeedhackToggle:SetValue(false)
+                    task.wait(0.1)
+                    Toggles.SpeedhackToggle:SetValue(true)
+                    print("[Speedhack] Re-enabled after Flight toggle-off")
+                end
+            end)
         end)
     end)
 
@@ -309,8 +346,11 @@ pcall(function()
         pcall(function()
             if renderConnection then renderConnection:Disconnect() end
             cleanupSpeed()
+            print("[Speedhack] Unloaded")
         end)
     end)
+end, function(err)
+    print("[Speedhack] Initialization error: " .. tostring(err))
 end)
 
 
@@ -421,6 +461,12 @@ pcall(function()
     local Players = game:GetService("Players")
     local player = Players.LocalPlayer
 
+    -- Check if GUI is initialized
+    if not Toggles or not Toggles.NoclipToggle then
+        print("[Noclip] Error: GUI toggles not initialized")
+        return
+    end
+
     local function setCollision(state)
         pcall(function()
             local char = player.Character
@@ -430,17 +476,51 @@ pcall(function()
                         part.CanCollide = state
                     end
                 end
+            else
+                print("[Noclip] Warning: No character found for setCollision")
             end
+        end, function(err)
+            print("[Noclip] setCollision error: " .. tostring(err))
         end)
     end
+
+    -- Check if character exists on script start
+    pcall(function()
+        if player.Character and Toggles.NoclipToggle.Value then
+            setCollision(false)
+            print("[Noclip] Enabled for existing character")
+        end
+    end)
+
+    player.CharacterAdded:Connect(function(character)
+        pcall(function()
+            -- Wait for character parts with timeout
+            local timeout = tick() + 5
+            while not character:FindFirstChild("HumanoidRootPart") and tick() < timeout do
+                task.wait()
+            end
+            if not character:FindFirstChild("HumanoidRootPart") then
+                print("[Noclip] Error: Character initialization failed")
+                return
+            end
+            if Toggles.NoclipToggle.Value then
+                setCollision(false)
+                print("[Noclip] Enabled for new character")
+            end
+        end)
+    end)
 
     local renderConnection
     pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function()
             pcall(function()
                 setCollision(not Toggles.NoclipToggle.Value)
+            end, function(err)
+                print("[Noclip] RenderStepped error: " .. tostring(err))
             end)
         end)
+    end, function(err)
+        print("[Noclip] Error connecting RenderStepped: " .. tostring(err))
     end)
 
     -- Cleanup on GUI unload
@@ -448,8 +528,11 @@ pcall(function()
         pcall(function()
             if renderConnection then renderConnection:Disconnect() end
             setCollision(true) -- Restore collision
+            print("[Noclip] Unloaded")
         end)
     end)
+end, function(err)
+    print("[Noclip] Initialization error: " .. tostring(err))
 end)
 
 
