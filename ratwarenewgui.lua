@@ -899,6 +899,298 @@ end, function(err)
 end)
 
 
+
+
+--Universal Tween & Location
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer
+pcall(function() LocalPlayer = LocalPlayer or Players.LocalPlayer end)
+
+-- State management
+local isTweening = false
+local priorSettings = {Speedhack = false, Flight = false, Noclip = false, NoFall = false, Speed = 100}
+local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
+local currentTarget = nil
+
+-- Save prior settings
+local function savePriorSettings()
+    pcall(function()
+        priorSettings.Speedhack = Toggles.SpeedhackToggle.Value
+        priorSettings.Flight = Toggles.FlightToggle.Value
+        priorSettings.Noclip = Toggles.NoclipToggle.Value
+        priorSettings.NoFall = Toggles.NoFallDamage.Value
+        priorSettings.Speed = Options.SpeedhackSpeed.Value
+    end)
+end
+
+-- Restore prior settings
+local function restoreSettings()
+    pcall(function()
+        Toggles.SpeedhackToggle:SetValue(priorSettings.Speedhack)
+        Toggles.FlightToggle:SetValue(priorSettings.Flight)
+        Toggles.NoclipToggle:SetValue(priorSettings.Noclip)
+        Toggles.NoFallDamage:SetValue(priorSettings.NoFall)
+        Options.SpeedhackSpeed:SetValue(priorSettings.Speed)
+    end)
+end
+
+-- Prevent toggle changes during tween
+local function preventToggleChange(toggleName, value)
+    if isTweening and (toggleName == "FlightToggle" or toggleName == "NoclipToggle" or toggleName == "NoFallDamage") and not value then
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "Tween Error",
+                Text = "Tween in progress. Stop to disable " .. toggleName:gsub("Toggle", ""),
+                Duration = 5
+            })
+        end)
+        return false
+    end
+    return true
+end
+
+-- Toggle handlers
+pcall(function()
+    Toggles.SpeedhackToggle:OnChanged(function(value)
+        if not isTweening or preventToggleChange("SpeedhackToggle", value) then
+            pcall(function() Options.SpeedhackSpeed:SetValue(value and Options.SpeedhackSpeed.Value or 100) end)
+        end
+    end)
+end)
+
+pcall(function()
+    Toggles.FlightToggle:OnChanged(function(value)
+        if preventToggleChange("FlightToggle", value) then
+            -- Flight logic (placeholder, assume handled by GUI)
+        end
+    end)
+end)
+
+pcall(function()
+    Toggles.NoclipToggle:OnChanged(function(value)
+        if preventToggleChange("NoclipToggle", value) then
+            -- Noclip logic (placeholder, assume handled by GUI)
+        end
+    end)
+end)
+
+pcall(function()
+    Toggles.NoFallDamage:OnChanged(function(value)
+        if preventToggleChange("NoFallDamage", value) then
+            -- NoFall logic (placeholder, assume handled by GUI)
+        end
+    end)
+end)
+
+-- Disable animations
+local function disableAnimations(char)
+    pcall(function()
+        local humanoid = char and char:FindFirstChild("Humanoid")
+        if humanoid then
+            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+                pcall(function() track:Stop() end)
+            end
+        end
+    end)
+end
+
+-- Get target CFrame
+local function getTargetCFrame(targetType, targetName)
+    local targetCFrame = nil
+    pcall(function()
+        if targetType == "Areas" then
+            local areaMarkers = game:GetService("ReplicatedStorage"):FindFirstChild("WorldModel") and game:GetService("ReplicatedStorage").WorldModel:FindFirstChild("AreaMarkers")
+            if areaMarkers then
+                for _, area in pairs(areaMarkers:GetChildren()) do
+                    if area.Name == targetName then
+                        targetCFrame = area.CFrame
+                        break
+                    end
+                end
+            end
+        elseif targetType == "NPCs" then
+            local npcs = game:GetService("Workspace"):FindFirstChild("NPCs")
+            if npcs then
+                for _, npc in pairs(npcs:GetChildren()) do
+                    if npc.Name == targetName then
+                        targetCFrame = npc.CFrame
+                        break
+                    elseif game:GetService("ReplicatedStorage"):FindFirstChild("TownMarkers") then
+                        for _, town in pairs(game:GetService("ReplicatedStorage").TownMarkers:GetChildren()) do
+                            if town:FindFirstChild(targetName) then
+                                targetCFrame = town[targetName].CFrame
+                                targetName = town.Name .. " " .. targetName
+                                break
+                            end
+                        end
+                    end
+                    if targetCFrame then break end
+                end
+            end
+        end
+    end)
+    return targetCFrame, targetName
+end
+
+-- Update dropdowns
+local function updateDropdowns()
+    pcall(function()
+        local areaValues = {}
+        local npcValues = {}
+        local areaMarkers = game:GetService("ReplicatedStorage"):FindFirstChild("WorldModel") and game:GetService("ReplicatedStorage").WorldModel:FindFirstChild("AreaMarkers")
+        if areaMarkers then
+            for _, area in pairs(areaMarkers:GetChildren()) do
+                if not table.find(areaValues, area.Name) then
+                    table.insert(areaValues, area.Name)
+                end
+            end
+        end
+        local npcs = game:GetService("Workspace"):FindFirstChild("NPCs")
+        if npcs then
+            for _, npc in pairs(npcs:GetChildren()) do
+                local npcName = npc.Name
+                if game:GetService("ReplicatedStorage"):FindFirstChild("TownMarkers") then
+                    for _, town in pairs(game:GetService("ReplicatedStorage").TownMarkers:GetChildren()) do
+                        if town:FindFirstChild(npcName) then
+                            npcName = town.Name .. " " .. npcName
+                            break
+                        end
+                    end
+                end
+                if not table.find(npcValues, npcName) then
+                    table.insert(npcValues, npcName)
+                end
+            end
+        end
+        Options.Areas:SetValues(areaValues)
+        Options.NPCs:SetValues(npcValues)
+        if #areaValues > 0 and Options.Areas.Value == "" then Options.Areas:SetValue(areaValues[1]) end
+        if #npcValues > 0 and Options.NPCs.Value == "" then Options.NPCs:SetValue(npcValues[1]) end
+    end)
+end
+
+-- Tween execution
+local function startTween(targetType, targetName)
+    if isTweening then
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "Tween Error",
+                Text = "Tween in progress. Stop to switch target.",
+                Duration = 5
+            })
+        end)
+        return
+    end
+
+    savePriorSettings()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+
+    pcall(function()
+        Toggles.SpeedhackToggle:SetValue(false)
+        if not Toggles.FlightToggle.Value then Toggles.FlightToggle:SetValue(true) end
+        if not Toggles.NoclipToggle.Value then Toggles.NoclipToggle:SetValue(true) end
+        if not Toggles.NoFallDamage.Value then Toggles.NoFallDamage:SetValue(true) end
+    end)
+
+    isTweening = true
+    disableAnimations(char)
+
+    local targetCFrame, adjustedName = getTargetCFrame(targetType, targetName)
+    if not targetCFrame then
+        isTweening = false
+        restoreSettings()
+        return
+    end
+
+    local speed = Options.UniversalTweenSpeed.Value / 100
+    local steps = {
+        {pos = hrp.Position + Vector3.new(0, 1000 - hrp.Position.Y, 0), time = (1000 - hrp.Position.Y) / speed},
+        {pos = Vector3.new(targetCFrame.X, 1000, targetCFrame.Z), time = ((Vector3.new(targetCFrame.X, 0, targetCFrame.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Magnitude) / speed},
+        {pos = targetCFrame.Position, time = 1000 / speed}
+    }
+
+    for i, step in pairs(steps) do
+        if not isTweening then break end
+        local tween = TweenService:Create(hrp, TweenInfo.new(step.time, Enum.EasingStyle.Linear), {Position = step.pos})
+        pcall(function() tween:Play() end)
+        pcall(function() tween.Completed:Wait() end)
+    end
+
+    if isTweening then
+        restoreSettings()
+    end
+    isTweening = false
+end
+
+local function stopTween()
+    if not isTweening then return end
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                pcall(function() tween:Cancel() end)
+            end
+        end
+    end)
+    restoreSettings()
+    isTweening = false
+end
+
+-- Button handlers
+pcall(function()
+    Options.Areas:OnChanged(function(value)
+        updateDropdowns()
+    end)
+end)
+
+pcall(function()
+    Options.NPCs:OnChanged(function(value)
+        updateDropdowns()
+    end)
+end)
+
+pcall(function()
+    MainGroup3.Buttons["Area Tween Start/Stop"]:SetCallback(function()
+        if Options.Areas.Value ~= "" then
+            startTween("Areas", Options.Areas.Value)
+        end
+    end)
+end)
+
+pcall(function()
+    MainGroup3.Buttons["NPC Tween Start/Stop"]:SetCallback(function()
+        if Options.NPCs.Value ~= "" then
+            startTween("NPCs", Options.NPCs.Value)
+        end
+    end)
+end)
+
+pcall(function()
+    MainGroup3.Buttons["Area Tween Start/Stop"]:AddCallbackOnRight(function()
+        stopTween()
+    end)
+end)
+
+pcall(function()
+    MainGroup3.Buttons["NPC Tween Start/Stop"]:AddCallbackOnRight(function()
+        stopTween()
+    end)
+end)
+
+-- Initial update
+pcall(updateDropdowns)
+
+
+
+
+
 --Attach to back Module [TESTING STILL]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
