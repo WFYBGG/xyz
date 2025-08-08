@@ -571,20 +571,7 @@ pcall(function()
 end)
 
 
---ESP Module [TESTING STILL]
---[[
-    Universal ESP with robust cleanup, Drawing API skeleton, and 2D chams effect.
-    Integrated with Linoria GUI (Toggles.PlayerESP).
-    - Toggles ESP for all players (excluding LocalPlayer) via Toggles.PlayerESP.
-    - Cleans up ESP for all players including those who leave or disconnect.
-    - Skeleton ESP (lines between limbs) with Drawing API.
-    - 2D chams: draws a filled rectangle behind the ESP box (not true 3D chams, but Drawing API-safe).
-    - All object access wrapped in pcall for anti-crash/anti-flag safety.
-    - No external libraries, no range limit, works for all streamed characters.
-    - Health/MaxHealth via Workspace.Living[Model.Name==Player.Name].Humanoid.
-    - Place in executor and run in-game.
---]]
-
+--Player ESP Module
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
@@ -770,167 +757,162 @@ pcall(function()
     end
 end)
 
--- Wait for GUI initialization
-local function waitForGUI()
-    local maxWait = 5
-    local waitTime = 0
-    while waitTime < maxWait do
-        local success, result = pcall(function() return Toggles.PlayerESP end)
-        if success and result then
-            return true
+-- Initialize ESP when GUI is ready
+local function initESP()
+    local function waitForGUI()
+        while not pcall(function() return Toggles.PlayerESP end) do
+            wait(0.1)
         end
-        wait(0.1)
-        waitTime = waitTime + 0.1
+        return true
     end
-    warn("Failed to initialize Toggles.PlayerESP after " .. maxWait .. " seconds")
-    return false
-end
-if not waitForGUI() then return end
-
--- Toggle ESP with GUI
-pcall(function()
-    Toggles.PlayerESP:OnChanged(function(value)
-        if not value then
-            for player, _ in pairs(ESPObjects) do
-                cleanupESP(player)
-            end
-        end
-    end)
-end)
-
-RunService.RenderStepped:Connect(function()
-    if Toggles.PlayerESP and Toggles.PlayerESP.Value then
-        local streamedPlayers = {}
-        for player, tbl in pairs(ESPObjects) do
-            streamedPlayers[player] = true
-            pcall(function()
-                local char = getCharacterModel(player)
-                local box, nameText, healthText, distText, chamBox
-                pcall(function()
-                    box = tbl.Box
-                    nameText = tbl.Name
-                    healthText = tbl.Health
-                    distText = tbl.Distance
-                    chamBox = tbl.ChamBox
-                end)
-
-                if char and safeGet(char, "HumanoidRootPart") then
-                    local hrp
-                    pcall(function() hrp = char.HumanoidRootPart end)
-                    local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
-
+    if waitForGUI() then
+        pcall(function()
+            Toggles.PlayerESP:OnChanged(function(value)
+                if not value then
+                    for player, _ in pairs(ESPObjects) do
+                        cleanupESP(player)
+                    end
+                end
+            end)
+        end)
+        RunService.RenderStepped:Connect(function()
+            if Toggles.PlayerESP and Toggles.PlayerESP.Value then
+                local streamedPlayers = {}
+                for player, tbl in pairs(ESPObjects) do
+                    streamedPlayers[player] = true
                     pcall(function()
-                        pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    end)
-
-                    pcall(function()
-                        health, maxHealth = getHealthInfo(char)
-                    end)
-
-                    pcall(function()
-                        extents = char:GetExtentsSize()
-                    end)
-
-                    pcall(function()
-                        topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
-                    end)
-                    pcall(function()
-                        botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
-                    end)
-                    pcall(function()
-                        height = (botW.Y - topW.Y)
-                        width = height * 0.45
-                    end)
-
-                    if onScreen and onScreen1 and onScreen2 and health > 0 then
-                        -- Chams box (drawn behind ESP box)
+                        local char = getCharacterModel(player)
+                        local box, nameText, healthText, distText, chamBox
                         pcall(function()
-                            chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
-                            chamBox.Size = Vector2.new(width, height)
-                            chamBox.Color = Color3.fromRGB(255, 0, 0)
-                            chamBox.Transparency = 0.15
-                            chamBox.Visible = true
+                            box = tbl.Box
+                            nameText = tbl.Name
+                            healthText = tbl.Health
+                            distText = tbl.Distance
+                            chamBox = tbl.ChamBox
                         end)
 
-                        -- Draw box (top horizontal line)
-                        pcall(function()
-                            box.From = Vector2.new(topW.X - width/2, topW.Y)
-                            box.To   = Vector2.new(topW.X + width/2, topW.Y)
-                            box.Visible = true
-                        end)
+                        if char and safeGet(char, "HumanoidRootPart") then
+                            local hrp
+                            pcall(function() hrp = char.HumanoidRootPart end)
+                            local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
 
-                        -- Draw name
-                        pcall(function()
-                            nameText.Text = player.DisplayName
-                            nameText.Position = Vector2.new(pos.X, topW.Y - 16)
-                            nameText.Visible = true
-                        end)
+                            pcall(function()
+                                pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                            end)
 
-                        -- Draw health/maxhealth
-                        pcall(function()
-                            healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
-                            healthText.Position = Vector2.new(pos.X, topW.Y - 2)
-                            local r = math.floor(255 - 255 * (health/maxHealth))
-                            local g = math.floor(255 * (health/maxHealth))
-                            healthText.Color = Color3.fromRGB(r, g, 0)
-                            healthText.Visible = true
-                        end)
+                            pcall(function()
+                                health, maxHealth = getHealthInfo(char)
+                            end)
 
-                        -- Draw distance
-                        pcall(function()
-                            local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                            distText.Text = "[" .. math.floor(dist) .. "m]"
-                            distText.Position = Vector2.new(pos.X, botW.Y + 2)
-                            distText.Visible = true
-                        end)
+                            pcall(function()
+                                extents = char:GetExtentsSize()
+                            end)
 
-                        -- Draw skeleton
-                        drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
-                    else
-                        pcall(function() box.Visible = false end)
-                        pcall(function() nameText.Visible = false end)
-                        pcall(function() healthText.Visible = false end)
-                        pcall(function() distText.Visible = false end)
-                        pcall(function() chamBox.Visible = false end)
-                        -- Hide skeleton lines
-                        if tbl.Skeleton then
-                            for _, line in pairs(tbl.Skeleton) do
-                                pcall(function() line.Visible = false end)
+                            pcall(function()
+                                topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
+                            end)
+                            pcall(function()
+                                botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
+                            end)
+                            pcall(function()
+                                height = (botW.Y - topW.Y)
+                                width = height * 0.45
+                            end)
+
+                            if onScreen and onScreen1 and onScreen2 and health > 0 then
+                                -- Chams box (drawn behind ESP box)
+                                pcall(function()
+                                    chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
+                                    chamBox.Size = Vector2.new(width, height)
+                                    chamBox.Color = Color3.fromRGB(255, 0, 0)
+                                    chamBox.Transparency = 0.15
+                                    chamBox.Visible = true
+                                end)
+
+                                -- Draw box (top horizontal line)
+                                pcall(function()
+                                    box.From = Vector2.new(topW.X - width/2, topW.Y)
+                                    box.To   = Vector2.new(topW.X + width/2, topW.Y)
+                                    box.Visible = true
+                                end)
+
+                                -- Draw name
+                                pcall(function()
+                                    nameText.Text = player.DisplayName
+                                    nameText.Position = Vector2.new(pos.X, topW.Y - 16)
+                                    nameText.Visible = true
+                                end)
+
+                                -- Draw health/maxhealth
+                                pcall(function()
+                                    healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
+                                    healthText.Position = Vector2.new(pos.X, topW.Y - 2)
+                                    local r = math.floor(255 - 255 * (health/maxHealth))
+                                    local g = math.floor(255 * (health/maxHealth))
+                                    healthText.Color = Color3.fromRGB(r, g, 0)
+                                    healthText.Visible = true
+                                end)
+
+                                -- Draw distance
+                                pcall(function()
+                                    local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
+                                    distText.Text = "[" .. math.floor(dist) .. "m]"
+                                    distText.Position = Vector2.new(pos.X, botW.Y + 2)
+                                    distText.Visible = true
+                                end)
+
+                                -- Draw skeleton
+                                drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
+                            else
+                                pcall(function() box.Visible = false end)
+                                pcall(function() nameText.Visible = false end)
+                                pcall(function() healthText.Visible = false end)
+                                pcall(function() distText.Visible = false end)
+                                pcall(function() chamBox.Visible = false end)
+                                -- Hide skeleton lines
+                                if tbl.Skeleton then
+                                    for _, line in pairs(tbl.Skeleton) do
+                                        pcall(function() line.Visible = false end)
+                                    end
+                                end
+                            end
+                        else
+                            pcall(function() box.Visible = false end)
+                            pcall(function() nameText.Visible = false end)
+                            pcall(function() healthText.Visible = false end)
+                            pcall(function() distText.Visible = false end)
+                            pcall(function() chamBox.Visible = false end)
+                            -- Hide skeleton lines
+                            if tbl.Skeleton then
+                                for _, line in pairs(tbl.Skeleton) do
+                                    pcall(function() line.Visible = false end)
+                                end
                             end
                         end
-                    end
-                else
-                    pcall(function() box.Visible = false end)
-                    pcall(function() nameText.Visible = false end)
-                    pcall(function() healthText.Visible = false end)
-                    pcall(function() distText.Visible = false end)
-                    pcall(function() chamBox.Visible = false end)
-                    -- Hide skeleton lines
-                    if tbl.Skeleton then
-                        for _, line in pairs(tbl.Skeleton) do
-                            pcall(function() line.Visible = false end)
+                    end)
+                end
+                -- Robust cleanup: remove ESP for any player no longer in Players
+                for playerRef in pairs(ESPObjects) do
+                    local found = false
+                    pcall(function()
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p == playerRef then
+                                found = true
+                                break
+                            end
                         end
+                    end)
+                    if not found then
+                        cleanupESP(playerRef)
                     end
                 end
-            end)
-        end
-        -- Robust cleanup: remove ESP for any player no longer in Players
-        for playerRef in pairs(ESPObjects) do
-            local found = false
-            pcall(function()
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p == playerRef then
-                        found = true
-                        break
-                    end
-                end
-            end)
-            if not found then
-                cleanupESP(playerRef)
             end
-        end
+        end)
     end
-end)
+end
+
+-- Start ESP initialization
+spawn(initESP)
 
 
 --Attach to back Module [TESTING STILL]
