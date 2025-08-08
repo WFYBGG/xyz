@@ -108,14 +108,34 @@ MainGroup4:AddToggle("NoFire", {
     Default = false
 })
 
-local MainGroup5 = Tabs.Main:AddLeftGroupbox("World Mods")
+local MainGroup5 = Tabs.Main:AddLeftGroupbox("World")
+MainGroup5:AddToggle("NoKillBricks", {
+    Text = "No Kill Bricks",
+    Default = false
+})
 MainGroup5:AddToggle("NoLava", {
     Text = "No Lava",
     Default = false
 })
-MainGroup5:AddToggle("NoKillBricks", {
-    Text = "No Kill Bricks",
+MainGroup5:AddToggle("NoFog", {
+    Text = "No Fog",
     Default = false
+})
+MainGroup5:AddToggle("NoShadows", {
+    Text = "No Shadows",
+    Default = false
+})
+MainGroup5:AddToggle("FullBright", {
+    Text = "FullBright",
+    Default = false
+})
+MainGroup5:AddSlider("FullBrightIntensity", {
+    Text = "FullBright intensity",
+    Default = 256,
+    Min = 0,
+    Max = 256,
+    Rounding = 0,
+    Compact = true
 })
 
 -- Visuals Tab
@@ -124,28 +144,6 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "ESP",
     Default = false
 })
-local VisualsGroup = Tabs.Visuals:AddRightGroupbox("World Visuals")
-VisualsGroup:AddToggle("FullBright", {
-    Text = "FullBright",
-    Default = false
-})
-VisualsGroup:AddSlider("FullBrightIntensity", {
-    Text = "FullBright intensity",
-    Default = 256,
-    Min = 0,
-    Max = 256,
-    Rounding = 0,
-    Compact = true
-})
-VisualsGroup:AddToggle("NoFog", {
-    Text = "No Fog",
-    Default = false
-})
-VisualsGroup:AddToggle("NoShadows", {
-    Text = "No Shadows",
-    Default = false
-})
-
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
