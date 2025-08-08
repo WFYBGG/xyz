@@ -77,36 +77,64 @@ MainGroup:AddToggle("NoclipToggle", {
 --    Text = "Auto Ingredient Pickup",
 --    Default = false
 --})
-local MainGroup3 = Tabs.Main:AddRightGroupbox("Tween to Location")
+local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween [Search]")
+local TweenFullList = {"WIP", "Area1", "Area2", "Area3", "Area4", "? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"} -- Combined list for areas and NPCs
+MainGroup3:AddInput("Search", {
+    Default = "",
+    Placeholder = "Search or select below...",
+    Callback = function(value)
+        local filteredValues = {}
+        for _, item in pairs(TweenFullList) do
+            if string.lower(item):find(string.lower(value)) or value == "" then
+                table.insert(filteredValues, item)
+            end
+        end
+        -- Update both dropdowns with filtered values
+        local areaValues = {}
+        local npcValues = {}
+        for _, item in pairs(filteredValues) do
+            if table.find({"WIP", "Area1", "Area2", "Area3", "Area4"}, item) then
+                table.insert(areaValues, item)
+            elseif table.find({"? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"}, item) then
+                table.insert(npcValues, item)
+            end
+        end
+        Options.Areas:SetValues(areaValues)
+        Options.NPCs:SetValues(npcValues)
+        if #areaValues > 0 and (Options.Areas.Value == "" or not table.find(areaValues, Options.Areas.Value)) then
+            Options.Areas:SetValue(areaValues[1]) -- Set first area match
+        elseif #areaValues == 0 then
+            Options.Areas:SetValue("") -- Clear if no area match
+        end
+        if #npcValues > 0 and (Options.NPCs.Value == "" or not table.find(npcValues, Options.NPCs.Value)) then
+            Options.NPCs:SetValue(npcValues[1]) -- Set first NPC match
+        elseif #npcValues == 0 then
+            Options.NPCs:SetValue("") -- Clear if no NPC match
+        end
+    end
+})
+
+MainGroup3:AddSlider("UniversalTweenSpeed", {
+    Text = "Universal Tween Speed",
+    Default = 150,
+    Min = 0,
+    Max = 300,
+    Rounding = 0,
+    Compact = true
+})
 MainGroup3:AddDropdown("Areas", {
     Text = "Area Selection",
     Default = "WIP",
-    Values = {"WIP"},
+    Values = {"WIP", "Area1", "Area2", "Area3", "Area4"},
     Multi = false
-})
-MainGroup3:AddSlider("AreaTweenSpeed", {
-    Text = "Speed",
-    Default = 150,
-    Min = 0,
-    Max = 200,
-    Rounding = 0,
-    Compact = true
 })
 MainGroup3:AddButton("Area Tween Start/Stop", function() print("Area Tween Start/Stop clicked") end)
 
 MainGroup3:AddDropdown("NPCs", {
     Text = "NPC Selection",
     Default = "? ??, God's Eye",
-    Values = {"? ??, God's Eye"},
+    Values = {"? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"},
     Multi = false
-})
-MainGroup3:AddSlider("NPCTweenSpeed", {
-    Text = "Speed",
-    Default = 150,
-    Min = 0,
-    Max = 200,
-    Rounding = 0,
-    Compact = true
 })
 MainGroup3:AddButton("NPC Tween Start/Stop", function() print("NPC Tween Start/Stop clicked") end)
 
@@ -144,6 +172,15 @@ MainGroup6:AddToggle("AttachtobackToggle", {
     Text = "N/A",
     Callback = function(value)
         Toggles.AttachtobackToggle:SetValue(value)
+    end
+})
+local MainGroup7 = LeftGroupBox:AddDropdown('PlayerDropdown', {
+    SpecialType = 'Player',
+    Text = 'Select Player',
+    Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
+
+    Callback = function(Value)
+        print('[cb] Player dropdown got changed:', Value)
     end
 })
 
