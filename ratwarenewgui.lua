@@ -594,6 +594,19 @@ end)
 
 
 --ESP Module [TESTING STILL]
+--[[
+    Universal ESP with robust cleanup, Drawing API skeleton, and 2D chams effect.
+    Integrated with Linoria GUI (Toggles.PlayerESP).
+    - Toggles ESP for all players (excluding LocalPlayer) via Toggles.PlayerESP.
+    - Cleans up ESP for all players including those who leave or disconnect.
+    - Skeleton ESP (lines between limbs) with Drawing API.
+    - 2D chams: draws a filled rectangle behind the ESP box (not true 3D chams, but Drawing API-safe).
+    - All object access wrapped in pcall for anti-crash/anti-flag safety.
+    - No external libraries, no range limit, works for all streamed characters.
+    - Health/MaxHealth via Workspace.Living[Model.Name==Player.Name].Humanoid.
+    - Place in executor and run in-game.
+--]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
@@ -619,7 +632,7 @@ local function getCharacterModel(player)
         living = workspace:FindFirstChild("Living")
     end)
     if not living then return nil end
-    return safeGet(living, player.Name) or nil
+    return safeGet(living, player.Name)
 end
 
 local function getHealthInfo(character)
@@ -631,73 +644,74 @@ local function getHealthInfo(character)
             maxHealth = humanoid.MaxHealth
         end
     end)
-    return health > 0 and health or 0, maxHealth > 0 and maxHealth or 100
+    return health, maxHealth
 end
 
 local function cleanupESP(player)
-    local success, err = pcall(function()
-        local tbl = ESPObjects[player]
-        if tbl then
-            for _, obj in pairs(tbl) do
-                if typeof(obj) == "table" then
-                    for _, v in pairs(obj) do
-                        pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
-                    end
-                else
-                    pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
+    local tbl
+    pcall(function() tbl = ESPObjects[player] end)
+    if tbl then
+        for _, obj in pairs(tbl) do
+            if typeof(obj) == "table" then
+                for _, v in pairs(obj) do
+                    pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
                 end
+            else
+                pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
             end
-            ESPObjects[player] = nil
         end
-    end)
-    if not success then
-        warn("Cleanup ESP failed for player " .. tostring(player) .. " at cleanupESP: " .. tostring(err))
+        pcall(function() ESPObjects[player] = nil end)
     end
 end
 
 local function createESP(player)
     if player == LocalPlayer then return end
-    local success, err = pcall(function()
+    pcall(function()
         if ESPObjects[player] then cleanupESP(player) end
 
         local box, nameText, healthText, distText, chamBox
-        local drawingSupported = pcall(function()
+
+        pcall(function()
             box = Drawing.new("Line")
             box.Visible = false
             box.Thickness = 2
             box.Color = Color3.fromRGB(255, 25, 25)
+        end)
 
+        pcall(function()
             nameText = Drawing.new("Text")
             nameText.Size = 14
             nameText.Center = true
             nameText.Outline = true
             nameText.Color = Color3.fromRGB(255, 255, 255)
             nameText.Visible = false
+        end)
 
+        pcall(function()
             healthText = Drawing.new("Text")
             healthText.Size = 13
             healthText.Center = true
             healthText.Outline = true
             healthText.Color = Color3.fromRGB(0, 255, 0)
             healthText.Visible = false
+        end)
 
+        pcall(function()
             distText = Drawing.new("Text")
             distText.Size = 13
             distText.Center = true
             distText.Outline = true
             distText.Color = Color3.fromRGB(200, 200, 200)
             distText.Visible = false
+        end)
 
+        pcall(function()
             chamBox = Drawing.new("Square")
             chamBox.Visible = false
             chamBox.Color = Color3.fromRGB(255, 0, 0)
             chamBox.Transparency = 0.2
             chamBox.Filled = true
         end)
-        if not drawingSupported then
-            warn("Drawing API not supported, skipping ESP creation for " .. tostring(player))
-            return
-        end
 
         ESPObjects[player] = {
             Box = box,
@@ -708,9 +722,6 @@ local function createESP(player)
             Skeleton = {},
         }
     end)
-    if not success then
-        warn("Create ESP failed for player " .. tostring(player) .. " at createESP: " .. tostring(err))
-    end
 end
 
 local function drawSkeleton(player, char, color, thickness)
@@ -751,7 +762,7 @@ local function drawSkeleton(player, char, color, thickness)
             if onScr1 and onScr2 then
                 line.From = Vector2.new(pos1.X, pos1.Y)
                 line.To = Vector2.new(pos2.X, pos2.Y)
-                line.Color = color or Color3.fromRGB(255, 255, 255)
+                line.Color = color or Color3.fromRGB(255,255,255)
                 line.Thickness = thickness or 2
                 line.Visible = true
             else
@@ -783,7 +794,7 @@ end)
 
 -- Wait for GUI initialization
 local function waitForGUI()
-    local maxWait = 10 -- Increased to 10 seconds for robustness
+    local maxWait = 5
     local waitTime = 0
     while waitTime < maxWait do
         local success, result = pcall(function() return Toggles.PlayerESP end)
@@ -801,44 +812,16 @@ if not waitForGUI() then return end
 -- Toggle ESP with GUI
 pcall(function()
     Toggles.PlayerESP:OnChanged(function(value)
-        local success, err = pcall(function()
-            if not value then
-                for player, _ in pairs(ESPObjects) do
-                    cleanupESP(player)
-                end
+        if not value then
+            for player, _ in pairs(ESPObjects) do
+                cleanupESP(player)
             end
-        end)
-        if not success then
-            warn("PlayerESP toggle cleanup failed at OnChanged: " .. tostring(err))
         end
     end)
 end)
 
 RunService.RenderStepped:Connect(function()
-    local success, err = pcall(function()
-        local espToggle = Toggles.PlayerESP
-        if not espToggle then
-            warn("Toggles.PlayerESP is nil, skipping ESP rendering")
-            return
-        end
-        if not espToggle.Value then
-            for player, tbl in pairs(ESPObjects) do
-                pcall(function()
-                    if tbl.Box then tbl.Box.Visible = false end
-                    if tbl.Name then tbl.Name.Visible = false end
-                    if tbl.Health then tbl.Health.Visible = false end
-                    if tbl.Distance then tbl.Distance.Visible = false end
-                    if tbl.ChamBox then tbl.ChamBox.Visible = false end
-                    if tbl.Skeleton then
-                        for _, line in pairs(tbl.Skeleton) do
-                            pcall(function() line.Visible = false end)
-                        end
-                    end
-                end)
-            end
-            return
-        end
-
+    if Toggles.PlayerESP and Toggles.PlayerESP.Value then
         local streamedPlayers = {}
         for player, tbl in pairs(ESPObjects) do
             streamedPlayers[player] = true
@@ -894,7 +877,7 @@ RunService.RenderStepped:Connect(function()
                         -- Draw box (top horizontal line)
                         pcall(function()
                             box.From = Vector2.new(topW.X - width/2, topW.Y)
-                            box.To = Vector2.new(topW.X + width/2, topW.Y)
+                            box.To   = Vector2.new(topW.X + width/2, topW.Y)
                             box.Visible = true
                         end)
 
@@ -924,13 +907,14 @@ RunService.RenderStepped:Connect(function()
                         end)
 
                         -- Draw skeleton
-                        drawSkeleton(player, char, Color3.fromRGB(255, 255, 255), 2)
+                        drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
                     else
                         pcall(function() box.Visible = false end)
                         pcall(function() nameText.Visible = false end)
                         pcall(function() healthText.Visible = false end)
                         pcall(function() distText.Visible = false end)
                         pcall(function() chamBox.Visible = false end)
+                        -- Hide skeleton lines
                         if tbl.Skeleton then
                             for _, line in pairs(tbl.Skeleton) do
                                 pcall(function() line.Visible = false end)
@@ -943,6 +927,7 @@ RunService.RenderStepped:Connect(function()
                     pcall(function() healthText.Visible = false end)
                     pcall(function() distText.Visible = false end)
                     pcall(function() chamBox.Visible = false end)
+                    -- Hide skeleton lines
                     if tbl.Skeleton then
                         for _, line in pairs(tbl.Skeleton) do
                             pcall(function() line.Visible = false end)
@@ -951,8 +936,7 @@ RunService.RenderStepped:Connect(function()
                 end
             end)
         end
-
-        -- Cleanup for players no longer in game
+        -- Robust cleanup: remove ESP for any player no longer in Players
         for playerRef in pairs(ESPObjects) do
             local found = false
             pcall(function()
@@ -967,11 +951,9 @@ RunService.RenderStepped:Connect(function()
                 cleanupESP(playerRef)
             end
         end
-    end)
-    if not success then
-        warn("RenderStepped failed at RenderStepped: " .. tostring(err))
     end
 end)
+
 
 --Attach to back Module [TESTING STILL]
 local RunService = game:GetService("RunService")
