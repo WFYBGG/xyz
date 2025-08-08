@@ -77,9 +77,10 @@ MainGroup:AddToggle("NoclipToggle", {
 --    Text = "Auto Ingredient Pickup",
 --    Default = false
 --})
-local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween [Search]")
+local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 local TweenFullList = {"WIP", "Area1", "Area2", "Area3", "Area4", "? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"} -- Combined list for areas and NPCs
 MainGroup3:AddInput("Search", {
+    Text = "Search:",
     Default = "",
     Placeholder = "Search or select below...",
     Callback = function(value)
@@ -174,7 +175,7 @@ MainGroup6:AddToggle("AttachtobackToggle", {
         Toggles.AttachtobackToggle:SetValue(value)
     end
 })
-local MainGroup7 = LeftGroupBox:AddDropdown('PlayerDropdown', {
+MainGroup6::AddDropdown('PlayerDropdown', {
     SpecialType = 'Player',
     Text = 'Select Player',
     Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
@@ -183,7 +184,6 @@ local MainGroup7 = LeftGroupBox:AddDropdown('PlayerDropdown', {
         print('[cb] Player dropdown got changed:', Value)
     end
 })
-
 
 -- Visuals Tab
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
