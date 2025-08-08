@@ -63,3 +63,10 @@ return v1
 
 --Water
 workspace.Map:GetChildren()[6017]
+
+
+--Decomposed Status
+workspace.Living.dqwdqwdqdWQDC.Status.Decomposed
+workspace.Living.dqwdqwdqdWQDC.Status.
+workspace.Living.dqwdqwdqdWQDC.Status.NoKB
+workspace.Living.dqwdqwdqdWQDC.Status.SwimmingServer
