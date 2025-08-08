@@ -358,10 +358,6 @@ pcall(function()
         if Toggles.FlightToggle then
             Toggles.FlightToggle:OnChanged(function(value)
                 pcall(function()
-                    if shouldCleanup then
-                        print("[Speedhack] Flight toggle skipped; cleanup requested")
-                        return
-                    end
                     if not value and Toggles.SpeedhackToggle.Value then
                         Toggles.SpeedhackToggle:SetValue(false)
                         task.wait(0.1)
