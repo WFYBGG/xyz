@@ -407,7 +407,7 @@ pcall(function()
     u8.Size = Vector3.new(6, 1, 6)
     u8.Anchored = true
     u8.CanCollide = true
-    u8.Transparency = 1.00
+    u8.Transparency = 0.75
     u8.Material = Enum.Material.SmoothPlastic
     u8.BrickColor = BrickColor.new("Bright blue")
 
@@ -447,6 +447,20 @@ pcall(function()
         end)
         if not success then
             warn("Restore speedhack failed: " .. tostring(err))
+        end
+    end
+
+    -- Ensure flight BodyVelocity is applied
+    local function ensureFlightBodyVelocity()
+        local success, err = pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                if not bodyVelocity.Parent then
+                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
+                end
+            end
+        end)
+        if not success then
+            warn("Ensure flight BodyVelocity failed: " .. tostring(err))
         end
     end
 
@@ -541,6 +555,9 @@ pcall(function()
                     moveDirection = moveDirection.Unit
                 end
 
+                -- Ensure flight BodyVelocity is active
+                ensureFlightBodyVelocity()
+
                 -- Apply BodyVelocity with speed capped at 200 studs per frame
                 local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 but respect 49 per frame limit
                 if moveDirection.Magnitude > 0 then
@@ -565,8 +582,10 @@ pcall(function()
                     end
                 end
 
-                -- Ensure speedhack is disabled
-                disableSpeedhack()
+                -- Conditionally disable speedhack
+                if Toggles.SpeedhackToggle and Toggles.SpeedhackToggle.Value then
+                    disableSpeedhack()
+                end
 
                 -- Monitor health to detect kill
                 if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
