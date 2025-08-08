@@ -214,227 +214,160 @@ VisualsGroup2:AddToggle("NoShadows", {
     Default = false
 })
 
-
 --BEGIN MODULES
 --BEGIN MODULES
 --BEGIN MODULES
 --BEGIN MODULES
 
--- Speedhack
-local function setWalkSpeed(speed)
-    local success, err = pcall(function()
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = speed
-        end
-    end)
-    if not success then
-        warn("Speedhack failed: " .. tostring(err))
-    end
-end
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
-Toggles.SpeedhackToggle:OnChanged(function(value)
-    local success, err = pcall(function()
-        if value then
-            setWalkSpeed(Options.SpeedhackSpeed.Value)
-        else
-            setWalkSpeed(16)
-        end
-    end)
-    if not success then
-        warn("Speedhack toggle failed: " .. tostring(err))
-    end
-end)
+--Speedhack Module
+_G.originalspeed = 100 -- Match GUI default
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
 
-Options.SpeedhackSpeed:OnChanged(function(value)
-    if Toggles.SpeedhackToggle.Value then
-        setWalkSpeed(value)
-    end
-end)
-
--- Noclip
-local function setNoclip(enabled)
-    local success, err = pcall(function()
-        local character = LocalPlayer.Character
-        if not character then return end
-
-        if enabled then
-            RunService:BindToRenderStep("Noclip", Enum.RenderPriority.Character.Value, function()
-                for _, part in pairs(character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end)
-        else
-            RunService:UnbindFromRenderStep("Noclip")
-            for _, part in pairs(character:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
+    _G.Speed = _G.originalspeed
+    local u1 = false
+    local u2 = false
+    local u4 = game:GetService("Players")
+    local u5 = game:GetService("UserInputService")
+    
+    -- Create BodyVelocity for movement
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    
+    -- Fallback to reset Humanoid state
+    local function resetHumanoidState()
+        local success, err = pcall(function()
+            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                local humanoid = u4.LocalPlayer.Character.Humanoid
+                humanoid.JumpPower = 50
+                humanoid.WalkSpeed = 16 -- Default Roblox walk speed
+                bodyVelocity.Parent = nil
             end
+        end)
+        if not success then
+            warn("Reset humanoid state failed: " .. tostring(err))
+        end
+    end
+
+    -- Handle character respawn
+    u4.LocalPlayer.CharacterAdded:Connect(function(character)
+        local success, err = pcall(function()
+            repeat
+                wait()
+            until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+            if u1 then
+                bodyVelocity.Parent = character.HumanoidRootPart
+                character.Humanoid.JumpPower = 0
+            end
+        end)
+        if not success then
+            warn("CharacterAdded handler failed: " .. tostring(err))
         end
     end)
-    if not success then
-        warn("Noclip failed: " .. tostring(err))
-    end
-end
 
-Toggles.NoclipToggle:OnChanged(function(value)
-    setNoclip(value)
-end)
-
--- No Stun
-local function preventStun()
-    local success, err = pcall(function()
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.StateChanged:Connect(function(oldState, newState)
-                if newState == Enum.HumanoidStateType.PlatformStanding or newState == Enum.HumanoidStateType.Ragdoll then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    -- Connect to GUI toggle
+    Toggles.SpeedhackToggle:OnChanged(function(value)
+        local success, err = pcall(function()
+            u1 = value
+            if u1 then
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0
                 end
-            end)
+            else
+                resetHumanoidState()
+            end
+        end)
+        if not success then
+            warn("Speedhack toggle failed: " .. tostring(err))
         end
     end)
-    if not success then
-        warn("No stun failed: " .. tostring(err))
-    end
-end
 
-Toggles.NoStun:OnChanged(function(value)
-    if value then
-        preventStun()
-    end
-end)
+    -- Connect to GUI slider
+    Options.SpeedhackSpeed:OnChanged(function(value)
+        local success, err = pcall(function()
+            _G.Speed = value
+        end)
+        if not success then
+            warn("Speedhack speed update failed: " .. tostring(err))
+        end
+    end)
 
--- No Fire
-local function removeFire()
-    local success, err = pcall(function()
-        RunService.Heartbeat:Connect(function()
-            local character = LocalPlayer.Character
-            if character then
-                for _, obj in pairs(character:GetChildren()) do
-                    if obj:IsA("Fire") then
-                        obj:Destroy()
-                    end
+    -- Main movement loop
+    game:GetService("RunService").RenderStepped:Connect(function(u9)
+        pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character.HumanoidRootPart and u4.LocalPlayer.Character.Humanoid then
+                u2 = true
+                local v11 = {
+                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
+                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
+                    Left = u5:IsKeyDown(Enum.KeyCode.A),
+                    Right = u5:IsKeyDown(Enum.KeyCode.D)
+                }
+                
+                -- Calculate movement direction
+                local moveDirection = Vector3.new(0, 0, 0)
+                if v11.Forward then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Backward then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Left then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
+                elseif v11.Right then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
+                end
+
+                -- Normalize direction to ensure consistent speed
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit
+                end
+
+                -- Apply BodyVelocity with speed capped to avoid teleport detection
+                local maxSpeedPerFrame = 49 / u9 -- Ensure movement < 50 studs per frame
+                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame)
+
+                -- Monitor Humanoid health to detect kill
+                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
+                    resetHumanoidState()
+                    u1 = false
+                    u2 = false
+                end
+            else
+                if u2 then
+                    resetHumanoidState()
+                    u2 = false
                 end
             end
         end)
     end)
-    if not success then
-        warn("No fire failed: " .. tostring(err))
-    end
-end
 
-Toggles.NoFire:OnChanged(function(value)
-    if value then
-        removeFire()
-    end
-end)
-
--- No Kill Bricks
-local function disableKillBricks()
-    local success, err = pcall(function()
-        for _, obj in pairs(getinstances()) do
-            if obj:IsA("BasePart") and obj.Name:lower():match("kill") or obj.Name:lower():match("death") then
-                obj.CanCollide = false
-                obj.Transparency = 0.5
-            end
+    -- Cleanup on script destruction
+    game:BindToClose(function()
+        local success, err = pcall(function()
+            bodyVelocity:Destroy()
+        end)
+        if not success then
+            warn("Cleanup failed: " .. tostring(err))
         end
     end)
-    if not success then
-        warn("No kill bricks failed: " .. tostring(err))
-    end
-end
-
-Toggles.NoKillBricks:OnChanged(function(value)
-    if value then
-        disableKillBricks()
-    end
 end)
 
--- No Lava
-local function disableLava()
-    local success, err = pcall(function()
-        for _, obj in pairs(getinstances()) do
-            if obj:IsA("BasePart") and obj.Name:lower():match("lava") then
-                obj.CanCollide = false
-                obj.Transparency = 0.5
-            end
-        end
-    end)
-    if not success then
-        warn("No lava failed: " .. tostring(err))
-    end
-end
 
-Toggles.NoLava:OnChanged(function(value)
-    if value then
-        disableLava()
-    end
-end)
 
--- FullBright
-local function setFullBright(intensity)
-    local success, err = pcall(function()
-        Lighting.Brightness = intensity / 100
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 100000
-    end)
-    if not success then
-        warn("FullBright failed: " .. tostring(err))
-    end
-end
-
-Toggles.FullBright:OnChanged(function(value)
-    if value then
-        setFullBright(Options.FullBrightIntensity.Value)
-    else
-        setFullBright(1)
-    end
-end)
-
-Options.FullBrightIntensity:OnChanged(function(value)
-    if Toggles.FullBright.Value then
-        setFullBright(value)
-    end
-end)
-
--- No Fog
-local function disableFog()
-    local success, err = pcall(function()
-        Lighting.FogEnd = 100000
-    end)
-    if not success then
-        warn("No fog failed: " .. tostring(err))
-    end
-end
-
-Toggles.NoFog:OnChanged(function(value)
-    if value then
-        disableFog()
-    else
-        Lighting.FogEnd = 1000
-    end
-end)
-
--- No Shadows
-local function disableShadows()
-    local success, err = pcall(function()
-        Lighting.GlobalShadows = false
-    end)
-    if not success then
-        warn("No shadows failed: " .. tostring(err))
-    end
-end
-
-Toggles.NoShadows:OnChanged(function(value)
-    if value then
-        disableShadows()
-    else
-        Lighting.GlobalShadows = true
-    end
-end)
 --END MODULES
 --END MODULES
 --END MODULES
