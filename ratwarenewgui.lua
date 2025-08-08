@@ -215,6 +215,232 @@ VisualsGroup2:AddToggle("NoShadows", {
 })
 
 
+--BEGIN MODULES
+--BEGIN MODULES
+--BEGIN MODULES
+--BEGIN MODULES
+
+-- Speedhack
+local function setWalkSpeed(speed)
+    local success, err = pcall(function()
+        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = speed
+        end
+    end)
+    if not success then
+        warn("Speedhack failed: " .. tostring(err))
+    end
+end
+
+Toggles.SpeedhackToggle:OnChanged(function(value)
+    local success, err = pcall(function()
+        if value then
+            setWalkSpeed(Options.SpeedhackSpeed.Value)
+        else
+            setWalkSpeed(16)
+        end
+    end)
+    if not success then
+        warn("Speedhack toggle failed: " .. tostring(err))
+    end
+end)
+
+Options.SpeedhackSpeed:OnChanged(function(value)
+    if Toggles.SpeedhackToggle.Value then
+        setWalkSpeed(value)
+    end
+end)
+
+-- Noclip
+local function setNoclip(enabled)
+    local success, err = pcall(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+
+        if enabled then
+            RunService:BindToRenderStep("Noclip", Enum.RenderPriority.Character.Value, function()
+                for _, part in pairs(character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        else
+            RunService:UnbindFromRenderStep("Noclip")
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end)
+    if not success then
+        warn("Noclip failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoclipToggle:OnChanged(function(value)
+    setNoclip(value)
+end)
+
+-- No Stun
+local function preventStun()
+    local success, err = pcall(function()
+        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.StateChanged:Connect(function(oldState, newState)
+                if newState == Enum.HumanoidStateType.PlatformStanding or newState == Enum.HumanoidStateType.Ragdoll then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                end
+            end)
+        end
+    end)
+    if not success then
+        warn("No stun failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoStun:OnChanged(function(value)
+    if value then
+        preventStun()
+    end
+end)
+
+-- No Fire
+local function removeFire()
+    local success, err = pcall(function()
+        RunService.Heartbeat:Connect(function()
+            local character = LocalPlayer.Character
+            if character then
+                for _, obj in pairs(character:GetChildren()) do
+                    if obj:IsA("Fire") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end)
+    end)
+    if not success then
+        warn("No fire failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoFire:OnChanged(function(value)
+    if value then
+        removeFire()
+    end
+end)
+
+-- No Kill Bricks
+local function disableKillBricks()
+    local success, err = pcall(function()
+        for _, obj in pairs(getinstances()) do
+            if obj:IsA("BasePart") and obj.Name:lower():match("kill") or obj.Name:lower():match("death") then
+                obj.CanCollide = false
+                obj.Transparency = 0.5
+            end
+        end
+    end)
+    if not success then
+        warn("No kill bricks failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoKillBricks:OnChanged(function(value)
+    if value then
+        disableKillBricks()
+    end
+end)
+
+-- No Lava
+local function disableLava()
+    local success, err = pcall(function()
+        for _, obj in pairs(getinstances()) do
+            if obj:IsA("BasePart") and obj.Name:lower():match("lava") then
+                obj.CanCollide = false
+                obj.Transparency = 0.5
+            end
+        end
+    end)
+    if not success then
+        warn("No lava failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoLava:OnChanged(function(value)
+    if value then
+        disableLava()
+    end
+end)
+
+-- FullBright
+local function setFullBright(intensity)
+    local success, err = pcall(function()
+        Lighting.Brightness = intensity / 100
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+    end)
+    if not success then
+        warn("FullBright failed: " .. tostring(err))
+    end
+end
+
+Toggles.FullBright:OnChanged(function(value)
+    if value then
+        setFullBright(Options.FullBrightIntensity.Value)
+    else
+        setFullBright(1)
+    end
+end)
+
+Options.FullBrightIntensity:OnChanged(function(value)
+    if Toggles.FullBright.Value then
+        setFullBright(value)
+    end
+end)
+
+-- No Fog
+local function disableFog()
+    local success, err = pcall(function()
+        Lighting.FogEnd = 100000
+    end)
+    if not success then
+        warn("No fog failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoFog:OnChanged(function(value)
+    if value then
+        disableFog()
+    else
+        Lighting.FogEnd = 1000
+    end
+end)
+
+-- No Shadows
+local function disableShadows()
+    local success, err = pcall(function()
+        Lighting.GlobalShadows = false
+    end)
+    if not success then
+        warn("No shadows failed: " .. tostring(err))
+    end
+end
+
+Toggles.NoShadows:OnChanged(function(value)
+    if value then
+        disableShadows()
+    else
+        Lighting.GlobalShadows = true
+    end
+end)
+--END MODULES
+--END MODULES
+--END MODULES
+--END MODULES
+
+
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
