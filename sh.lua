@@ -219,7 +219,7 @@ VisualsGroup2:AddToggle("NoShadows", {
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-    Default = "insert",
+    Default = "Insert",
     NoUI = true,
     Text = "Menu keybind"
 })
