@@ -214,10 +214,14 @@ VisualsGroup2:AddToggle("NoShadows", {
     Default = false
 })
 
+
+
+
 --BEGIN MODULES
 --BEGIN MODULES
 --BEGIN MODULES
 --BEGIN MODULES
+
 
 -- Services
 local Players = game:GetService("Players")
@@ -226,6 +230,7 @@ local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
+
 
 --Speedhack Module
 _G.originalspeed = 100 -- Match GUI default
@@ -367,6 +372,234 @@ pcall(function()
 end)
 
 
+--Fly/Flight Module
+_G.originalspeed = 200 -- Match GUI default
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    _G.Speed = _G.originalspeed
+    local u1 = false
+    local u2 = false
+    local u4 = game:GetService("Players")
+    local u5 = game:GetService("UserInputService")
+
+    local function resetHumanoidState()
+        local success, err = pcall(function()
+            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                local humanoid = u4.LocalPlayer.Character.Humanoid
+                humanoid.JumpPower = 50
+                humanoid.WalkSpeed = 16 -- Restore defaults
+            end
+        end)
+        if not success then
+            warn("Reset humanoid state failed: " .. tostring(err))
+        end
+    end
+
+    -- Create platform
+    local u8 = Instance.new("Part")
+    u8.Name = "OldDebris"
+    u8.Size = Vector3.new(6, 1, 6)
+    u8.Anchored = true
+    u8.CanCollide = true
+    u8.Transparency = 0.75
+    u8.Material = Enum.Material.SmoothPlastic
+    u8.BrickColor = BrickColor.new("Bright blue")
+
+    -- Create BodyVelocity for flight
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "FlightBodyVelocity" -- Unique name to distinguish from speedhack
+    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+    -- Function to disable speedhack BodyVelocity
+    local function disableSpeedhack()
+        local success, err = pcall(function()
+            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local speedhackBV = u4.LocalPlayer.Character.HumanoidRootPart:FindFirstChild("bodyVelocity")
+                if speedhackBV then
+                    speedhackBV.Parent = nil
+                end
+            end
+        end)
+        if not success then
+            warn("Disable speedhack failed: " .. tostring(err))
+        end
+    end
+
+    -- Function to restore speedhack BodyVelocity
+    local function restoreSpeedhack()
+        local success, err = pcall(function()
+            if Toggles.SpeedhackToggle and Toggles.SpeedhackToggle.Value then
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local speedhackBV = game:GetService("ReplicatedStorage"):FindFirstChild("bodyVelocity") or Instance.new("BodyVelocity")
+                    speedhackBV.Name = "bodyVelocity"
+                    speedhackBV.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    speedhackBV.Velocity = Vector3.new(0, 0, 0)
+                    speedhackBV.Parent = u4.LocalPlayer.Character.HumanoidRootPart
+                end
+            end
+        end)
+        if not success then
+            warn("Restore speedhack failed: " .. tostring(err))
+        end
+    end
+
+    -- Handle character respawn
+    u4.LocalPlayer.CharacterAdded:Connect(function(character)
+        local success, err = pcall(function()
+            repeat
+                wait()
+            until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
+            if u1 then
+                if character:FindFirstChild("Humanoid") then
+                    character.Humanoid.JumpPower = 0
+                end
+                u8.Parent = workspace
+                u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                bodyVelocity.Parent = character.HumanoidRootPart
+                disableSpeedhack() -- Disable speedhack when flight is active
+            else
+                u8.Parent = nil
+                bodyVelocity.Parent = nil
+                restoreSpeedhack() -- Restore speedhack if needed
+            end
+        end)
+        if not success then
+            warn("CharacterAdded handler failed: " .. tostring(err))
+        end
+    end)
+
+    -- Connect to GUI toggle
+    Toggles.FlightToggle:OnChanged(function(value)
+        local success, err = pcall(function()
+            u1 = value
+            if u1 then
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0
+                end
+                u8.Parent = workspace
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    u8.CFrame = u4.LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
+                    disableSpeedhack() -- Disable speedhack when flight is enabled
+                end
+            else
+                resetHumanoidState()
+                u8.Parent = nil
+                bodyVelocity.Parent = nil
+                restoreSpeedhack() -- Restore speedhack when flight is disabled
+            end
+        end)
+        if not success then
+            warn("Flight toggle failed: " .. tostring(err))
+        end
+    end)
+
+    -- Connect to GUI slider
+    Options.FlightSpeed:OnChanged(function(value)
+        local success, err = pcall(function()
+            _G.Speed = value
+        end)
+        if not success then
+            warn("Flight speed update failed: " .. tostring(err))
+        end
+    end)
+
+    -- Main movement loop
+    game:GetService("RunService").RenderStepped:Connect(function(u9)
+        pcall(function()
+            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                u2 = true
+                local v11 = {
+                    Forward = u5:IsKeyDown(Enum.KeyCode.W),
+                    Backward = u5:IsKeyDown(Enum.KeyCode.S),
+                    Left = u5:IsKeyDown(Enum.KeyCode.A),
+                    Right = u5:IsKeyDown(Enum.KeyCode.D),
+                    Up = u5:IsKeyDown(Enum.KeyCode.Space),
+                    Down = u5:IsKeyDown(Enum.KeyCode.LeftControl)
+                }
+                
+                local v10 = u4.LocalPlayer.Character.HumanoidRootPart
+                local moveDirection = Vector3.new(0, 0, 0)
+                if v11.Forward then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Backward then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.LookVector
+                elseif v11.Left then
+                    moveDirection = moveDirection - workspace.CurrentCamera.CFrame.RightVector
+                elseif v11.Right then
+                    moveDirection = moveDirection + workspace.CurrentCamera.CFrame.RightVector
+                end
+
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit
+                end
+
+                -- Apply BodyVelocity with speed capped at 200 studs per frame
+                local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 but respect 49 per frame limit
+                if moveDirection.Magnitude > 0 then
+                    bodyVelocity.Velocity = moveDirection * math.min(_G.Speed * u9, maxSpeedPerFrame)
+                else
+                    bodyVelocity.Velocity = Vector3.new(0, bodyVelocity.Velocity.Y, 0) -- Preserve vertical velocity
+                end
+
+                -- Allow JumpPower modification
+                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0 -- Keep grounded
+                end
+
+                -- Update platform and flight
+                if v10 then
+                    u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
+                    local flightMove = 49 * u9 -- Stay under 50 studs per frame
+                    if v11.Up then
+                        u8.CFrame = u8.CFrame + Vector3.new(0, flightMove, 0)
+                    elseif v11.Down then
+                        u8.CFrame = u8.CFrame - Vector3.new(0, flightMove, 0)
+                    end
+                end
+
+                -- Ensure speedhack is disabled
+                disableSpeedhack()
+
+                -- Monitor health to detect kill
+                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
+                    resetHumanoidState()
+                    u1 = false
+                    u2 = false
+                    u8.Parent = nil
+                    bodyVelocity.Parent = nil
+                    restoreSpeedhack()
+                end
+            else
+                if u2 then
+                    resetHumanoidState()
+                    u2 = false
+                    u8.Parent = nil
+                    bodyVelocity.Parent = nil
+                    restoreSpeedhack()
+                end
+            end
+        end)
+    end)
+
+    -- Cleanup on script destruction
+    game:BindToClose(function()
+        local success, err = pcall(function()
+            bodyVelocity:Destroy()
+            u8:Destroy()
+        end)
+        if not success then
+            warn("Cleanup failed: " .. tostring(err))
+        end
+    end)
+end)
 
 --END MODULES
 --END MODULES
