@@ -239,9 +239,14 @@ pcall(function()
     local UserInputService = game:GetService("UserInputService")
     local player = Players.LocalPlayer
 
-    -- Check if GUI is initialized
+    -- Wait for GUI initialization with timeout
+    local timeout = tick() + 10
+    while not (Toggles and Toggles.SpeedhackToggle and Options and Options.SpeedhackSpeed) and tick() < timeout do
+        print("[Speedhack] Waiting for GUI initialization...")
+        task.wait(0.1)
+    end
     if not Toggles or not Toggles.SpeedhackToggle or not Options or not Options.SpeedhackSpeed then
-        print("[Speedhack] Error: GUI Toggles or Options not initialized")
+        print("[Speedhack] Error: GUI Toggles or Options not initialized after timeout")
         return
     end
 
@@ -255,17 +260,8 @@ pcall(function()
             if char and char:FindFirstChild("Humanoid") then
                 char.Humanoid.WalkSpeed = 16
                 char.Humanoid.JumpPower = 50
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    for _, bv in ipairs(hrp:GetChildren()) do
-                        if bv:IsA("BodyVelocity") and bv.Name == "SpeedhackVelocity" then
-                            bv.Parent = nil
-                        end
-                    end
-                end
-            else
-                print("[Speedhack] Warning: No character or Humanoid found for reset")
             end
+            BodyVelocity.Parent = nil
         end, function(err)
             print("[Speedhack] resetSpeed error: " .. tostring(err))
         end)
@@ -275,7 +271,7 @@ pcall(function()
         pcall(function()
             resetSpeed()
             BodyVelocity:Destroy()
-            print("[Speedhack] Cleaned up")
+            print("[Speedhack] Cleaned up at " .. os.date("%H:%M:%S"))
         end, function(err)
             print("[Speedhack] cleanupSpeed error: " .. tostring(err))
         end)
@@ -293,11 +289,13 @@ pcall(function()
         else
             print("[Speedhack] Warning: No character or components found on startup")
         end
+    end, function(err)
+        print("[Speedhack] Initial character check error: " .. tostring(err))
     end)
 
     player.CharacterAdded:Connect(function(character)
         pcall(function()
-            -- Wait for HumanoidRootPart and Humanoid with timeout
+            -- Wait for HumanoidRootPart and Humanoid
             local timeout = tick() + 5
             while not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) and tick() < timeout do
                 task.wait()
@@ -321,7 +319,7 @@ pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function(dt)
             pcall(function()
                 local char = player.Character
-                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
                     local dir = Vector3.zero
                     if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
                     if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
@@ -329,13 +327,9 @@ pcall(function()
                     if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += workspace.CurrentCamera.CFrame.RightVector end
                     dir = dir.Magnitude > 0 and dir.Unit or Vector3.zero
 
-                    -- Apply BodyVelocity
                     BodyVelocity.Velocity = dir * math.min(Options.SpeedhackSpeed.Value, 49 / dt)
                     BodyVelocity.Parent = char.HumanoidRootPart
                     char.Humanoid.JumpPower = 0
-
-                    -- Fallback: Modify WalkSpeed if BodyVelocity fails
-                    char.Humanoid.WalkSpeed = math.max(16, Options.SpeedhackSpeed.Value)
                     print("[Speedhack] Applied speed: " .. tostring(Options.SpeedhackSpeed.Value))
                 else
                     resetSpeed()
@@ -366,6 +360,8 @@ pcall(function()
         else
             print("[Speedhack] Warning: Toggles.FlightToggle not found")
         end
+    end, function(err)
+        print("[Speedhack] Error setting up FlightToggle: " .. tostring(err))
     end)
 
     -- Cleanup on GUI unload
@@ -374,7 +370,7 @@ pcall(function()
             pcall(function()
                 if renderConnection then renderConnection:Disconnect() end
                 cleanupSpeed()
-                print("[Speedhack] Unloaded")
+                print("[Speedhack] Unloaded at " .. os.date("%H:%M:%S"))
             end, function(err)
                 print("[Speedhack] Unload error: " .. tostring(err))
             end)
@@ -382,6 +378,9 @@ pcall(function()
     end, function(err)
         print("[Speedhack] Error setting up OnUnload: " .. tostring(err))
     end)
+
+    -- Log script start
+    print("[Speedhack] Script initialized at " .. os.date("%H:%M:%S"))
 end, function(err)
     print("[Speedhack] Initialization error: " .. tostring(err))
 end)
