@@ -1,0 +1,62 @@
+--KILL BRICKS UNDER HERE
+Workspace/Map/moundkillbricks
+
+
+--SCREEN EFFECTS UNDER HER
+Workspace/Terrain/AreaClouds
+Workspace/Terrain/RainEffects
+Workspace/Terrain/RainEffectsLight
+Workspace/Terrain/SkyMesh
+Workspace/Terrain/SnowEffects
+
+
+--AREA UNDER HERE
+game:GetService("ReplicatedStorage").WorldModel.AreaMarkers
+(Remove duplicates)
+--NPCs UNDER HERE
+Workspace/NPCs
+
+FOR REPEAT NPCS: game:GetService("ReplicatedStorage").TownMarkers
+TownMarkers/Cactica/Bank (or Blacksmith, Doctor, Merchant, Collector, Inn, Missions, Jail, Cargo, Shipwright, Bazaar, Bounties,
+
+--MOBS UNDER HERE
+Workspace/Living/ (Scan for any models that DO NOT contain a player's username or contain the list of names within its name below)
+game:GetService("ReplicatedStorage").Info.MonsterNames
+
+-Items:
+game:GetService("ReplicatedStorage").Info.ItemNames[""]
+
+--Interactions UNDER HERE:
+Workspace/Interactions  -> get world pivot of models and tween to the coordinates (PYLONS IN HERE TOO)
+Cultist rune return coordinates: -1467.241943359375, 520.7960205078125, -7915.8701171875
+
+
+-Skill Names:
+game:GetService("ReplicatedStorage").Info.SkillNames
+
+-Weapon Names:
+game:GetService("ReplicatedStorage").Info.WeaponNames
+
+-remotes:
+game:GetService("ReplicatedStorage").Remotes
+game:GetService("ReplicatedStorage").Remotes.PickUpItem
+game:GetService("ReplicatedStorage").Remotes.Teleported
+
+
+-Forcefield
+game:GetService("ReplicatedStorage").CmdrClient.Commands.forcefield
+
+local v1 = {
+    ["Name"] = "forcefield",
+    ["Aliases"] = { "ff", "god" },
+    ["Description"] = "Gives player a forcefield",
+    ["Group"] = "SrMod",
+    ["Args"] = {
+        {
+            ["Type"] = "player",
+            ["Name"] = "player",
+            ["Description"] = "The player to give FF to"
+        }
+    }
+}
+return v1
