@@ -24,7 +24,7 @@ MainGroup:AddToggle("SpeedhackToggle", {
 }):AddKeyPicker("SpeedhackKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "",
+    Text = "N/A",
     Callback = function(value)
         Toggles.SpeedhackToggle:SetValue(value)
     end
@@ -43,7 +43,7 @@ MainGroup:AddToggle("FlightToggle", {
 }):AddKeyPicker("FlightKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "",
+    Text = "N/A",
     Callback = function(value)
         Toggles.FlightToggle:SetValue(value)
     end
@@ -62,7 +62,7 @@ MainGroup:AddToggle("NoclipToggle", {
 }):AddKeyPicker("NoclipKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "",
+    Text = "N/A",
     Callback = function(value)
         Toggles.NoclipToggle:SetValue(value)
     end
