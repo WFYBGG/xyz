@@ -192,7 +192,7 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "Player ESP",
     Default = false
 })
-VisualsGroup:AddColorPicker("PlayerESPColor", {
+Options.PlayerESPColor = VisualsGroup:AddColorpicker({
     Text = "ESP Color",
     Default = Color3.fromRGB(255, 0, 0),
     Callback = function(value) end
