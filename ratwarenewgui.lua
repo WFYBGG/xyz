@@ -417,53 +417,6 @@ pcall(function()
     bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
 
-    -- Function to disable speedhack BodyVelocity
-    local function disableSpeedhack()
-        local success, err = pcall(function()
-            if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local speedhackBV = u4.LocalPlayer.Character.HumanoidRootPart:FindFirstChild("bodyVelocity")
-                if speedhackBV then
-                    speedhackBV.Parent = nil
-                end
-            end
-        end)
-        if not success then
-            warn("Disable speedhack failed: " .. tostring(err))
-        end
-    end
-
-    -- Function to restore speedhack BodyVelocity
-    local function restoreSpeedhack()
-        local success, err = pcall(function()
-            if Toggles.SpeedhackToggle and Toggles.SpeedhackToggle.Value then
-                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local speedhackBV = game:GetService("ReplicatedStorage"):FindFirstChild("bodyVelocity") or Instance.new("BodyVelocity")
-                    speedhackBV.Name = "bodyVelocity"
-                    speedhackBV.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                    speedhackBV.Velocity = Vector3.new(0, 0, 0)
-                    speedhackBV.Parent = u4.LocalPlayer.Character.HumanoidRootPart
-                end
-            end
-        end)
-        if not success then
-            warn("Restore speedhack failed: " .. tostring(err))
-        end
-    end
-
-    -- Ensure flight BodyVelocity is applied
-    local function ensureFlightBodyVelocity()
-        local success, err = pcall(function()
-            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                if not bodyVelocity.Parent then
-                    bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
-                end
-            end
-        end)
-        if not success then
-            warn("Ensure flight BodyVelocity failed: " .. tostring(err))
-        end
-    end
-
     -- Handle character respawn
     u4.LocalPlayer.CharacterAdded:Connect(function(character)
         local success, err = pcall(function()
@@ -477,11 +430,9 @@ pcall(function()
                 u8.Parent = workspace
                 u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
-                disableSpeedhack() -- Disable speedhack when flight is active
             else
                 u8.Parent = nil
                 bodyVelocity.Parent = nil
-                restoreSpeedhack() -- Restore speedhack if needed
             end
         end)
         if not success then
@@ -501,13 +452,11 @@ pcall(function()
                 if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     u8.CFrame = u4.LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                     bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
-                    disableSpeedhack() -- Disable speedhack when flight is enabled
                 end
             else
                 resetHumanoidState()
                 u8.Parent = nil
                 bodyVelocity.Parent = nil
-                restoreSpeedhack() -- Restore speedhack when flight is disabled
             end
         end)
         if not success then
@@ -555,9 +504,6 @@ pcall(function()
                     moveDirection = moveDirection.Unit
                 end
 
-                -- Ensure flight BodyVelocity is active
-                ensureFlightBodyVelocity()
-
                 -- Apply BodyVelocity with speed capped at 200 studs per frame
                 local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 but respect 49 per frame limit
                 if moveDirection.Magnitude > 0 then
@@ -582,11 +528,6 @@ pcall(function()
                     end
                 end
 
-                -- Conditionally disable speedhack
-                if Toggles.SpeedhackToggle and Toggles.SpeedhackToggle.Value then
-                    disableSpeedhack()
-                end
-
                 -- Monitor health to detect kill
                 if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
                     resetHumanoidState()
@@ -594,7 +535,6 @@ pcall(function()
                     u2 = false
                     u8.Parent = nil
                     bodyVelocity.Parent = nil
-                    restoreSpeedhack()
                 end
             else
                 if u2 then
@@ -602,7 +542,6 @@ pcall(function()
                     u2 = false
                     u8.Parent = nil
                     bodyVelocity.Parent = nil
-                    restoreSpeedhack()
                 end
             end
         end)
