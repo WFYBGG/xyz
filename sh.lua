@@ -3,7 +3,7 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Scarlet Hook Rogueblox",
+    Title = "Ratware.exe",
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -13,15 +13,42 @@ local Window = Library:CreateWindow({
 local Tabs = {
     Main = Window:AddTab("Main"),
     Visuals = Window:AddTab("Visuals"),
-    Misc = Window:AddTab("Misc"),
     UI = Window:AddTab("UI Settings")
 }
 
 -- Main Tab
 local MainGroup = Tabs.Main:AddLeftGroupbox("Movement")
+MainGroup:AddToggle("SpeedToggle", {
+    Text = "Speedhack",
+    Default = false
+})
+MainGroup:AddLabel("Keybind"):AddKeyPicker("SpeedKeybind", {
+    Default = "F4",
+    Mode = "Toggle",
+    Text = "Speed",
+    Callback = function(value)
+        Toggles.SpeedToggle:SetValue(value)
+    end
+})
+MainGroup:AddSlider("SpeedhackSpeed", {
+    Text = "Speed",
+    Default = 200,
+    Min = 0,
+    Max = 200,
+    Rounding = 0,
+    Compact = true
+})
 MainGroup:AddToggle("FlightToggle", {
     Text = "Flight",
     Default = false
+})
+MainGroup:AddLabel("Keybind"):AddKeyPicker("FlightKeybind", {
+    Default = "X",
+    Mode = "Toggle",
+    Text = "Flight",
+    Callback = function(value)
+        Toggles.FlightToggle:SetValue(value)
+    end
 })
 MainGroup:AddSlider("FlightSpeed", {
     Text = "Flight Speed",
@@ -31,28 +58,8 @@ MainGroup:AddSlider("FlightSpeed", {
     Rounding = 0,
     Compact = true
 })
-MainGroup:AddToggle("AABypass", {
-    Text = "AA bypass",
-    Default = false
-})
-MainGroup:AddToggle("AutoFall", {
-    Text = "Auto fall",
-    Default = false
-})
-MainGroup:AddSlider("AutoFallSpeed", {
-    Text = "Auto Fall Speed",
-    Default = 0,
-    Min = 0,
-    Max = 50,
-    Rounding = 0,
-    Compact = true
-})
 MainGroup:AddToggle("NoClip", {
     Text = "NoClip",
-    Default = false
-})
-MainGroup:AddToggle("TpToGround", {
-    Text = "Tp to ground",
     Default = false
 })
 
@@ -74,15 +81,15 @@ MainGroup3:AddDropdown("NPCSelection", {
 })
 MainGroup3:AddSlider("Speed", {
     Text = "Speed",
-    Default = 130,
+    Default = 150,
     Min = 0,
-    Max = 400,
+    Max = 200,
     Rounding = 0,
     Compact = true
 })
 MainGroup3:AddButton("Start/Stop", function() print("Start/Stop clicked") end)
 
-local MainGroup4 = Tabs.Main:AddLeftGroupbox("Main")
+local MainGroup4 = Tabs.Main:AddLeftGroupbox("Humanoid")
 MainGroup4:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
@@ -96,11 +103,7 @@ MainGroup4:AddToggle("NoFire", {
     Default = false
 })
 
-local MainGroup5 = Tabs.Main:AddLeftGroupbox("World")
-MainGroup5:AddToggle("NoQuickSand", {
-    Text = "No Quick Sand",
-    Default = false
-})
+local MainGroup5 = Tabs.Main:AddLeftGroupbox("World Mods")
 MainGroup5:AddToggle("NoLava", {
     Text = "No Lava",
     Default = false
@@ -111,7 +114,12 @@ MainGroup5:AddToggle("NoKillBricks", {
 })
 
 -- Visuals Tab
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("World Visuals")
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
+VisualsGroup:AddToggle("PlayerESP", {
+    Text = "ESP",
+    Default = false
+})
+local VisualsGroup = Tabs.Visuals:AddRightGroupbox("World Visuals")
 VisualsGroup:AddToggle("FullBright", {
     Text = "FullBright",
     Default = false
@@ -132,6 +140,7 @@ VisualsGroup:AddToggle("NoShadows", {
     Text = "No Shadows",
     Default = false
 })
+
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
