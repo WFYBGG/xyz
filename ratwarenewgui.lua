@@ -572,142 +572,352 @@ end)
 
 
 --ESP Module [TESTING STILL]
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 
--- Drawing is available, but Drawing.new is NOT. 
--- Assume getgc or other allowed funcs are used internally or use a minimal fallback (for example, Drawing class accessible).
+local LocalPlayer
+pcall(function() LocalPlayer = Players.LocalPlayer end)
 
 local ESP_Enabled = false
-local ESP_Objects = {}
+local ESPObjects = {}
 
--- Utility function to safely call a function and catch errors
-local function safe_pcall(func, ...)
-    local ok, result = pcall(func, ...)
-    if not ok then
-        -- optionally print error or silently ignore to avoid detection
-        return nil
-    end
+local function safeGet(parent, child)
+    local result
+    pcall(function()
+        if parent and child then
+            result = parent:FindFirstChild(child)
+        end
+    end)
     return result
 end
 
--- Clean up ESP objects
-local function ClearESP()
-    for _, espObj in pairs(ESP_Objects) do
-        safe_pcall(function()
-            if espObj and espObj.Visible then
-                espObj.Visible = false
-                -- If espObj has Destroy method or similar, call it
-                if espObj.Destroy then espObj:Destroy() end
+local function getCharacterModel(player)
+    local living
+    pcall(function()
+        living = workspace:FindFirstChild("Living")
+    end)
+    if not living then return nil end
+    return safeGet(living, player.Name)
+end
+
+local function getHealthInfo(character)
+    local health, maxHealth = 0, 0
+    pcall(function()
+        local humanoid = safeGet(character, "Humanoid")
+        if humanoid then
+            health = humanoid.Health
+            maxHealth = humanoid.MaxHealth
+        end
+    end)
+    return health, maxHealth
+end
+
+local function cleanupESP(player)
+    local tbl
+    pcall(function() tbl = ESPObjects[player] end)
+    if tbl then
+        for _, obj in pairs(tbl) do
+            if typeof(obj) == "table" then
+                for _, v in pairs(obj) do
+                    pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
+                end
+            else
+                pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
+            end
+        end
+        pcall(function() ESPObjects[player] = nil end)
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    pcall(function()
+        if ESPObjects[player] then cleanupESP(player) end
+
+        local box, nameText, healthText, distText, chamBox
+
+        pcall(function()
+            box = Drawing.new("Line")
+            box.Visible = false
+            box.Thickness = 2
+            box.Color = Color3.fromRGB(255, 25, 25)
+        end)
+
+        pcall(function()
+            nameText = Drawing.new("Text")
+            nameText.Size = 14
+            nameText.Center = true
+            nameText.Outline = true
+            nameText.Color = Color3.fromRGB(255, 255, 255)
+            nameText.Visible = false
+        end)
+
+        pcall(function()
+            healthText = Drawing.new("Text")
+            healthText.Size = 13
+            healthText.Center = true
+            healthText.Outline = true
+            healthText.Color = Color3.fromRGB(0, 255, 0)
+            healthText.Visible = false
+        end)
+
+        pcall(function()
+            distText = Drawing.new("Text")
+            distText.Size = 13
+            distText.Center = true
+            distText.Outline = true
+            distText.Color = Color3.fromRGB(200, 200, 200)
+            distText.Visible = false
+        end)
+
+        pcall(function()
+            chamBox = Drawing.new("Square")
+            chamBox.Visible = false
+            chamBox.Color = Color3.fromRGB(255, 0, 0)
+            chamBox.Transparency = 0.2
+            chamBox.Filled = true
+        end)
+
+        ESPObjects[player] = {
+            Box = box,
+            Name = nameText,
+            Health = healthText,
+            Distance = distText,
+            ChamBox = chamBox,
+            Skeleton = {},
+        }
+    end)
+end
+
+local function drawSkeleton(player, char, color, thickness)
+    local bones = {
+        { "Head", "HumanoidRootPart" },
+        { "HumanoidRootPart", "LeftUpperLeg" },
+        { "LeftUpperLeg", "LeftLowerLeg" },
+        { "LeftLowerLeg", "LeftFoot" },
+        { "HumanoidRootPart", "RightUpperLeg" },
+        { "RightUpperLeg", "RightLowerLeg" },
+        { "RightLowerLeg", "RightFoot" },
+        { "HumanoidRootPart", "LeftUpperArm" },
+        { "LeftUpperArm", "LeftLowerArm" },
+        { "LeftLowerArm", "LeftHand" },
+        { "HumanoidRootPart", "RightUpperArm" },
+        { "RightUpperArm", "RightLowerArm" },
+        { "RightLowerArm", "RightHand" },
+    }
+
+    if not ESPObjects[player] then ESPObjects[player] = {} end
+    local skeleton = ESPObjects[player].Skeleton or {}
+
+    for i, pair in ipairs(bones) do
+        local part1, part2
+        pcall(function()
+            part1 = char:FindFirstChild(pair[1])
+            part2 = char:FindFirstChild(pair[2])
+        end)
+        local line = skeleton[i]
+        if not line then
+            line = Drawing.new("Line")
+            skeleton[i] = line
+        end
+
+        if part1 and part2 then
+            local pos1, onScr1 = Camera:WorldToViewportPoint(part1.Position)
+            local pos2, onScr2 = Camera:WorldToViewportPoint(part2.Position)
+            if onScr1 and onScr2 then
+                line.From = Vector2.new(pos1.X, pos1.Y)
+                line.To = Vector2.new(pos2.X, pos2.Y)
+                line.Color = color or Color3.fromRGB(255,255,255)
+                line.Thickness = thickness or 2
+                line.Visible = true
+            else
+                line.Visible = false
+            end
+        else
+            line.Visible = false
+        end
+    end
+    ESPObjects[player].Skeleton = skeleton
+end
+
+-- Player join/leave management
+pcall(function()
+    Players.PlayerAdded:Connect(function(plr)
+        if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
+    end)
+end)
+pcall(function()
+    Players.PlayerRemoving:Connect(function(plr)
+        pcall(function() cleanupESP(plr) end)
+    end)
+end)
+pcall(function()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local streamedPlayers = {}
+    for player, tbl in pairs(ESPObjects) do
+        streamedPlayers[player] = true
+        pcall(function()
+            local char = getCharacterModel(player)
+            local box, nameText, healthText, distText, chamBox
+            pcall(function()
+                box = tbl.Box
+                nameText = tbl.Name
+                healthText = tbl.Health
+                distText = tbl.Distance
+                chamBox = tbl.ChamBox
+            end)
+
+            if char and safeGet(char, "HumanoidRootPart") then
+                local hrp
+                pcall(function() hrp = char.HumanoidRootPart end)
+                local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
+
+                pcall(function()
+                    pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                end)
+
+                pcall(function()
+                    health, maxHealth = getHealthInfo(char)
+                end)
+
+                pcall(function()
+                    extents = char:GetExtentsSize()
+                end)
+
+                pcall(function()
+                    topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
+                end)
+                pcall(function()
+                    botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
+                end)
+                pcall(function()
+                    height = (botW.Y - topW.Y)
+                    width = height * 0.45
+                end)
+
+                if onScreen and onScreen1 and onScreen2 and health > 0 then
+                    -- Chams box (drawn behind ESP box)
+                    pcall(function()
+                        chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
+                        chamBox.Size = Vector2.new(width, height)
+                        chamBox.Color = Color3.fromRGB(255, 0, 0)
+                        chamBox.Transparency = 0.15
+                        chamBox.Visible = true
+                    end)
+
+                    -- Draw box (top horizontal line)
+                    pcall(function()
+                        box.From = Vector2.new(topW.X - width/2, topW.Y)
+                        box.To   = Vector2.new(topW.X + width/2, topW.Y)
+                        box.Visible = true
+                    end)
+
+                    -- Draw name
+                    pcall(function()
+                        nameText.Text = player.DisplayName
+                        nameText.Position = Vector2.new(pos.X, topW.Y - 16)
+                        nameText.Visible = true
+                    end)
+
+                    -- Draw health/maxhealth
+                    pcall(function()
+                        healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
+                        healthText.Position = Vector2.new(pos.X, topW.Y - 2)
+                        local r = math.floor(255 - 255 * (health/maxHealth))
+                        local g = math.floor(255 * (health/maxHealth))
+                        healthText.Color = Color3.fromRGB(r, g, 0)
+                        healthText.Visible = true
+                    end)
+
+                    -- Draw distance
+                    pcall(function()
+                        local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
+                        distText.Text = "[" .. math.floor(dist) .. "m]"
+                        distText.Position = Vector2.new(pos.X, botW.Y + 2)
+                        distText.Visible = true
+                    end)
+
+                    -- Draw skeleton
+                    drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
+                else
+                    pcall(function() box.Visible = false end)
+                    pcall(function() nameText.Visible = false end)
+                    pcall(function() healthText.Visible = false end)
+                    pcall(function() distText.Visible = false end)
+                    pcall(function() chamBox.Visible = false end)
+                    -- Hide skeleton lines
+                    if tbl.Skeleton then
+                        for _, line in pairs(tbl.Skeleton) do
+                            pcall(function() line.Visible = false end)
+                        end
+                    end
+                end
+            else
+                pcall(function() box.Visible = false end)
+                pcall(function() nameText.Visible = false end)
+                pcall(function() healthText.Visible = false end)
+                pcall(function() distText.Visible = false end)
+                pcall(function() chamBox.Visible = false end)
+                -- Hide skeleton lines
+                if tbl.Skeleton then
+                    for _, line in pairs(tbl.Skeleton) do
+                        pcall(function() line.Visible = false end)
+                    end
+                end
             end
         end)
     end
-    ESP_Objects = {}
-end
-
--- Create ESP box or text for a player character
-local function CreateESPForCharacter(character)
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
-    local espBox = nil
-    local espName = nil
-    
-    safe_pcall(function()
-        -- Use Drawing library to create ESP objects; 
-        -- since Drawing.new is disallowed, you may have to get drawing objs via getgc or other allowed way
-        -- For now, let's assume Drawing is available as Drawing.new
-        -- Otherwise, fallback or skip drawing to avoid errors
-        
-        -- Example:
-        espName = Drawing.new("Text")
-        espName.Text = character.Name
-        espName.Size = 16
-        espName.Color = Color3.new(1, 1, 1)
-        espName.Outline = true
-        espName.Visible = false
-
-        espBox = Drawing.new("Square")
-        espBox.Color = Color3.new(1, 1, 1)
-        espBox.Thickness = 2
-        espBox.Filled = false
-        espBox.Visible = false
-    end)
-    
-    return {
-        Name = espName,
-        Box = espBox,
-        Character = character
-    }
-end
-
--- Update all ESP objects on RenderStepped
-local function UpdateESP()
-    if not ESP_Enabled then 
-        ClearESP()
-        return
-    end
-    
-    local players = Players:GetPlayers()
-    for _, player in pairs(players) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            if not ESP_Objects[player] then
-                ESP_Objects[player] = CreateESPForCharacter(player.Character)
+    -- Robust cleanup: remove ESP for any player no longer in Players
+    for playerRef in pairs(ESPObjects) do
+        local found = false
+        pcall(function()
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p == playerRef then
+                    found = true
+                    break
+                end
             end
-            
-            local esp = ESP_Objects[player]
-            if esp then
-                safe_pcall(function()
-                    local hrp = player.Character.HumanoidRootPart
-                    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        local size = Vector3.new(1, 2, 1) -- approximate size for box
-                        -- Position ESP text
-                        esp.Name.Position = Vector2.new(pos.X, pos.Y - 20)
-                        esp.Name.Visible = true
-                        -- Position ESP box
-                        esp.Box.Position = Vector2.new(pos.X - 25, pos.Y - 50)
-                        esp.Box.Size = Vector2.new(50, 100)
-                        esp.Box.Visible = true
-                    else
-                        esp.Name.Visible = false
-                        esp.Box.Visible = false
-                    end
-                end)
-            end
-        else
-            -- Clear ESP for players without character or local player
-            if ESP_Objects[player] then
-                safe_pcall(function()
-                    if ESP_Objects[player].Name then ESP_Objects[player].Name.Visible = false end
-                    if ESP_Objects[player].Box then ESP_Objects[player].Box.Visible = false end
-                end)
-                ESP_Objects[player] = nil
-            end
+        end)
+        if not found then
+            cleanupESP(playerRef)
         end
     end
+end)  -- <<< This closes the RunService.RenderStepped:Connect
+
+-- Define ClearESP to cleanup all ESP drawings
+local function ClearESP()
+    for player, _ in pairs(ESPObjects) do
+        cleanupESP(player)
+    end
 end
 
--- Connect to RenderStepped with pcall wrapper to avoid errors
-local ESP_Connection
-ESP_Connection = RunService.RenderStepped:Connect(function()
-    pcall(UpdateESP)
-end)
+-- Grab the toggle from Linora UI groupbox
+local playerESPToggle = VisualsGroup.PlayerESP
 
--- Watch toggle to enable/disable ESP
-Toggles.PlayerESP:OnChanged(function(value)
-    ESP_Enabled = value
-    if not value then
-        ClearESP()
-    end
-end)
+-- Hook toggle OnChanged event
+if playerESPToggle and playerESPToggle.OnChanged then
+    playerESPToggle:OnChanged(function(value)
+        ESP_Enabled = value
+        if not value then
+            ClearESP()
+        else
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer then
+                    pcall(function() createESP(plr) end)
+                end
+            end
+        end
+    end)
+end
 
 
 --Attach to back Module [TESTING STILL]
--- Attach To Back module compatible with Linoria GUI
--- Uses MainGroup6.PlayerDropdown for target player username
--- Uses toggle Toggles.AttachtobackToggle to enable/disable
-
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
