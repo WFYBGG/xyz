@@ -23,7 +23,7 @@ TownMarkers/Cactica/Bank (or Blacksmith, Doctor, Merchant, Collector, Inn, Missi
 Workspace/Living/ (Scan for any models that DO NOT contain a player's username or contain the list of names within its name below)
 game:GetService("ReplicatedStorage").Info.MonsterNames
 
--Items:
+--Items:
 game:GetService("ReplicatedStorage").Info.ItemNames[""]
 
 --Interactions UNDER HERE:
@@ -31,19 +31,19 @@ Workspace/Interactions  -> get world pivot of models and tween to the coordinate
 Cultist rune return coordinates: -1467.241943359375, 520.7960205078125, -7915.8701171875
 
 
--Skill Names:
+--Skill Names:
 game:GetService("ReplicatedStorage").Info.SkillNames
 
--Weapon Names:
+--Weapon Names:
 game:GetService("ReplicatedStorage").Info.WeaponNames
 
--remotes:
+--remotes:
 game:GetService("ReplicatedStorage").Remotes
 game:GetService("ReplicatedStorage").Remotes.PickUpItem
 game:GetService("ReplicatedStorage").Remotes.Teleported
 
 
--Forcefield
+--Forcefield
 game:GetService("ReplicatedStorage").CmdrClient.Commands.forcefield
 
 local v1 = {
@@ -60,3 +60,6 @@ local v1 = {
     }
 }
 return v1
+
+--Water
+workspace.Map:GetChildren()[6017]
