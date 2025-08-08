@@ -383,8 +383,6 @@ pcall(function()
     until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     _G.Speed = _G.originalspeed
-    local u1 = false
-    local u2 = false
     local u4 = game:GetService("Players")
     local u5 = game:GetService("UserInputService")
 
@@ -413,9 +411,8 @@ pcall(function()
 
     -- Create BodyVelocity for flight
     local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "FlightBodyVelocity" -- Unique name to distinguish from speedhack
-    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge) -- Control X and Z axes only
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Name = "FlightBodyVelocity"
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- All axes for smooth flight
 
     -- Handle character respawn
     u4.LocalPlayer.CharacterAdded:Connect(function(character)
@@ -423,12 +420,12 @@ pcall(function()
             repeat
                 wait()
             until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
-            if u1 then
+            if Toggles.FlightToggle.Value then
                 if character:FindFirstChild("Humanoid") then
                     character.Humanoid.JumpPower = 0
                 end
-                u8.Parent = workspace
                 u8.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                u8.Parent = workspace
                 bodyVelocity.Parent = character.HumanoidRootPart
             else
                 u8.Parent = nil
@@ -443,14 +440,13 @@ pcall(function()
     -- Connect to GUI toggle
     Toggles.FlightToggle:OnChanged(function(value)
         local success, err = pcall(function()
-            u1 = value
-            if u1 then
+            if value then
                 if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
                     u4.LocalPlayer.Character.Humanoid.JumpPower = 0
                 end
-                u8.Parent = workspace
                 if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     u8.CFrame = u4.LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                    u8.Parent = workspace
                     bodyVelocity.Parent = u4.LocalPlayer.Character.HumanoidRootPart
                 end
             else
@@ -477,8 +473,8 @@ pcall(function()
     -- Main movement loop
     game:GetService("RunService").RenderStepped:Connect(function(u9)
         pcall(function()
-            if u1 and u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") and u4.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                u2 = true
+            local char = u4.LocalPlayer.Character
+            if Toggles.FlightToggle.Value and char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
                 local v11 = {
                     Forward = u5:IsKeyDown(Enum.KeyCode.W),
                     Backward = u5:IsKeyDown(Enum.KeyCode.S),
@@ -488,7 +484,7 @@ pcall(function()
                     Down = u5:IsKeyDown(Enum.KeyCode.LeftControl)
                 }
                 
-                local v10 = u4.LocalPlayer.Character.HumanoidRootPart
+                local v10 = char.HumanoidRootPart
                 local moveDirection = Vector3.new(0, 0, 0)
                 if v11.Forward then
                     moveDirection = moveDirection + workspace.CurrentCamera.CFrame.LookVector
@@ -504,42 +500,37 @@ pcall(function()
                     moveDirection = moveDirection.Unit
                 end
 
-                -- Apply BodyVelocity with speed capped at 200 studs per frame
-                local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 but respect 49 per frame limit
-                if moveDirection.Magnitude > 0 then
-                    bodyVelocity.Velocity = moveDirection * math.min(_G.Speed * u9, maxSpeedPerFrame)
-                else
-                    bodyVelocity.Velocity = Vector3.new(0, bodyVelocity.Velocity.Y, 0) -- Preserve vertical velocity
+                local vert = 0
+                if v11.Up then
+                    vert = 70 -- Match unified script's flyJumpPower
+                elseif v11.Down then
+                    vert = -70 -- Match unified script's flyFallSpeed
                 end
 
-                -- Allow JumpPower modification
-                if u4.LocalPlayer.Character and u4.LocalPlayer.Character:FindFirstChild("Humanoid") then
-                    u4.LocalPlayer.Character.Humanoid.JumpPower = 0 -- Keep grounded
+                -- Apply BodyVelocity with speed capped
+                local maxSpeedPerFrame = math.min(200, 49 / u9) -- Cap at 200 or 49 per frame
+                bodyVelocity.Velocity = moveDirection * math.min(_G.Speed, maxSpeedPerFrame) + Vector3.new(0, vert, 0)
+                bodyVelocity.Parent = v10
+
+                -- Update platform
+                u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
+                u8.Parent = workspace
+
+                -- Keep grounded
+                if char:FindFirstChild("Humanoid") then
+                    char.Humanoid.JumpPower = 0
                 end
 
-                -- Update platform and flight
-                if v10 then
-                    u8.CFrame = v10.CFrame - Vector3.new(0, 3.499, 0)
-                    local flightMove = 49 * u9 -- Stay under 50 studs per frame
-                    if v11.Up then
-                        u8.CFrame = u8.CFrame + Vector3.new(0, flightMove, 0)
-                    elseif v11.Down then
-                        u8.CFrame = u8.CFrame - Vector3.new(0, flightMove, 0)
-                    end
-                end
-
-                -- Monitor health to detect kill
-                if u4.LocalPlayer.Character.Humanoid.Health <= 0 then
+                -- Monitor health
+                if char.Humanoid.Health <= 0 then
                     resetHumanoidState()
-                    u1 = false
-                    u2 = false
+                    Toggles.FlightToggle:SetValue(false)
                     u8.Parent = nil
                     bodyVelocity.Parent = nil
                 end
             else
-                if u2 then
+                if u8.Parent or bodyVelocity.Parent then
                     resetHumanoidState()
-                    u2 = false
                     u8.Parent = nil
                     bodyVelocity.Parent = nil
                 end
@@ -558,7 +549,6 @@ pcall(function()
         end
     end)
 end)
-
 --END MODULES
 --END MODULES
 --END MODULES
