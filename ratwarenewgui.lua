@@ -241,12 +241,13 @@ pcall(function()
 
     -- Check if GUI is initialized
     if not Toggles or not Toggles.SpeedhackToggle or not Options or not Options.SpeedhackSpeed then
-        print("[Speedhack] Error: GUI toggles or options not initialized")
+        print("[Speedhack] Error: GUI Toggles or Options not initialized")
         return
     end
 
     local BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    BodyVelocity.Name = "SpeedhackVelocity"
 
     local function resetSpeed()
         pcall(function()
@@ -254,10 +255,19 @@ pcall(function()
             if char and char:FindFirstChild("Humanoid") then
                 char.Humanoid.WalkSpeed = 16
                 char.Humanoid.JumpPower = 50
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    for _, bv in ipairs(hrp:GetChildren()) do
+                        if bv:IsA("BodyVelocity") and bv.Name == "SpeedhackVelocity" then
+                            bv.Parent = nil
+                        end
+                    end
+                end
             else
                 print("[Speedhack] Warning: No character or Humanoid found for reset")
             end
-            BodyVelocity.Parent = nil
+        end, function(err)
+            print("[Speedhack] resetSpeed error: " .. tostring(err))
         end)
     end
 
@@ -266,8 +276,24 @@ pcall(function()
             resetSpeed()
             BodyVelocity:Destroy()
             print("[Speedhack] Cleaned up")
+        end, function(err)
+            print("[Speedhack] cleanupSpeed error: " .. tostring(err))
         end)
     end
+
+    -- Initialize for existing character
+    pcall(function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            if Toggles.SpeedhackToggle.Value then
+                local char = player.Character
+                BodyVelocity.Parent = char.HumanoidRootPart
+                char.Humanoid.JumpPower = 0
+                print("[Speedhack] Initialized for existing character")
+            end
+        else
+            print("[Speedhack] Warning: No character or components found on startup")
+        end
+    end)
 
     player.CharacterAdded:Connect(function(character)
         pcall(function()
@@ -285,19 +311,9 @@ pcall(function()
                 character.Humanoid.JumpPower = 0
                 print("[Speedhack] Enabled for new character")
             end
+        end, function(err)
+            print("[Speedhack] CharacterAdded error: " .. tostring(err))
         end)
-    end)
-
-    -- Check if character exists on script start
-    pcall(function()
-        if player.Character then
-            local char = player.Character
-            if char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and Toggles.SpeedhackToggle.Value then
-                BodyVelocity.Parent = char.HumanoidRootPart
-                char.Humanoid.JumpPower = 0
-                print("[Speedhack] Enabled for existing character")
-            end
-        end
     end)
 
     local renderConnection
@@ -313,9 +329,14 @@ pcall(function()
                     if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += workspace.CurrentCamera.CFrame.RightVector end
                     dir = dir.Magnitude > 0 and dir.Unit or Vector3.zero
 
+                    -- Apply BodyVelocity
                     BodyVelocity.Velocity = dir * math.min(Options.SpeedhackSpeed.Value, 49 / dt)
                     BodyVelocity.Parent = char.HumanoidRootPart
                     char.Humanoid.JumpPower = 0
+
+                    -- Fallback: Modify WalkSpeed if BodyVelocity fails
+                    char.Humanoid.WalkSpeed = math.max(16, Options.SpeedhackSpeed.Value)
+                    print("[Speedhack] Applied speed: " .. tostring(Options.SpeedhackSpeed.Value))
                 else
                     resetSpeed()
                 end
@@ -329,25 +350,37 @@ pcall(function()
 
     -- Handle Flight toggle-off when both are active
     pcall(function()
-        Toggles.FlightToggle:OnChanged(function(value)
-            pcall(function()
-                if not value and Toggles.SpeedhackToggle.Value then
-                    Toggles.SpeedhackToggle:SetValue(false)
-                    task.wait(0.1)
-                    Toggles.SpeedhackToggle:SetValue(true)
-                    print("[Speedhack] Re-enabled after Flight toggle-off")
-                end
+        if Toggles.FlightToggle then
+            Toggles.FlightToggle:OnChanged(function(value)
+                pcall(function()
+                    if not value and Toggles.SpeedhackToggle.Value then
+                        Toggles.SpeedhackToggle:SetValue(false)
+                        task.wait(0.1)
+                        Toggles.SpeedhackToggle:SetValue(true)
+                        print("[Speedhack] Re-enabled after Flight toggle-off")
+                    end
+                end, function(err)
+                    print("[Speedhack] FlightToggle OnChanged error: " .. tostring(err))
+                end)
             end)
-        end)
+        else
+            print("[Speedhack] Warning: Toggles.FlightToggle not found")
+        end
     end)
 
     -- Cleanup on GUI unload
-    Library:OnUnload(function()
-        pcall(function()
-            if renderConnection then renderConnection:Disconnect() end
-            cleanupSpeed()
-            print("[Speedhack] Unloaded")
+    pcall(function()
+        Library:OnUnload(function()
+            pcall(function()
+                if renderConnection then renderConnection:Disconnect() end
+                cleanupSpeed()
+                print("[Speedhack] Unloaded")
+            end, function(err)
+                print("[Speedhack] Unload error: " .. tostring(err))
+            end)
         end)
+    end, function(err)
+        print("[Speedhack] Error setting up OnUnload: " .. tostring(err))
     end)
 end, function(err)
     print("[Speedhack] Initialization error: " .. tostring(err))
