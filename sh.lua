@@ -77,7 +77,7 @@ MainGroup:AddToggle("NoclipToggle", {
 --    Text = "Auto Ingredient Pickup",
 --    Default = false
 --})
-local MainGroup3 = Tabs.Main:AddRightGroupbox("Tween to Locations")
+local MainGroup3 = Tabs.Main:AddRightGroupbox("Tween to Location")
 MainGroup3:AddDropdown("Areas", {
     Text = "Area Selection",
     Default = "WIP",
