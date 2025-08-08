@@ -330,7 +330,6 @@ pcall(function()
                     BodyVelocity.Velocity = dir * math.min(Options.SpeedhackSpeed.Value, 49 / dt)
                     BodyVelocity.Parent = char.HumanoidRootPart
                     char.Humanoid.JumpPower = 0
-                    print("[Speedhack] Applied speed: " .. tostring(Options.SpeedhackSpeed.Value))
                 else
                     resetSpeed()
                 end
