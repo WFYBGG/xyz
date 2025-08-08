@@ -239,6 +239,9 @@ pcall(function()
     local UserInputService = game:GetService("UserInputService")
     local player = Players.LocalPlayer
 
+    -- Flag to track manual cleanup
+    local shouldCleanup = false
+
     -- Wait for GUI initialization with timeout
     local timeout = tick() + 10
     while not (Toggles and Toggles.SpeedhackToggle and Options and Options.SpeedhackSpeed) and tick() < timeout do
@@ -269,9 +272,13 @@ pcall(function()
 
     local function cleanupSpeed()
         pcall(function()
-            resetSpeed()
-            BodyVelocity:Destroy()
-            print("[Speedhack] Cleaned up at " .. os.date("%H:%M:%S"))
+            if shouldCleanup then
+                resetSpeed()
+                BodyVelocity:Destroy()
+                print("[Speedhack] Cleaned up at " .. os.date("%H:%M:%S"))
+            else
+                print("[Speedhack] Cleanup skipped; not requested")
+            end
         end, function(err)
             print("[Speedhack] cleanupSpeed error: " .. tostring(err))
         end)
@@ -318,6 +325,10 @@ pcall(function()
     pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function(dt)
             pcall(function()
+                if shouldCleanup then
+                    print("[Speedhack] RenderStepped skipped; cleanup requested")
+                    return
+                end
                 local char = player.Character
                 if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
                     local dir = Vector3.zero
@@ -347,6 +358,10 @@ pcall(function()
         if Toggles.FlightToggle then
             Toggles.FlightToggle:OnChanged(function(value)
                 pcall(function()
+                    if shouldCleanup then
+                        print("[Speedhack] Flight toggle skipped; cleanup requested")
+                        return
+                    end
                     if not value and Toggles.SpeedhackToggle.Value then
                         Toggles.SpeedhackToggle:SetValue(false)
                         task.wait(0.1)
@@ -364,126 +379,22 @@ pcall(function()
         print("[Speedhack] Error setting up FlightToggle: " .. tostring(err))
     end)
 
-    -- Cleanup on GUI unload
-    pcall(function()
-        Library:OnUnload(function()
-            pcall(function()
-                if renderConnection then renderConnection:Disconnect() end
-                cleanupSpeed()
-                print("[Speedhack] Unloaded at " .. os.date("%H:%M:%S"))
-            end, function(err)
-                print("[Speedhack] Unload error: " .. tostring(err))
-            end)
+    -- Manual cleanup function
+    _G.SpeedhackCleanup = function()
+        pcall(function()
+            shouldCleanup = true
+            if renderConnection then renderConnection:Disconnect() end
+            cleanupSpeed()
+            print("[Speedhack] Manual cleanup triggered at " .. os.date("%H:%M:%S"))
+        end, function(err)
+            print("[Speedhack] Manual cleanup error: " .. tostring(err))
         end)
-    end, function(err)
-        print("[Speedhack] Error setting up OnUnload: " .. tostring(err))
-    end)
+    end
 
     -- Log script start
     print("[Speedhack] Script initialized at " .. os.date("%H:%M:%S"))
 end, function(err)
     print("[Speedhack] Initialization error: " .. tostring(err))
-end)
-
-
---Fly/Flight Module
-pcall(function()
-    local RunService = game:GetService("RunService")
-    local Players = game:GetService("Players")
-    local UserInputService = game:GetService("UserInputService")
-    local player = Players.LocalPlayer
-
-    local Platform = Instance.new("Part")
-    Platform.Size = Vector3.new(6, 1, 6)
-    Platform.Anchored = true
-    Platform.CanCollide = true
-    Platform.Transparency = 1.00
-    Platform.BrickColor = BrickColor.new("Bright blue")
-    Platform.Material = Enum.Material.SmoothPlastic
-    Platform.Name = "OldDebris"
-
-    local FlyVelocity = Instance.new("BodyVelocity")
-    FlyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-
-    local function resetFly()
-        pcall(function()
-            Platform.Parent = nil
-            FlyVelocity.Parent = nil
-            local char = player.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid.WalkSpeed = 16
-                char.Humanoid.JumpPower = 50
-            end
-        end)
-    end
-
-    local function cleanupFly()
-        pcall(function()
-            resetFly()
-            Platform:Destroy()
-            FlyVelocity:Destroy()
-        end)
-    end
-
-    player.CharacterAdded:Connect(function(char)
-        pcall(function()
-            repeat task.wait() until char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")
-            if Toggles.FlightToggle.Value then
-                FlyVelocity.Parent = char.HumanoidRootPart
-                Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                Platform.Parent = workspace
-                char.Humanoid.JumpPower = 0
-            end
-        end)
-    end)
-
-    local renderConnection
-    pcall(function()
-        renderConnection = RunService.RenderStepped:Connect(function(dt)
-            pcall(function()
-                local char = player.Character
-                if Toggles.FlightToggle.Value and char and char:FindFirstChild("HumanoidRootPart") then
-                    local moveDir = Vector3.zero
-                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= workspace.CurrentCamera.CFrame.RightVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += workspace.CurrentCamera.CFrame.RightVector end
-                    moveDir = moveDir.Magnitude > 0 and moveDir.Unit or Vector3.zero
-
-                    local vert = 0
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vert = 70 end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vert = -70 end
-
-                    FlyVelocity.Velocity = moveDir * math.min(Options.FlightSpeed.Value, 49 / dt) + Vector3.new(0, vert, 0)
-                    FlyVelocity.Parent = char.HumanoidRootPart
-
-                    Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                    Platform.Parent = workspace
-                else
-                    resetFly()
-                end
-            end)
-        end)
-    end)
-
-    -- Handle Speedhack toggle-off when both are active
-    Toggles.SpeedhackToggle:OnChanged(function(value)
-        pcall(function()
-            if not value and Toggles.FlightToggle.Value then
-                Toggles.FlightToggle:SetValue(false)
-                task.wait(0.1)
-                Toggles.FlightToggle:SetValue(true)
-            end
-        end)
-    end)
-
-    -- Cleanup on GUI unload
-    Library:OnUnload(function()
-        pcall(function()
-            if renderConnection then renderConnection:Disconnect() end
-            cleanupFly()
-        end)
-    end)
 end)
 
 
