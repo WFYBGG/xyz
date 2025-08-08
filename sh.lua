@@ -30,10 +30,10 @@ MainGroup:AddSlider("SpeedhackSpeed", {
     Rounding = 0,
     Compact = true
 })
-MainGroup:AddLabel("Keybind"):AddKeyPicker("SpeedKeybind", {
-    Default = "F4",
+MainGroup:AddLabel("Speedhack Keybind"):AddKeyPicker("SpeedKeybind", {
+    Default = "",
     Mode = "Toggle",
-    Text = "Speed Keybind",
+    Text = "",
     Callback = function(value)
         Toggles.SpeedToggle:SetValue(value)
     end
@@ -50,22 +50,22 @@ MainGroup:AddSlider("FlightSpeed", {
     Rounding = 0,
     Compact = true
 })
-MainGroup:AddLabel("Keybind"):AddKeyPicker("FlightKeybind", {
-    Default = "X",
+MainGroup:AddLabel("Fly Keybind"):AddKeyPicker("FlightKeybind", {
+    Default = "",
     Mode = "Toggle",
-    Text = "Fly Keybind",
+    Text = "",
     Callback = function(value)
         Toggles.FlightToggle:SetValue(value)
     end
 })
 MainGroup:AddToggle("NoClipToggle", {
-    Text = "No Clip",
+    Text = "Noclip",
     Default = false
 })
-MainGroup:AddLabel("Keybind"):AddKeyPicker("NoclipKeybind", {
-    Default = "X",
+MainGroup:AddLabel("Noclip Keybind"):AddKeyPicker("NoclipKeybind", {
+    Default = "",
     Mode = "Toggle",
-    Text = "No Clip Keybind",
+    Text = "",
     Callback = function(value)
         Toggles.NoClipToggle:SetValue(value)
     end
