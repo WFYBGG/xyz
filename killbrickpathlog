@@ -4,6 +4,8 @@ Workspace/Debris/BanditCampfire
 Disable touch events 
 Any part Turquoise, [120, 255, 181], Neon
 
+Part named "void"  [Persimmon and [255, 91, 62] material Neon] under Workspace/Map
+
 Burning folder
 Knocked folder
 HealthPackCD
