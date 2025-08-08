@@ -80,7 +80,7 @@ MainGroup:AddToggle("NoclipToggle", {
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 local TweenFullList = {"WIP", "Area1", "Area2", "Area3", "Area4", "? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"} -- Combined list for areas and NPCs
 MainGroup3:AddInput("Search", {
-    Text = "Search:",
+    Text = "Search",
     Default = "",
     Placeholder = "Search or select below...",
     Callback = function(value)
@@ -124,7 +124,7 @@ MainGroup3:AddSlider("UniversalTweenSpeed", {
     Compact = true
 })
 MainGroup3:AddDropdown("Areas", {
-    Text = "Area Selection",
+    Text = "Areas",
     Default = "WIP",
     Values = {"WIP", "Area1", "Area2", "Area3", "Area4"},
     Multi = false
@@ -132,7 +132,7 @@ MainGroup3:AddDropdown("Areas", {
 MainGroup3:AddButton("Area Tween Start/Stop", function() print("Area Tween Start/Stop clicked") end)
 
 MainGroup3:AddDropdown("NPCs", {
-    Text = "NPC Selection",
+    Text = "NPCs",
     Default = "? ??, God's Eye",
     Values = {"? ??, God's Eye", "NPC1", "NPC2", "NPC3", "NPC4"},
     Multi = false
@@ -175,7 +175,7 @@ MainGroup6:AddToggle("AttachtobackToggle", {
         Toggles.AttachtobackToggle:SetValue(value)
     end
 })
-MainGroup6::AddDropdown('PlayerDropdown', {
+MainGroup6:AddDropdown('PlayerDropdown', {
     SpecialType = 'Player',
     Text = 'Select Player',
     Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
