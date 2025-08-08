@@ -170,33 +170,6 @@ MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
     Text = "Menu keybind"
 })
 
--- Add Theme Selection
-MenuGroup:AddLabel("Theme"):AddDropdown("ThemeSelector", {
-    Values = ThemeManager:GetThemes(),
-    Default = 1,
-    Multi = false,
-    Text = "Theme",
-    Callback = function(value)
-        ThemeManager:SetTheme(value)
-    end
-})
-
--- Create Custom Theme
-ThemeManager:CreateTheme({
-    Name = "Ratware.exe",
-    Accent = Color3.fromRGB(0, 0, 0), 
-    Background = Color3.fromRGB(255, 255, 255), 
-    Outline = Color3.fromRGB(0, 0, 0), 
-    TextColor = Color3.fromRGB(255, 0, 0),
-    TextboxBackground = Color3.fromRGB(40, 40, 50), 
-    ButtonBackground = Color3.fromRGB(50, 50, 60),
-    SliderTrack = Color3.fromRGB(60, 60, 70), 
-    SliderProgress = Color3.fromRGB(0, 150, 255)
-})
-
--- Apply the custom theme initially
-ThemeManager:SetTheme("Ratware.exe")
-
 Library.ToggleKeybind = Options.MenuKeybind
 
 ThemeManager:SetLibrary(Library)
