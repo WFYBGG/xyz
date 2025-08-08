@@ -571,321 +571,294 @@ pcall(function()
 end)
 
 
---ESP Module [TESTING STILL]
---[[
-    Universal ESP with robust cleanup, Drawing API skeleton, and 2D chams effect.
-    Integrated with Linoria GUI (Toggles.PlayerESP).
-    - Toggles ESP for all players (excluding LocalPlayer) via Toggles.PlayerESP.
-    - Cleans up ESP for all players including those who leave or disconnect.
-    - Skeleton ESP (lines between limbs) with Drawing API.
-    - 2D chams: draws a filled rectangle behind the ESP box (not true 3D chams, but Drawing API-safe).
-    - All object access wrapped in pcall for anti-crash/anti-flag safety.
-    - No external libraries, no range limit, works for all streamed characters.
-    - Health/MaxHealth via Workspace.Living[Model.Name==Player.Name].Humanoid.
-    - Place in executor and run in-game.
---]]
+--Player ESP Module
+pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local Camera = workspace.CurrentCamera
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
+    local LocalPlayer
+    pcall(function() LocalPlayer = Players.LocalPlayer end)
 
-local LocalPlayer
-pcall(function() LocalPlayer = Players.LocalPlayer end)
+    local ESPObjects = {}
 
-local ESPObjects = {}
-
-local function safeGet(parent, child)
-    local result
-    pcall(function()
-        if parent and child then
-            result = parent:FindFirstChild(child)
-        end
-    end)
-    return result
-end
-
-local function getCharacterModel(player)
-    local living
-    pcall(function()
-        living = workspace:FindFirstChild("Living")
-    end)
-    if not living then return nil end
-    return safeGet(living, player.Name)
-end
-
-local function getHealthInfo(character)
-    local health, maxHealth = 0, 0
-    pcall(function()
-        local humanoid = safeGet(character, "Humanoid")
-        if humanoid then
-            health = humanoid.Health
-            maxHealth = humanoid.MaxHealth
-        end
-    end)
-    return health, maxHealth
-end
-
-local function cleanupESP(player)
-    local tbl
-    pcall(function() tbl = ESPObjects[player] end)
-    if tbl then
-        for _, obj in pairs(tbl) do
-            if typeof(obj) == "table" then
-                for _, v in pairs(obj) do
-                    pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
-                end
-            else
-                pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
+    local function safeGet(parent, child)
+        local result
+        pcall(function()
+            if parent and child then
+                result = parent:FindFirstChild(child)
             end
-        end
-        pcall(function() ESPObjects[player] = nil end)
+        end)
+        return result
     end
-end
 
-local function createESP(player)
-    if player == LocalPlayer then return end
-    pcall(function()
-        if ESPObjects[player] then cleanupESP(player) end
-
-        local box, nameText, healthText, distText, chamBox
-
+    local function getCharacterModel(player)
+        local living
         pcall(function()
-            box = Drawing.new("Line")
-            box.Visible = false
-            box.Thickness = 2
-            box.Color = Color3.fromRGB(255, 25, 25)
+            living = workspace:FindFirstChild("Living")
         end)
+        if not living then return nil end
+        return safeGet(living, player.Name)
+    end
 
+    local function getHealthInfo(character)
+        local health, maxHealth = 0, 0
         pcall(function()
-            nameText = Drawing.new("Text")
-            nameText.Size = 14
-            nameText.Center = true
-            nameText.Outline = true
-            nameText.Color = Color3.fromRGB(255, 255, 255)
-            nameText.Visible = false
+            local humanoid = safeGet(character, "Humanoid")
+            if humanoid then
+                health = humanoid.Health
+                maxHealth = humanoid.MaxHealth
+            end
         end)
+        return health, maxHealth
+    end
 
-        pcall(function()
-            healthText = Drawing.new("Text")
-            healthText.Size = 13
-            healthText.Center = true
-            healthText.Outline = true
-            healthText.Color = Color3.fromRGB(0, 255, 0)
-            healthText.Visible = false
-        end)
-
-        pcall(function()
-            distText = Drawing.new("Text")
-            distText.Size = 13
-            distText.Center = true
-            distText.Outline = true
-            distText.Color = Color3.fromRGB(200, 200, 200)
-            distText.Visible = false
-        end)
-
-        pcall(function()
-            chamBox = Drawing.new("Square")
-            chamBox.Visible = false
-            chamBox.Color = Color3.fromRGB(255, 0, 0)
-            chamBox.Transparency = 0.2
-            chamBox.Filled = true
-        end)
-
-        ESPObjects[player] = {
-            Box = box,
-            Name = nameText,
-            Health = healthText,
-            Distance = distText,
-            ChamBox = chamBox,
-            Skeleton = {},
-        }
-    end)
-end
-
-local function drawSkeleton(player, char, color, thickness)
-    local bones = {
-        { "Head", "HumanoidRootPart" },
-        { "HumanoidRootPart", "LeftUpperLeg" },
-        { "LeftUpperLeg", "LeftLowerLeg" },
-        { "LeftLowerLeg", "LeftFoot" },
-        { "HumanoidRootPart", "RightUpperLeg" },
-        { "RightUpperLeg", "RightLowerLeg" },
-        { "RightLowerLeg", "RightFoot" },
-        { "HumanoidRootPart", "LeftUpperArm" },
-        { "LeftUpperArm", "LeftLowerArm" },
-        { "LeftLowerArm", "LeftHand" },
-        { "HumanoidRootPart", "RightUpperArm" },
-        { "RightUpperArm", "RightLowerArm" },
-        { "RightLowerArm", "RightHand" },
-    }
-
-    if not ESPObjects[player] then ESPObjects[player] = {} end
-    local skeleton = ESPObjects[player].Skeleton or {}
-
-    for i, pair in ipairs(bones) do
-        local part1, part2
-        pcall(function()
-            part1 = char:FindFirstChild(pair[1])
-            part2 = char:FindFirstChild(pair[2])
-        end)
-        local line = skeleton[i]
-        if not line then
-            line = Drawing.new("Line")
-            skeleton[i] = line
+    local function cleanupESP(player)
+        local tbl
+        pcall(function() tbl = ESPObjects[player] end)
+        if tbl then
+            for _, obj in pairs(tbl) do
+                if typeof(obj) == "table" then
+                    for _, v in pairs(obj) do
+                        pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
+                    end
+                else
+                    pcall(function() if typeof(obj) == "userdata" and v.Remove then obj:Remove() end end)
+                end
+            end
+            pcall(function() ESPObjects[player] = nil end)
         end
+    end
 
-        if part1 and part2 then
-            local pos1, onScr1 = Camera:WorldToViewportPoint(part1.Position)
-            local pos2, onScr2 = Camera:WorldToViewportPoint(part2.Position)
-            if onScr1 and onScr2 then
-                line.From = Vector2.new(pos1.X, pos1.Y)
-                line.To = Vector2.new(pos2.X, pos2.Y)
-                line.Color = color or Color3.fromRGB(255,255,255)
-                line.Thickness = thickness or 2
-                line.Visible = true
+    local function createESP(player)
+        if player == LocalPlayer then return end
+        pcall(function()
+            if ESPObjects[player] then cleanupESP(player) end
+
+            local box, nameText, healthText, distText, chamBox
+
+            pcall(function()
+                box = Drawing.new("Line")
+                box.Visible = false
+                box.Thickness = 2
+                box.Color = Color3.fromRGB(255, 25, 25)
+            end)
+
+            pcall(function()
+                nameText = Drawing.new("Text")
+                nameText.Size = 14
+                nameText.Center = true
+                nameText.Outline = true
+                nameText.Color = Color3.fromRGB(255, 255, 255)
+                nameText.Visible = false
+            end)
+
+            pcall(function()
+                healthText = Drawing.new("Text")
+                healthText.Size = 13
+                healthText.Center = true
+                healthText.Outline = true
+                healthText.Color = Color3.fromRGB(0, 255, 0)
+                healthText.Visible = false
+            end)
+
+            pcall(function()
+                distText = Drawing.new("Text")
+                distText.Size = 13
+                distText.Center = true
+                distText.Outline = true
+                distText.Color = Color3.fromRGB(200, 200, 200)
+                distText.Visible = false
+            end)
+
+            pcall(function()
+                chamBox = Drawing.new("Square")
+                chamBox.Visible = false
+                chamBox.Color = Color3.fromRGB(255, 0, 0)
+                chamBox.Transparency = 0.2
+                chamBox.Filled = true
+            end)
+
+            ESPObjects[player] = {
+                Box = box,
+                Name = nameText,
+                Health = healthText,
+                Distance = distText,
+                ChamBox = chamBox,
+                Skeleton = {},
+            }
+        end)
+    end
+
+    local function drawSkeleton(player, char, color, thickness)
+        local bones = {
+            { "Head", "HumanoidRootPart" },
+            { "HumanoidRootPart", "LeftUpperLeg" },
+            { "LeftUpperLeg", "LeftLowerLeg" },
+            { "LeftLowerLeg", "LeftFoot" },
+            { "HumanoidRootPart", "RightUpperLeg" },
+            { "RightUpperLeg", "RightLowerLeg" },
+            { "RightLowerLeg", "RightFoot" },
+            { "HumanoidRootPart", "LeftUpperArm" },
+            { "LeftUpperArm", "LeftLowerArm" },
+            { "LeftLowerArm", "LeftHand" },
+            { "HumanoidRootPart", "RightUpperArm" },
+            { "RightUpperArm", "RightLowerArm" },
+            { "RightLowerArm", "RightHand" },
+        }
+
+        if not ESPObjects[player] then ESPObjects[player] = {} end
+        local skeleton = ESPObjects[player].Skeleton or {}
+
+        for i, pair in ipairs(bones) do
+            local part1, part2
+            pcall(function()
+                part1 = char:FindFirstChild(pair[1])
+                part2 = char:FindFirstChild(pair[2])
+            end)
+            local line = skeleton[i]
+            if not line then
+                line = Drawing.new("Line")
+                skeleton[i] = line
+            end
+
+            if part1 and part2 then
+                local pos1, onScr1 = Camera:WorldToViewportPoint(part1.Position)
+                local pos2, onScr2 = Camera:WorldToViewportPoint(part2.Position)
+                if onScr1 and onScr2 then
+                    line.From = Vector2.new(pos1.X, pos1.Y)
+                    line.To = Vector2.new(pos2.X, pos2.Y)
+                    line.Color = color or Color3.fromRGB(255,255,255)
+                    line.Thickness = thickness or 2
+                    line.Visible = Toggles.PlayerESP.Value
+                else
+                    line.Visible = false
+                end
             else
                 line.Visible = false
             end
-        else
-            line.Visible = false
         end
+        ESPObjects[player].Skeleton = skeleton
     end
-    ESPObjects[player].Skeleton = skeleton
-end
 
--- Player join/leave management
-pcall(function()
-    Players.PlayerAdded:Connect(function(plr)
-        if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
+    -- Player join/leave management
+    pcall(function()
+        Players.PlayerAdded:Connect(function(plr)
+            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
+        end)
     end)
-end)
-pcall(function()
-    Players.PlayerRemoving:Connect(function(plr)
-        pcall(function() cleanupESP(plr) end)
+    pcall(function()
+        Players.PlayerRemoving:Connect(function(plr)
+            pcall(function() cleanupESP(plr) end)
+        end)
     end)
-end)
-pcall(function()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
-    end
-end)
-
--- Wait for GUI initialization
-local function waitForGUI()
-    local maxWait = 5
-    local waitTime = 0
-    while waitTime < maxWait do
-        local success, result = pcall(function() return Toggles.PlayerESP end)
-        if success and result then
-            return true
-        end
-        wait(0.1)
-        waitTime = waitTime + 0.1
-    end
-    warn("Failed to initialize Toggles.PlayerESP after " .. maxWait .. " seconds")
-    return false
-end
-if not waitForGUI() then return end
-
--- Toggle ESP with GUI
-pcall(function()
-    Toggles.PlayerESP:OnChanged(function(value)
-        if not value then
-            for player, _ in pairs(ESPObjects) do
-                cleanupESP(player)
-            end
+    pcall(function()
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
         end
     end)
-end)
 
-RunService.RenderStepped:Connect(function()
-    if Toggles.PlayerESP and Toggles.PlayerESP.Value then
-        local streamedPlayers = {}
-        for player, tbl in pairs(ESPObjects) do
-            streamedPlayers[player] = true
-            pcall(function()
-                local char = getCharacterModel(player)
-                local box, nameText, healthText, distText, chamBox
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            local streamedPlayers = {}
+            for player, tbl in pairs(ESPObjects) do
+                streamedPlayers[player] = true
                 pcall(function()
-                    box = tbl.Box
-                    nameText = tbl.Name
-                    healthText = tbl.Health
-                    distText = tbl.Distance
-                    chamBox = tbl.ChamBox
-                end)
-
-                if char and safeGet(char, "HumanoidRootPart") then
-                    local hrp
-                    pcall(function() hrp = char.HumanoidRootPart end)
-                    local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
-
+                    local char = getCharacterModel(player)
+                    local box, nameText, healthText, distText, chamBox
                     pcall(function()
-                        pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        box = tbl.Box
+                        nameText = tbl.Name
+                        healthText = tbl.Health
+                        distText = tbl.Distance
+                        chamBox = tbl.ChamBox
                     end)
 
-                    pcall(function()
-                        health, maxHealth = getHealthInfo(char)
-                    end)
+                    if char and safeGet(char, "HumanoidRootPart") then
+                        local hrp
+                        pcall(function() hrp = char.HumanoidRootPart end)
+                        local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
 
-                    pcall(function()
-                        extents = char:GetExtentsSize()
-                    end)
-
-                    pcall(function()
-                        topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
-                    end)
-                    pcall(function()
-                        botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
-                    end)
-                    pcall(function()
-                        height = (botW.Y - topW.Y)
-                        width = height * 0.45
-                    end)
-
-                    if onScreen and onScreen1 and onScreen2 and health > 0 then
-                        -- Chams box (drawn behind ESP box)
                         pcall(function()
-                            chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
-                            chamBox.Size = Vector2.new(width, height)
-                            chamBox.Color = Color3.fromRGB(255, 0, 0)
-                            chamBox.Transparency = 0.15
-                            chamBox.Visible = true
+                            pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                         end)
 
-                        -- Draw box (top horizontal line)
                         pcall(function()
-                            box.From = Vector2.new(topW.X - width/2, topW.Y)
-                            box.To   = Vector2.new(topW.X + width/2, topW.Y)
-                            box.Visible = true
+                            health, maxHealth = getHealthInfo(char)
                         end)
 
-                        -- Draw name
                         pcall(function()
-                            nameText.Text = player.DisplayName
-                            nameText.Position = Vector2.new(pos.X, topW.Y - 16)
-                            nameText.Visible = true
+                            extents = char:GetExtentsSize()
                         end)
 
-                        -- Draw health/maxhealth
                         pcall(function()
-                            healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
-                            healthText.Position = Vector2.new(pos.X, topW.Y - 2)
-                            local r = math.floor(255 - 255 * (health/maxHealth))
-                            local g = math.floor(255 * (health/maxHealth))
-                            healthText.Color = Color3.fromRGB(r, g, 0)
-                            healthText.Visible = true
+                            topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
+                        end)
+                        pcall(function()
+                            botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
+                        end)
+                        pcall(function()
+                            height = (botW.Y - topW.Y)
+                            width = height * 0.45
                         end)
 
-                        -- Draw distance
-                        pcall(function()
-                            local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                            distText.Text = "[" .. math.floor(dist) .. "m]"
-                            distText.Position = Vector2.new(pos.X, botW.Y + 2)
-                            distText.Visible = true
-                        end)
+                        if Toggles.PlayerESP.Value and onScreen and onScreen1 and onScreen2 and health > 0 then
+                            -- Chams box (drawn behind ESP box)
+                            pcall(function()
+                                chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
+                                chamBox.Size = Vector2.new(width, height)
+                                chamBox.Color = Color3.fromRGB(255, 0, 0)
+                                chamBox.Transparency = 0.15
+                                chamBox.Visible = true
+                            end)
 
-                        -- Draw skeleton
-                        drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
+                            -- Draw box (top horizontal line)
+                            pcall(function()
+                                box.From = Vector2.new(topW.X - width/2, topW.Y)
+                                box.To = Vector2.new(topW.X + width/2, topW.Y)
+                                box.Visible = true
+                            end)
+
+                            -- Draw name
+                            pcall(function()
+                                nameText.Text = player.DisplayName
+                                nameText.Position = Vector2.new(pos.X, topW.Y - 16)
+                                nameText.Visible = true
+                            end)
+
+                            -- Draw health/maxhealth
+                            pcall(function()
+                                healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
+                                healthText.Position = Vector2.new(pos.X, topW.Y - 2)
+                                local r = math.floor(255 - 255 * (health/maxHealth))
+                                local g = math.floor(255 * (health/maxHealth))
+                                healthText.Color = Color3.fromRGB(r, g, 0)
+                                healthText.Visible = true
+                            end)
+
+                            -- Draw distance
+                            pcall(function()
+                                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
+                                distText.Text = "[" .. math.floor(dist) .. "m]"
+                                distText.Position = Vector2.new(pos.X, botW.Y + 2)
+                                distText.Visible = true
+                            end)
+
+                            -- Draw skeleton
+                            drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
+                        else
+                            pcall(function() box.Visible = false end)
+                            pcall(function() nameText.Visible = false end)
+                            pcall(function() healthText.Visible = false end)
+                            pcall(function() distText.Visible = false end)
+                            pcall(function() chamBox.Visible = false end)
+                            -- Hide skeleton lines
+                            if tbl.Skeleton then
+                                for _, line in pairs(tbl.Skeleton) do
+                                    pcall(function() line.Visible = false end)
+                                end
+                            end
+                        end
                     else
                         pcall(function() box.Visible = false end)
                         pcall(function() nameText.Visible = false end)
@@ -899,153 +872,251 @@ RunService.RenderStepped:Connect(function()
                             end
                         end
                     end
-                else
-                    pcall(function() box.Visible = false end)
-                    pcall(function() nameText.Visible = false end)
-                    pcall(function() healthText.Visible = false end)
-                    pcall(function() distText.Visible = false end)
-                    pcall(function() chamBox.Visible = false end)
-                    -- Hide skeleton lines
-                    if tbl.Skeleton then
-                        for _, line in pairs(tbl.Skeleton) do
-                            pcall(function() line.Visible = false end)
+                end)
+            end
+            -- Robust cleanup: remove ESP for any player no longer in Players
+            for playerRef in pairs(ESPObjects) do
+                local found = false
+                pcall(function()
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p == playerRef then
+                            found = true
+                            break
                         end
                     end
+                end)
+                if not found then
+                    cleanupESP(playerRef)
                 end
-            end)
-        end
-        -- Robust cleanup: remove ESP for any player no longer in Players
-        for playerRef in pairs(ESPObjects) do
-            local found = false
-            pcall(function()
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p == playerRef then
-                        found = true
-                        break
-                    end
-                end
-            end)
-            if not found then
-                cleanupESP(playerRef)
             end
-        end
-    end
+        end)
+    end)
+
+    -- Log script start
+    print("[ESP] Script initialized at " .. os.date("%H:%M:%S"))
+end, function(err)
+    print("[ESP] Initialization error: " .. tostring(err))
 end)
 
 
 --Attach to back Module [TESTING STILL]
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
-local AttachEnabled = false
-local TargetPlayerName = nil
-local TargetCharacter = nil
+-- Internal state
+local targetPlayer = nil
+local isAttached = false
+local attachConn = nil
+local isTweening = false
+local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
 
-local AttachPart = nil
-
-local function safe_pcall(func, ...)
-    local ok, result = pcall(func, ...)
-    if not ok then
-        -- error handling silently to avoid detection
-        return nil
+-- Utility: Safe get
+local function safeGet(obj, ...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        local ok, res = pcall(function() return obj[v] end)
+        if not ok then return nil end
+        obj = res
+        if not obj then return nil end
     end
-    return result
+    return obj
 end
 
--- Function to update the target player and character reference
-local function UpdateTargetPlayer()
-    local selectedPlayerName = nil
-    -- use pcall because Options.PlayerDropdown might be nil or not set
-    safe_pcall(function()
-        selectedPlayerName = Options.PlayerDropdown.Value
-    end)
+-- Toggle GUI utilities
+local function setToggle(toggleName, value)
+    local ok, toggle = pcall(function() return Toggles[toggleName] end)
+    if ok and toggle then
+        pcall(function() toggle:SetValue(value) end)
+    end
+end
 
-    if selectedPlayerName and selectedPlayerName ~= "" then
-        if TargetPlayerName ~= selectedPlayerName then
-            TargetPlayerName = selectedPlayerName
-            local player = Players:FindFirstChild(TargetPlayerName)
-            if player and player.Character then
-                TargetCharacter = player.Character
-            else
-                TargetCharacter = nil
+-- Get tween speed safely
+local function getTweenSpeed()
+    local ok, value = pcall(function() return Options.UniversalTweenSpeed.Value end)
+    return ok and math.max(0, math.min(300, value)) or 150
+end
+
+-- Death detection and cleanup
+local function checkDeathCleanup()
+    local char = LocalPlayer.Character
+    local targetChar = targetPlayer and targetPlayer.Character
+    local localHumanoid = char and safeGet(char, "Humanoid")
+    local targetHumanoid = targetChar and safeGet(targetChar, "Humanoid")
+    local isLocalDead = localHumanoid and pcall(function() return localHumanoid.Health <= 0 end)
+    local isTargetDead = targetHumanoid and pcall(function() return targetHumanoid.Health <= 0 end)
+    if isLocalDead or isTargetDead then
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        if hrp and isTweening then
+            for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                pcall(function() tween:Cancel() end)
             end
         end
-    else
-        TargetPlayerName = nil
-        TargetCharacter = nil
+        stopAttach()
+        isTweening = false
+        return true
     end
+    return false
 end
 
--- Attach a part to back of TargetCharacter's HumanoidRootPart
-local function AttachToBack()
-    if not TargetCharacter or not TargetCharacter:FindFirstChild("HumanoidRootPart") then return end
-    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+-- Attach/Detach logic
+local function stopAttach()
+    isAttached = false
+    if attachConn then pcall(function() attachConn:Disconnect() end) attachConn = nil end
+    setToggle("FlightToggle", false)
+    setToggle("NoclipToggle", false)
+    setToggle("NoFallDamage", false)
+    isTweening = false
+end
 
-    -- Remove old attachment if exists
-    if AttachPart then
-        safe_pcall(function()
-            AttachPart:Destroy()
+local function startAttach()
+    stopAttach()
+    isAttached = true
+    setToggle("NoFallDamage", true)
+    attachConn = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer and targetPlayer.Character
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+        if not (hrp and targetHrp) then return end
+        pcall(function()
+            hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
         end)
-        AttachPart = nil
-    end
-
-    safe_pcall(function()
-        AttachPart = Instance.new("Part")
-        AttachPart.Name = "AttachToBackPart"
-        AttachPart.Size = Vector3.new(1,1,1)
-        AttachPart.Transparency = 1
-        AttachPart.CanCollide = false
-        AttachPart.Anchored = false
-        AttachPart.Parent = Character
-
-        local weld = Instance.new("WeldConstraint")
-        weld.Part0 = Character.HumanoidRootPart
-        weld.Part1 = AttachPart
-        weld.Parent = AttachPart
-
-        -- Position AttachPart 2 studs behind target player's HumanoidRootPart
-        local targetHRP = TargetCharacter.HumanoidRootPart
-        local offset = targetHRP.CFrame.LookVector * -2
-        AttachPart.CFrame = targetHRP.CFrame + offset
+        checkDeathCleanup()
     end)
 end
 
--- Remove the attach part safely
-local function RemoveAttachment()
-    if AttachPart then
-        safe_pcall(function()
-            AttachPart:Destroy()
-        end)
-        AttachPart = nil
+-- Tween logic with GUI toggles
+local function tweenToBack()
+    if isTweening or not targetPlayer then return end
+    isTweening = true
+    local char = LocalPlayer.Character
+    local targetChar = targetPlayer.Character
+    local hrp = char and safeGet(char, "HumanoidRootPart")
+    local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+    if not (hrp and targetHrp) then isTweening = false return end
+
+    -- Enable movement toggles
+    setToggle("FlightToggle", true)
+    setToggle("NoclipToggle", true)
+    setToggle("NoFallDamage", true)
+
+    local speed = getTweenSpeed()
+    local steps = {
+        { pos = hrp.Position + Vector3.new(0, 1000 - hrp.Position.Y, 0), time = (1000 - hrp.Position.Y) / speed },
+        { pos = targetHrp.Position + Vector3.new(0, 1000 - targetHrp.Position.Y, 0), time = (targetHrp.Position - hrp.Position).Magnitude / speed },
+        { pos = (targetHrp.CFrame * CFrame.new(0, 0, 2)).Position, time = 1000 / speed }
+    }
+
+    for i, step in ipairs(steps) do
+        if not Toggles.AttachtobackToggle.Value or checkDeathCleanup() or not targetPlayer then
+            local currentTweens = TweenService:GetTweens(hrp)
+            for _, tween in pairs(currentTweens) do
+                pcall(function() tween:Cancel() end)
+            end
+            isTweening = false
+            setToggle("FlightToggle", false)
+            setToggle("NoclipToggle", false)
+            return
+        end
+        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(step.pos)})
+        pcall(function() tween:Play() end)
+        pcall(function() tween.Completed:Wait() end)
+    end
+
+    -- Disable movement toggles after tween
+    setToggle("FlightToggle", false)
+    setToggle("NoclipToggle", false)
+    isTweening = false
+    if Toggles.AttachtobackToggle.Value and targetPlayer and not checkDeathCleanup() then
+        startAttach()
     end
 end
 
--- Main update loop for attaching
-local AttachConnection
-AttachConnection = RunService.Heartbeat:Connect(function()
-    pcall(function()
-        if AttachEnabled then
-            UpdateTargetPlayer()
-            if TargetCharacter then
-                AttachToBack()
-            else
-                RemoveAttachment()
+-- GUI Integration
+pcall(function()
+    Options.PlayerDropdown:OnChanged(function(value)
+        targetPlayer = value ~= "" and Players:FindFirstChild(value) or nil
+        if Toggles.AttachtobackToggle.Value and not isTweening and not isAttached then
+            tweenToBack()
+        elseif isTweening or isAttached then
+            local char = LocalPlayer.Character
+            local hrp = char and safeGet(char, "HumanoidRootPart")
+            if hrp then
+                for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                    pcall(function() tween:Cancel() end)
+                end
             end
-        else
-            RemoveAttachment()
+            stopAttach()
+            if targetPlayer then
+                tweenToBack()
+            end
         end
     end)
 end)
 
--- Watch toggle for Attach to Back
-Toggles.AttachtobackToggle:OnChanged(function(value)
-    AttachEnabled = value
-    if not value then
-        RemoveAttachment()
-    end
+pcall(function()
+    Toggles.AttachtobackToggle:OnChanged(function(value)
+        if not value then
+            local char = LocalPlayer.Character
+            local hrp = char and safeGet(char, "HumanoidRootPart")
+            if hrp and isTweening then
+                for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                    pcall(function() tween:Cancel() end)
+                end
+            end
+            stopAttach()
+        elseif value and targetPlayer and not isTweening and not isAttached then
+            tweenToBack()
+        end
+    end)
 end)
+
+-- Player join/leave management
+pcall(function()
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            local ok, _ = pcall(function() Options.PlayerDropdown:Refresh() end)
+        end
+    end)
+end)
+
+pcall(function()
+    Players.PlayerRemoving:Connect(function(player)
+        if player == targetPlayer then
+            stopAttach()
+            targetPlayer = nil
+            pcall(function() Options.PlayerDropdown:SetValue("") end)
+        end
+        pcall(function() Options.PlayerDropdown:Refresh() end)
+    end)
+end)
+
+-- Character added/respawn handling
+pcall(function()
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        local humanoid = safeGet(char, "Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid.Died:Connect(function()
+                    local hrp = safeGet(char, "HumanoidRootPart")
+                    if hrp and isTweening then
+                        for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                            pcall(function() tween:Cancel() end)
+                        end
+                    end
+                    stopAttach()
+                    isTweening = false
+                end)
+            end)
+        end
+        stopAttach() -- Reset on respawn
+    end)
+end)
+
+-- Initial cleanup
+stopAttach()
 
 
 --END MODULES
@@ -1074,5 +1145,3 @@ SaveManager:SetFolder("Ratware/Rogueblox")
 SaveManager:BuildConfigSection(Tabs.UI)
 ThemeManager:ApplyToTab(Tabs.UI)
 SaveManager:LoadAutoloadConfig()
-
-Library:Init()
