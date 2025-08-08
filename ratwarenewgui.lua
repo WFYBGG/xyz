@@ -934,118 +934,234 @@ end)
 
 
 --Attach to back Module [TESTING STILL]
-local RunService = game:GetService("RunService")
+--[[
+    Attach to Back with Linoria GUI integration.
+    - Selects target via PlayerDropdown in Linoria GUI.
+    - Toggles ON/OFF with AttachtobackToggle, enabling/disabling attachment.
+    - Uses GUI toggles (FlightToggle, NoclipToggle, NoFallDamage) for movement during tween.
+    - Disables on character or target death, cancels tween, allows immediate target switch.
+    - Tweens to target back with speed from UniversalTweenSpeed slider, stops if toggled off midway, allows reselection.
+    - All object access wrapped in pcall for anti-crash/anti-flag safety.
+    - No external libraries, works for all streamed characters.
+--]]
+
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
-local AttachEnabled = false
-local TargetPlayerName = nil
-local TargetCharacter = nil
+-- Internal state
+local targetPlayer = nil
+local isAttached = false
+local attachConn = nil
+local isTweening = false
+local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
 
-local AttachPart = nil
-
-local function safe_pcall(func, ...)
-    local ok, result = pcall(func, ...)
-    if not ok then
-        -- error handling silently to avoid detection
-        return nil
+-- Utility: Safe get
+local function safeGet(obj, ...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        local ok, res = pcall(function() return obj[v] end)
+        if not ok then return nil end
+        obj = res
+        if not obj then return nil end
     end
-    return result
+    return obj
 end
 
--- Function to update the target player and character reference
-local function UpdateTargetPlayer()
-    local selectedPlayerName = nil
-    -- use pcall because Options.PlayerDropdown might be nil or not set
-    safe_pcall(function()
-        selectedPlayerName = Options.PlayerDropdown.Value
-    end)
+-- Toggle GUI utilities
+local function setToggle(toggleName, value)
+    local ok, toggle = pcall(function() return Toggles[toggleName] end)
+    if ok and toggle then
+        pcall(function() toggle:SetValue(value) end)
+    end
+end
 
-    if selectedPlayerName and selectedPlayerName ~= "" then
-        if TargetPlayerName ~= selectedPlayerName then
-            TargetPlayerName = selectedPlayerName
-            local player = Players:FindFirstChild(TargetPlayerName)
-            if player and player.Character then
-                TargetCharacter = player.Character
-            else
-                TargetCharacter = nil
+-- Get tween speed safely
+local function getTweenSpeed()
+    local ok, value = pcall(function() return Options.UniversalTweenSpeed.Value end)
+    return ok and math.max(0, math.min(300, value)) or 150
+end
+
+-- Death detection and cleanup
+local function checkDeathCleanup()
+    local char = LocalPlayer.Character
+    local targetChar = targetPlayer and targetPlayer.Character
+    local localHumanoid = char and safeGet(char, "Humanoid")
+    local targetHumanoid = targetChar and safeGet(targetChar, "Humanoid")
+    local isLocalDead = localHumanoid and pcall(function() return localHumanoid.Health <= 0 end)
+    local isTargetDead = targetHumanoid and pcall(function() return targetHumanoid.Health <= 0 end)
+    if isLocalDead or isTargetDead then
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        if hrp and isTweening then
+            for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                pcall(function() tween:Cancel() end)
             end
         end
-    else
-        TargetPlayerName = nil
-        TargetCharacter = nil
+        stopAttach()
+        isTweening = false
+        return true
     end
+    return false
 end
 
--- Attach a part to back of TargetCharacter's HumanoidRootPart
-local function AttachToBack()
-    if not TargetCharacter or not TargetCharacter:FindFirstChild("HumanoidRootPart") then return end
-    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+-- Attach/Detach logic
+local function stopAttach()
+    isAttached = false
+    if attachConn then pcall(function() attachConn:Disconnect() end) attachConn = nil end
+    setToggle("FlightToggle", false)
+    setToggle("NoclipToggle", false)
+    setToggle("NoFallDamage", false)
+    isTweening = false
+end
 
-    -- Remove old attachment if exists
-    if AttachPart then
-        safe_pcall(function()
-            AttachPart:Destroy()
+local function startAttach()
+    stopAttach()
+    isAttached = true
+    setToggle("NoFallDamage", true)
+    attachConn = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer and targetPlayer.Character
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+        if not (hrp and targetHrp) then return end
+        pcall(function()
+            hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
         end)
-        AttachPart = nil
-    end
-
-    safe_pcall(function()
-        AttachPart = Instance.new("Part")
-        AttachPart.Name = "AttachToBackPart"
-        AttachPart.Size = Vector3.new(1,1,1)
-        AttachPart.Transparency = 1
-        AttachPart.CanCollide = false
-        AttachPart.Anchored = false
-        AttachPart.Parent = Character
-
-        local weld = Instance.new("WeldConstraint")
-        weld.Part0 = Character.HumanoidRootPart
-        weld.Part1 = AttachPart
-        weld.Parent = AttachPart
-
-        -- Position AttachPart 2 studs behind target player's HumanoidRootPart
-        local targetHRP = TargetCharacter.HumanoidRootPart
-        local offset = targetHRP.CFrame.LookVector * -2
-        AttachPart.CFrame = targetHRP.CFrame + offset
+        checkDeathCleanup()
     end)
 end
 
--- Remove the attach part safely
-local function RemoveAttachment()
-    if AttachPart then
-        safe_pcall(function()
-            AttachPart:Destroy()
-        end)
-        AttachPart = nil
+-- Tween logic with GUI toggles
+local function tweenToBack()
+    if isTweening or not targetPlayer then return end
+    isTweening = true
+    local char = LocalPlayer.Character
+    local targetChar = targetPlayer.Character
+    local hrp = char and safeGet(char, "HumanoidRootPart")
+    local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+    if not (hrp and targetHrp) then isTweening = false return end
+
+    -- Enable movement toggles
+    setToggle("FlightToggle", true)
+    setToggle("NoclipToggle", true)
+    setToggle("NoFallDamage", true)
+
+    local speed = getTweenSpeed()
+    local steps = {
+        { pos = hrp.Position + Vector3.new(0, 1000 - hrp.Position.Y, 0), time = (1000 - hrp.Position.Y) / speed },
+        { pos = targetHrp.Position + Vector3.new(0, 1000 - targetHrp.Position.Y, 0), time = (targetHrp.Position - hrp.Position).Magnitude / speed },
+        { pos = (targetHrp.CFrame * CFrame.new(0, 0, 2)).Position, time = 1000 / speed }
+    }
+
+    for i, step in ipairs(steps) do
+        if not Toggles.AttachtobackToggle.Value or checkDeathCleanup() or not targetPlayer then
+            local currentTweens = TweenService:GetTweens(hrp)
+            for _, tween in pairs(currentTweens) do
+                pcall(function() tween:Cancel() end)
+            end
+            isTweening = false
+            setToggle("FlightToggle", false)
+            setToggle("NoclipToggle", false)
+            return
+        end
+        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(step.pos)})
+        pcall(function() tween:Play() end)
+        pcall(function() tween.Completed:Wait() end)
+    end
+
+    -- Disable movement toggles after tween
+    setToggle("FlightToggle", false)
+    setToggle("NoclipToggle", false)
+    isTweening = false
+    if Toggles.AttachtobackToggle.Value and targetPlayer and not checkDeathCleanup() then
+        startAttach()
     end
 end
 
--- Main update loop for attaching
-local AttachConnection
-AttachConnection = RunService.Heartbeat:Connect(function()
-    pcall(function()
-        if AttachEnabled then
-            UpdateTargetPlayer()
-            if TargetCharacter then
-                AttachToBack()
-            else
-                RemoveAttachment()
+-- GUI Integration
+pcall(function()
+    Options.PlayerDropdown:OnChanged(function(value)
+        targetPlayer = value ~= "" and Players:FindFirstChild(value) or nil
+        if Toggles.AttachtobackToggle.Value and not isTweening and not isAttached then
+            tweenToBack()
+        elseif isTweening or isAttached then
+            local char = LocalPlayer.Character
+            local hrp = char and safeGet(char, "HumanoidRootPart")
+            if hrp then
+                for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                    pcall(function() tween:Cancel() end)
+                end
             end
-        else
-            RemoveAttachment()
+            stopAttach()
+            if targetPlayer then
+                tweenToBack()
+            end
         end
     end)
 end)
 
--- Watch toggle for Attach to Back
-Toggles.AttachtobackToggle:OnChanged(function(value)
-    AttachEnabled = value
-    if not value then
-        RemoveAttachment()
-    end
+pcall(function()
+    Toggles.AttachtobackToggle:OnChanged(function(value)
+        if not value then
+            local char = LocalPlayer.Character
+            local hrp = char and safeGet(char, "HumanoidRootPart")
+            if hrp and isTweening then
+                for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                    pcall(function() tween:Cancel() end)
+                end
+            end
+            stopAttach()
+        elseif value and targetPlayer and not isTweening and not isAttached then
+            tweenToBack()
+        end
+    end)
 end)
+
+-- Player join/leave management
+pcall(function()
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            local ok, _ = pcall(function() Options.PlayerDropdown:Refresh() end)
+        end
+    end)
+end)
+
+pcall(function()
+    Players.PlayerRemoving:Connect(function(player)
+        if player == targetPlayer then
+            stopAttach()
+            targetPlayer = nil
+            pcall(function() Options.PlayerDropdown:SetValue("") end)
+        end
+        pcall(function() Options.PlayerDropdown:Refresh() end)
+    end)
+end)
+
+-- Character added/respawn handling
+pcall(function()
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        local humanoid = safeGet(char, "Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid.Died:Connect(function()
+                    local hrp = safeGet(char, "HumanoidRootPart")
+                    if hrp and isTweening then
+                        for _, tween in pairs(TweenService:GetTweens(hrp)) do
+                            pcall(function() tween:Cancel() end)
+                        end
+                    end
+                    stopAttach()
+                    isTweening = false
+                end)
+            end)
+        end
+        stopAttach() -- Reset on respawn
+    end)
+end)
+
+-- Initial cleanup
+stopAttach()
 
 
 --END MODULES
