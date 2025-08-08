@@ -117,32 +117,33 @@ MainGroup5:AddToggle("NoLava", {
     Text = "No Lava",
     Default = false
 })
-MainGroup5:AddToggle("NoFog", {
-    Text = "No Fog",
-    Default = false
-})
-MainGroup5:AddToggle("NoShadows", {
-    Text = "No Shadows",
-    Default = false
-})
-MainGroup5:AddToggle("FullBright", {
-    Text = "FullBright",
-    Default = false
-})
-MainGroup5:AddSlider("FullBrightIntensity", {
-    Text = "FullBright intensity",
-    Default = 256,
-    Min = 0,
-    Max = 256,
-    Rounding = 0,
-    Compact = true
-})
 
 -- Visuals Tab
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 VisualsGroup:AddToggle("PlayerESP", {
     Text = "ESP",
     Default = false
+})
+local VisualsGroup2 = Tabs.Visuals:AddRightGroupbox("World Visual")
+VisualsGroup2:AddToggle("NoFog", {
+    Text = "No Fog",
+    Default = false
+})
+VisualsGroup2:AddToggle("NoShadows", {
+    Text = "No Shadows",
+    Default = false
+})
+VisualsGroup2:AddToggle("FullBright", {
+    Text = "FullBright",
+    Default = false
+})
+VisualsGroup2:AddSlider("FullBrightIntensity", {
+    Text = "FullBright intensity",
+    Default = 100,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Compact = true
 })
 
 -- UI Settings Tab
