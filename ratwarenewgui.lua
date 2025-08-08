@@ -3,7 +3,7 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Ratware.exe [Press 'Insert' to hide GUI]",
+    Title = "Ratware.exe - 100% By ChatGPT [Press 'Insert' to hide GUI] ",
     Center = true,
     AutoShow = true,
     TabPadding = 8,
