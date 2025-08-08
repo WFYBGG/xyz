@@ -407,7 +407,7 @@ pcall(function()
     u8.Size = Vector3.new(6, 1, 6)
     u8.Anchored = true
     u8.CanCollide = true
-    u8.Transparency = 0.75
+    u8.Transparency = 1.00
     u8.Material = Enum.Material.SmoothPlastic
     u8.BrickColor = BrickColor.new("Bright blue")
 
