@@ -77,14 +77,14 @@ MainGroup2:AddToggle("AutoIngredient", {
     Text = "Auto Ingredient Pickup",
     Default = false
 })
-local MainGroup3 = Tabs.Main:AddRightGroupbox("Locations")
-MainGroup3:AddDropdown("NPCSelection", {
-    Text = "NPC selection",
-    Default = "? ??, God's Eye",
-    Values = {"? ??, God's Eye"},
+local MainGroup3 = Tabs.Main:AddRightGroupbox("Tween to Locations")
+MainGroup3:AddDropdown("Areas", {
+    Text = "Area Selection",
+    Default = "WIP",
+    Values = {"WIP"},
     Multi = false
 })
-MainGroup3:AddSlider("Speed", {
+MainGroup3:AddSlider("AreaTweenSpeed", {
     Text = "Speed",
     Default = 150,
     Min = 0,
@@ -92,7 +92,23 @@ MainGroup3:AddSlider("Speed", {
     Rounding = 0,
     Compact = true
 })
-MainGroup3:AddButton("Start/Stop", function() print("Start/Stop clicked") end)
+MainGroup3:AddButton("Area Tween Start/Stop", function() print("Area Tween Start/Stop clicked") end)
+
+MainGroup3:AddDropdown("NPCs", {
+    Text = "NPC Selection",
+    Default = "? ??, God's Eye",
+    Values = {"? ??, God's Eye"},
+    Multi = false
+})
+MainGroup3:AddSlider("NPCTweenSpeed", {
+    Text = "Speed",
+    Default = 150,
+    Min = 0,
+    Max = 200,
+    Rounding = 0,
+    Compact = true
+})
+MainGroup3:AddButton("NPC Tween Start/Stop", function() print("NPC Tween Start/Stop clicked") end)
 
 local MainGroup4 = Tabs.Main:AddLeftGroupbox("Humanoid")
 MainGroup4:AddToggle("NoFallDamage", {
