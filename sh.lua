@@ -164,6 +164,15 @@ MainGroup5:AddToggle("NoLava", {
 })
 
 local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
+MainGroup6:AddDropdown('PlayerDropdown', {
+    SpecialType = 'Player',
+    Text = 'Select Player',
+    Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
+
+    Callback = function(Value)
+        print('[cb] Player dropdown got changed:', Value)
+    end
+})
 MainGroup6:AddToggle("AttachtobackToggle", {
     Text = "Attach To Back",
     Default = false
@@ -175,15 +184,7 @@ MainGroup6:AddToggle("AttachtobackToggle", {
         Toggles.AttachtobackToggle:SetValue(value)
     end
 })
-MainGroup6:AddDropdown('PlayerDropdown', {
-    SpecialType = 'Player',
-    Text = 'Select Player',
-    Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
 
-    Callback = function(Value)
-        print('[cb] Player dropdown got changed:', Value)
-    end
-})
 
 -- Visuals Tab
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
