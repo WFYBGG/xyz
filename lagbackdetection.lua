@@ -1,99 +1,77 @@
---// Lagback Freeze Script
---// Based on extreme speed spike detection
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local LocalPlayer = Players.LocalPlayer
-local MAX_LOG_ENTRIES = 100
-local recentData = {}
-local lastPos
-local totalDistance = 0
-
-local lagbackSpeedThreshold = 250 -- Speed above this triggers lagback freeze 
-local freezeDuration = 1 -- seconds
-
-local function safeInsert(tbl, value)
-	pcall(function()
-		table.insert(tbl, value)
-		if #tbl > MAX_LOG_ENTRIES then
-			table.remove(tbl, 1)
-		end
-	end)
-end
-
-local function getMagnitude(v1, v2)
-	local success, result = pcall(function()
-		return (v1 - v2).Magnitude
-	end)
-	return success and result or 0
-end
-
-local function logData()
-	pcall(function()
-		warn("=== Lagback Detected! Logging Recent Data ===")
-		for i, entry in ipairs(recentData) do
-			print(string.format(
-				"t=%.2f | speed=%.2f | dist=%.2f",
-				entry.time, entry.speed, entry.distance
-			))
-		end
-		warn("=== End of Log ===")
-	end)
-end
-
-local function freezeMovement(char)
-	pcall(function()
-		local hum = char:FindFirstChildWhichIsA("Humanoid")
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if hum and hrp then
-			local oldSpeed = hum.WalkSpeed
-			local oldJump = hum.JumpPower
-
-			hum.WalkSpeed = 0
-			hum.JumpPower = 0
-			hrp.Anchored = true
-
-			task.delay(freezeDuration, function()
-				pcall(function()
-					hum.WalkSpeed = oldSpeed
-					hum.JumpPower = oldJump
-					hrp.Anchored = false
-				end)
-			end)
-		end
-	end)
-end
-
 pcall(function()
-	RunService.Heartbeat:Connect(function(dt)
-		pcall(function()
-			local char = LocalPlayer.Character
-			if not (char and char:FindFirstChild("HumanoidRootPart")) then return end
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    local lagbackSpeedThreshold = 300
+    local holdTime = 5
+    local restoreTime = 2 -- seconds to fully restore control
+    local BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    BodyVelocity.Name = "LagbackHoldVelocity"
 
-			local hrp = char.HumanoidRootPart
-			local currentPos = hrp.Position
+    local lastPos = nil
+    local holding = false
+    local holdEndTime = 0
+    local restoreStartTime = 0
 
-			if lastPos then
-				local stepDist = getMagnitude(currentPos, lastPos)
-				totalDistance = totalDistance + stepDist
-				local speed = stepDist / math.max(dt, 0.0001)
+    local function zeroVelocity()
+        pcall(function()
+            BodyVelocity.Velocity = Vector3.zero
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                BodyVelocity.Parent = player.Character.HumanoidRootPart
+            end
+        end)
+    end
 
-				safeInsert(recentData, {
-					time = tick(),
-					speed = speed,
-					distance = totalDistance
-				})
+    local function removeVelocity()
+        pcall(function()
+            BodyVelocity.Parent = nil
+        end)
+    end
 
-				-- Detect huge speed spike as lagback
-				if speed > lagbackSpeedThreshold then
-					logData()
-					freezeMovement(char)
-					totalDistance = 0
-				end
-			end
+    RunService.RenderStepped:Connect(function(dt)
+        pcall(function()
+            local char = player.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then
+                lastPos = nil
+                return
+            end
 
-			lastPos = currentPos
-		end)
-	end)
+            local root = char.HumanoidRootPart
+            local currentPos = root.Position
+            if lastPos then
+                local speed = (currentPos - lastPos).Magnitude / dt
+
+                -- Lagback detection
+                if not holding and speed >= lagbackSpeedThreshold then
+                    holding = true
+                    holdEndTime = tick() + holdTime
+                    zeroVelocity()
+                    print(string.format("[Lagback] Detected at %.1f speed, holding for %ds", speed, holdTime))
+                end
+
+                -- Holding phase
+                if holding then
+                    if tick() < holdEndTime then
+                        zeroVelocity()
+                    else
+                        -- Start restoring
+                        holding = false
+                        restoreStartTime = tick()
+                    end
+                else
+                    -- Restoration phase
+                    local elapsed = tick() - restoreStartTime
+                    if elapsed < restoreTime then
+                        local factor = elapsed / restoreTime
+                        BodyVelocity.Velocity = BodyVelocity.Velocity:Lerp(Vector3.zero, 1 - factor)
+                        BodyVelocity.Parent = root
+                    else
+                        removeVelocity()
+                    end
+                end
+            end
+            lastPos = currentPos
+        end)
+    end)
 end)
