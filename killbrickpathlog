@@ -1,6 +1,13 @@
 --KILL BRICKS UNDER HERE
 Workspace/Map/moundkillbricks
+Workspace/Debris/BanditCampfire
+Disable touch events 
+Any part Turquoise, [120, 255, 181], Neon
 
+Burning folder
+Knocked folder
+HealthPackCD
+FallRagdoll
 
 --SCREEN EFFECTS UNDER HER
 Workspace/Terrain/AreaClouds
@@ -8,6 +15,8 @@ Workspace/Terrain/RainEffects
 Workspace/Terrain/RainEffectsLight
 Workspace/Terrain/SkyMesh
 Workspace/Terrain/SnowEffects
+workspace.Map.tundracloud
+workspace.Map.(anypart with wind under it)
 
 
 --AREA UNDER HERE
@@ -70,3 +79,384 @@ workspace.Living.dqwdqwdqdWQDC.Status.Decomposed
 workspace.Living.dqwdqwdqdWQDC.Status.
 workspace.Living.dqwdqwdqdWQDC.Status.NoKB
 workspace.Living.dqwdqwdqdWQDC.Status.SwimmingServer
+
+
+--Status Handler
+local v1 = game.Players.LocalPlayer
+repeat
+    task.wait()
+until v1.Character and v1.Character.Parent == workspace.Living
+local u2 = {
+    ["buffs"] = "rbxassetid://16127737433",
+    ["debuffs"] = "rbxassetid://16127759900",
+    ["neutral"] = "rbxassetid://16127752312"
+}
+local u5 = {
+    ["buffs"] = {
+        ["TankPotionActive"] = {
+            ["name"] = "Tank",
+            ["desc"] = "-50% Speed, +50% Damage Resistance",
+            ["icon"] = ""
+        },
+        ["NoFall"] = {
+            ["name"] = "Fall Resistance",
+            ["desc"] = "You will not take fall damage.",
+            ["icon"] = "16350512685"
+        },
+        ["SpeedBoost"] = {
+            ["name"] = "Speed Boost",
+            ["desc"] = function(p3) --[[Function name: desc, line 25]]
+                if p3.Value < 0 then
+                    return p3.Value .. " Speed"
+                else
+                    return "+" .. p3.Value .. " Speed"
+                end
+            end,
+            ["icon"] = "16350551656"
+        },
+        ["Speed"] = {
+            ["name"] = "Speed Boost",
+            ["desc"] = function(p4) --[[Function name: desc, line 36]]
+                return "+" .. p4.Value .. " Speed"
+            end,
+            ["icon"] = "16350551656"
+        },
+        ["HylotlSpeedBoost"] = {
+            ["name"] = "Hylotl Speed Boost",
+            ["desc"] = function(_) --[[Function name: desc, line 43]]
+                return "+1 Speed"
+            end,
+            ["icon"] = "16350551656"
+        },
+        ["BloomingResolve"] = {
+            ["name"] = "Blooming Resolve",
+            ["desc"] = function(_) --[[Function name: desc, line 50]]
+                return "+10% Damage, +4.5 Speed"
+            end,
+            ["icon"] = "17111236562"
+        },
+        ["ShrineDoom"] = {
+            ["name"] = "Shrine: Doom",
+            ["desc"] = function(_) --[[Function name: desc, line 57]]
+                return "+9% Damage, -2.15 Speed"
+            end,
+            ["icon"] = "17512678620"
+        },
+        ["ShrineSalvation"] = {
+            ["name"] = "Shrine: Salvation",
+            ["desc"] = function(_) --[[Function name: desc, line 64]]
+                return "2x Alignment Gain"
+            end,
+            ["icon"] = "17512712011"
+        },
+        ["ShrineFerocity"] = {
+            ["name"] = "Shrine: Ferocity",
+            ["desc"] = function(_) --[[Function name: desc, line 71]]
+                return "+10% Outgoing Damage, +10% Incoming Damage"
+            end,
+            ["icon"] = "17512709863"
+        },
+        ["ShrineLife"] = {
+            ["name"] = "Shrine: Life",
+            ["desc"] = function(_) --[[Function name: desc, line 78]]
+                return "-10% Outgoing Damage, -10% Incoming Damage"
+            end,
+            ["icon"] = "17512745010"
+        },
+        ["ShrineDexterity"] = {
+            ["name"] = "Shrine: Dexterity",
+            ["desc"] = function(_) --[[Function name: desc, line 85]]
+                return "-6% Outgoing Damage, +2.15 Speed"
+            end,
+            ["icon"] = "17512752529"
+        },
+        ["ShrineTribulation"] = {
+            ["name"] = "Shrine: Tribulation",
+            ["desc"] = function(_) --[[Function name: desc, line 92]]
+                return "+20% PvE Damage, -10% PvP Damage"
+            end,
+            ["icon"] = "17512752529"
+        },
+        ["ShrineFrost"] = {
+            ["name"] = "Shrine: Frost",
+            ["desc"] = function(_) --[[Function name: desc, line 99]]
+                return "Gain and lose temperature 50% slower."
+            end,
+            ["icon"] = "17512752529"
+        },
+        ["ShrinePurity"] = {
+            ["name"] = "Shrine: Purity",
+            ["desc"] = function(_) --[[Function name: desc, line 106]]
+                return "+15% Spell Casting Range, -25% Mana Charge Speed"
+            end,
+            ["icon"] = "17512752529"
+        },
+        ["SoulFurnaceStack"] = {
+            ["name"] = "Soul Furnace",
+            ["desc"] = "-2.5% Incoming Damage, +1.5% Speed",
+            ["icon"] = "16127705176"
+        },
+        ["SageEnchantActive"] = {
+            ["name"] = "Sage Enchantment",
+            ["desc"] = "+9% Damage",
+            ["icon"] = "146465740"
+        }
+    },
+    ["debuffs"] = {
+        ["Burning"] = {
+            ["name"] = "Burning",
+            ["desc"] = "You are on fire. Tap Q to evade the flames.",
+            ["icon"] = "16127705176",
+            ["onlyShowOne"] = true
+        },
+        ["DaemonicBurning"] = {
+            ["name"] = "Daemonic Burning",
+            ["desc"] = "You are on fire. After 3 seconds, the fire will be extinguished and Sundered will be applied.",
+            ["icon"] = "17377791201",
+            ["onlyShowOne"] = true
+        },
+        ["DaemonicSundered"] = {
+            ["name"] = "Sundered",
+            ["desc"] = "You can no longer be set on fire. Burn attacks deal 40% more.",
+            ["icon"] = "17377791201",
+            ["onlyShowOne"] = true
+        },
+        ["Slowed"] = {
+            ["name"] = "Slowed",
+            ["desc"] = "Your speed is decreased.",
+            ["icon"] = "16127769900"
+        },
+        ["FreezeStack"] = {
+            ["name"] = "Freeze Stack",
+            ["desc"] = "Your speed is decreased.",
+            ["icon"] = "16127769900"
+        },
+        ["HinderSlowdown"] = {
+            ["name"] = "Hindered",
+            ["desc"] = "Your speed is decreased.",
+            ["icon"] = "16127769900"
+        },
+        ["Poisoned"] = {
+            ["name"] = "Poisoned",
+            ["desc"] = "Poison tick damage will be dealt to you.",
+            ["icon"] = "16127783454"
+        },
+        ["LawsOfTheJungle"] = {
+            ["name"] = "Laws of the Jungle",
+            ["desc"] = "Being hit by attacks will reduce their damage by 1, but apply poison lasting 50% of their damage, capping at 8 seconds.",
+            ["icon"] = "16127783454"
+        },
+        ["WhiteBurning"] = {
+            ["name"] = "Seeker Flames",
+            ["desc"] = "You are on fire. Tap Q to evade the flames.",
+            ["icon"] = "16262786353"
+        },
+        ["Stun"] = {
+            ["name"] = "Stun",
+            ["desc"] = "...",
+            ["icon"] = "16262797081",
+            ["onlyShowOne"] = true
+        },
+        ["NoManaCharge"] = {
+            ["name"] = "Mana Block",
+            ["desc"] = "You can not charge mana.",
+            ["icon"] = "16262803560",
+            ["onlyShowOne"] = true
+        },
+        ["Ragdolled"] = {
+            ["name"] = "Ragdolled",
+            ["desc"] = "...",
+            ["icon"] = "16350478057",
+            ["onlyShowOne"] = true
+        },
+        ["Bleeding"] = {
+            ["name"] = "Bleeding",
+            ["desc"] = "Gradual damage over time.",
+            ["icon"] = "16350699482"
+        },
+        ["Bloodbarb"] = {
+            ["name"] = "Bloodbarb",
+            ["desc"] = "You are affected by Bloodbarb. Dashing will damage you and inflict Bleeding.",
+            ["icon"] = "1025159869",
+            ["onlyShowOne"] = true
+        },
+        ["Dazed"] = {
+            ["name"] = "Dazed",
+            ["desc"] = "You are Dazed. You can not attack, but you can block and dash.",
+            ["icon"] = "11738192107",
+            ["onlyShowOne"] = true
+        },
+        ["Illness:Monotrophic Malaise"] = {
+            ["name"] = "Monotrophic Malaise",
+            ["desc"] = "Drain Stomach 2x faster and halve Stomach gain from eating food.",
+            ["icon"] = "12013974300",
+            ["onlyShowOne"] = true
+        },
+        ["Illness:Salmonella"] = {
+            ["name"] = "Salmonella",
+            ["desc"] = "Drain Stomach 2x faster and halve Stomach gain from eating food.",
+            ["icon"] = "11300608063",
+            ["onlyShowOne"] = true
+        },
+        ["Illness:Thermal Hyperalgesia"] = {
+            ["name"] = "Thermal Hyperalgesia",
+            ["desc"] = "Take 35% extra burn damage.",
+            ["icon"] = "8892270317",
+            ["onlyShowOne"] = true
+        },
+        ["Illness:Toxicosis"] = {
+            ["name"] = "Toxicosis",
+            ["desc"] = "Take 35% extra poison damage.",
+            ["icon"] = "463023400",
+            ["onlyShowOne"] = true
+        },
+        ["Illness:Hemophilia"] = {
+            ["name"] = "Hemophilia",
+            ["desc"] = "Take 35% extra bleed damage.",
+            ["icon"] = "6526838066",
+            ["onlyShowOne"] = true
+        },
+        ["ManaSickness"] = {
+            ["name"] = "Mana Sickness",
+            ["desc"] = "Charge mana and cast Spells 50% slower.",
+            ["icon"] = "12758934531"
+        }
+    },
+    ["neutral"] = {
+        ["FullStop"] = {
+            ["name"] = "Halted Movement",
+            ["desc"] = "You can not move.",
+            ["icon"] = "16127769900"
+        },
+        ["NoMove"] = {
+            ["name"] = "Halted Movement",
+            ["desc"] = "You can not move.",
+            ["icon"] = "16127769900"
+        },
+        ["Action"] = {
+            ["name"] = "Action",
+            ["desc"] = "You are performing an action.",
+            ["icon"] = "16350460426",
+            ["onlyShowOne"] = true
+        }
+    }
+}
+local u6 = v1.Character:WaitForChild("Status", (1 / 0))
+u6.DescendantAdded:connect(function(u7) --[[Anonymous function at line 274]]
+    --[[
+    Upvalues:
+        [1] = u5
+        [2] = u2
+        [3] = u6
+    --]]
+    xpcall(function() --[[Anonymous function at line 275]]
+        --[[
+        Upvalues:
+            [1] = u7
+            [2] = u5
+            [3] = u2
+            [4] = u6
+        --]]
+        local v8 = u7.Name
+        for v9, v10 in pairs(u5) do
+            v18 = v10[v8]
+            if v18 then
+                v18.type = v9
+                ::l4::
+                if v18 then
+                    if not v18.onlyShowOne or (not script.Parent.Frame:FindFirstChild(u7.Name) or script.Parent.Frame:FindFirstChild(u7.Name):HasTag("Fading")) then
+                        local u11 = script.IconFrame:clone()
+                        local v12 = u11:WaitForChild("Background")
+                        v12.ImageTransparency = 1
+                        v12.Border.ImageTransparency = 1
+                        v12.Icon.ImageTransparency = 1
+                        v12.Image = u2[v18.type]
+                        v12.Icon.Image = "rbxassetid://" .. v18.icon
+                        u11.Name = u7.Name
+                        u11.Parent = script.Parent.Frame
+                        game.TweenService:Create(v12, TweenInfo.new(0.12), {
+                            ["ImageTransparency"] = 0
+                        }):Play()
+                        game.TweenService:Create(v12.Border, TweenInfo.new(0.12), {
+                            ["ImageTransparency"] = 0
+                        }):Play()
+                        game.TweenService:Create(v12.Icon, TweenInfo.new(0.15), {
+                            ["ImageTransparency"] = 0
+                        }):Play()
+                        local v13 = v18.desc
+                        if typeof(v13) == "function" then
+                            local v14 = u7
+                            v13 = tostring(v13(v14))
+                        end
+                        local v15 = "<b><u>" .. v18.name .. "</u></b>\n" .. "<i>" .. v13 .. "</i>"
+                        local v16 = game.TextService:GetTextSize(v15, 12, Enum.Font.Bodoni, Vector2.new(200, (1 / 0)))
+                        u11.Tip.Size = UDim2.new(0, 200, 0, v16.Y + 4)
+                        u11.Tip.Label.Text = v15
+                        u11.Tip.BackgroundTransparency = 1
+                        u11.Tip.Border.ImageTransparency = 1
+                        u11.Tip.Label.TextTransparency = 1
+                        u11.Tip.Visible = true
+                        u11.MouseEnter:connect(function() --[[Anonymous function at line 316]]
+                            --[[
+                            Upvalues:
+                                [1] = u11
+                            --]]
+                            game.TweenService:Create(u11.Tip, TweenInfo.new(0.08), {
+                                ["BackgroundTransparency"] = 0
+                            }):Play()
+                            game.TweenService:Create(u11.Tip.Border, TweenInfo.new(0.08), {
+                                ["ImageTransparency"] = 0
+                            }):Play()
+                            game.TweenService:Create(u11.Tip.Label, TweenInfo.new(0.1), {
+                                ["TextTransparency"] = 0
+                            }):Play()
+                        end)
+                        u11.MouseLeave:connect(function() --[[Anonymous function at line 322]]
+                            --[[
+                            Upvalues:
+                                [1] = u11
+                            --]]
+                            game.TweenService:Create(u11.Tip, TweenInfo.new(0.1), {
+                                ["BackgroundTransparency"] = 1
+                            }):Play()
+                            game.TweenService:Create(u11.Tip.Border, TweenInfo.new(0.1), {
+                                ["ImageTransparency"] = 1
+                            }):Play()
+                            game.TweenService:Create(u11.Tip.Label, TweenInfo.new(0.08), {
+                                ["TextTransparency"] = 1
+                            }):Play()
+                        end)
+                        if v18.onlyShowOne then
+                            local v17 = u7.Name
+                            while u6:FindFirstChild(v17, true) do
+                                task.wait()
+                            end
+                        else
+                            while u7 and u7.Parent do
+                                task.wait()
+                            end
+                        end
+                        u11:AddTag("Fading")
+                        game.TweenService:Create(v12, TweenInfo.new(0.15), {
+                            ["ImageTransparency"] = 1
+                        }):Play()
+                        game.TweenService:Create(v12.Border, TweenInfo.new(0.15), {
+                            ["ImageTransparency"] = 1
+                        }):Play()
+                        game.TweenService:Create(v12.Icon, TweenInfo.new(0.12), {
+                            ["ImageTransparency"] = 1
+                        }):Play()
+                        task.wait(0.15)
+                        u11:Destroy()
+                    end
+                else
+                    return
+                end
+            end
+        end
+        local v18 = nil
+        goto l4
+    end, warn)
+end)
+game.ContentProvider:PreloadAsync({ script.Parent })
+
