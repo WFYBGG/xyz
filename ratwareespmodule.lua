@@ -314,19 +314,32 @@ RunService.RenderStepped:Connect(function()
             cleanupESP(playerRef)
         end
     end
+end)  -- <<< This closes the RunService.RenderStepped:Connect
 
--- Connect to RenderStepped with pcall wrapper to avoid errors
-local ESP_Connection
-ESP_Connection = RunService.RenderStepped:Connect(function()
-    pcall(UpdateESP)
-end)
-
--- Watch toggle to enable/disable ESP
-Toggles.PlayerESP:OnChanged(function(value)
-    ESP_Enabled = value
-    if not value then
-        ClearESP()
+-- Define ClearESP to cleanup all ESP drawings
+local function ClearESP()
+    for player, _ in pairs(ESPObjects) do
+        cleanupESP(player)
     end
-end)
+end
+
+-- Grab the toggle from Linora UI groupbox
+local playerESPToggle = VisualsGroup.PlayerESP
+
+-- Hook toggle OnChanged event
+if playerESPToggle and playerESPToggle.OnChanged then
+    playerESPToggle:OnChanged(function(value)
+        ESP_Enabled = value
+        if not value then
+            ClearESP()
+        else
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer then
+                    pcall(function() createESP(plr) end)
+                end
+            end
+        end
+    end)
+end
 
 
