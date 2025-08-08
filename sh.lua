@@ -118,6 +118,20 @@ MainGroup5:AddToggle("NoLava", {
     Default = false
 })
 
+local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
+MainGroup6:AddToggle("AttachtobackToggle", {
+    Text = "Attach To Back",
+    Default = false
+}):AddKeyPicker("Attachtobackbind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.AttachtobackToggle:SetValue(value)
+    end
+})
+
+
 -- Visuals Tab
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 VisualsGroup:AddToggle("PlayerESP", {
@@ -151,7 +165,7 @@ VisualsGroup2:AddToggle("NoShadows", {
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
 MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-    Default = "End",
+    Default = "insert",
     NoUI = true,
     Text = "Menu keybind"
 })
@@ -162,8 +176,8 @@ ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({"MenuKeybind"})
-ThemeManager:SetFolder("MyScriptHub")
-SaveManager:SetFolder("MyScriptHub/specific-game")
+ThemeManager:SetFolder("Ratware.exe")
+SaveManager:SetFolder("Ratware.exe/Rogueblox")
 SaveManager:BuildConfigSection(Tabs.UI)
 ThemeManager:ApplyToTab(Tabs.UI)
 SaveManager:LoadAutoloadConfig()
