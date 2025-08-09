@@ -262,10 +262,10 @@ if successTowns then
     end
 end
 
--- Sort lists for consistency
-table.sort(areaList)
-table.sort(npcList)
-table.sort(TweenFullList)
+-- Sort lists for consistency (case-insensitive)
+table.sort(areaList, function(a, b) return string.lower(a) < string.lower(b) end)
+table.sort(npcList, function(a, b) return string.lower(a) < string.lower(b) end)
+table.sort(TweenFullList, function(a, b) return string.lower(a) < string.lower(b) end)
 
 -- Search bar with filtering logic
 MainGroup3:AddInput("Search", {
