@@ -64,10 +64,18 @@ if successNPCs then
             local positionSuccess, pos = pcall(function()
                 return npc.WorldPivot.Position
             end)
+            if not positionSuccess then
+                positionSuccess, pos = pcall(function()
+                    return npc.CFrame.Position
+                end)
+                if positionSuccess then
+                    print("Used CFrame.Position for NPC: " .. npcName)
+                else
+                    print("Failed to get WorldPivot.Position and CFrame.Position for NPC: " .. npcName)
+                end
+            end
             if positionSuccess then
                 position = pos
-            else
-                print("Failed to get WorldPivot.Position for NPC: " .. npcName)
             end
             table.insert(npcInstances[npcName], {instance = npc, position = position, name = npcName})
         end
@@ -83,39 +91,11 @@ if successNPCs then
                 table.insert(TweenFullList, npcName)
             end
         elseif #instances == 1 then
-            -- Single instance, add with area if position available, else raw name
+            -- Single instance, use raw name
             local instanceData = instances[1]
-            if instanceData.position then
-                local closestArea = nil
-                local minDistance = math.huge
-                for _, areaName in pairs(areaList) do
-                    local areaSuccess, areaPart = pcall(function()
-                        return game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName]
-                    end)
-                    if areaSuccess and areaPart then
-                        local areaPositionSuccess, areaPosition = pcall(function()
-                            return areaPart.CFrame.Position
-                        end)
-                        if areaPositionSuccess and areaPosition then
-                            local distance = getDistance(instanceData.position, areaPosition)
-                            if distance < minDistance then
-                                minDistance = distance
-                                closestArea = areaName
-                            end
-                        end
-                    end
-                end
-                if closestArea then
-                    table.insert(npcList, npcName .. ", " .. closestArea)
-                    table.insert(TweenFullList, npcName .. ", " .. closestArea)
-                else
-                    table.insert(npcList, npcName)
-                    table.insert(TweenFullList, npcName)
-                end
-            else
-                table.insert(npcList, npcName)
-                table.insert(TweenFullList, npcName)
-            end
+            print("Single-instance NPC: " .. npcName .. " added with raw name")
+            table.insert(npcList, npcName)
+            table.insert(TweenFullList, npcName)
         else
             -- Multiple instances, find closest area for each
             for _, instanceData in pairs(instances) do
@@ -131,11 +111,14 @@ if successNPCs then
                                 return areaPart.CFrame.Position
                             end)
                             if areaPositionSuccess and areaPosition then
+                                print("Area position accessed for " .. areaName .. ": " .. tostring(areaPosition))
                                 local distance = getDistance(instanceData.position, areaPosition)
                                 if distance < minDistance then
                                     minDistance = distance
                                     closestArea = areaName
                                 end
+                            else
+                                print("Failed to get CFrame.Position for Area: " .. areaName)
                             end
                         end
                     end
