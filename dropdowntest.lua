@@ -106,7 +106,7 @@ end
 -- Safely fetch NPCs from Workspace and TownMarkers
 local ignoredNPCs = {
     "Blacksmith", "Doctor", "Merchant", "Collector", "Inn", "Missions",
-    "Jail", "Cargo", "Shipwright", "Bazaar", "Bounties"
+    "Jail", "Cargo", "Shipwright", "Bazaar", "Bounties", "Banker", "Bank", "Innkeeper"
 }
 
 -- Fetch NPCs from Workspace/NPCs
