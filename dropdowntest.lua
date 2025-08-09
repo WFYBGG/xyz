@@ -89,7 +89,6 @@ local success, areaMarkers = pcall(function()
     return game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:GetChildren()
 end)
 if success then
-    -- Remove duplicates by tracking seen names
     local seenAreas = {}
     for _, area in pairs(areaMarkers) do
         local areaNameSuccess, areaName = pcall(function()
@@ -109,18 +108,111 @@ local ignoredNPCs = {
     "Jail", "Cargo", "Shipwright", "Bazaar", "Bounties", "Banker", "Bank", "Innkeeper", "The Collector"
 }
 
--- Fetch NPCs from Workspace/NPCs
+-- NPCs to only include the first instance of
+local firstInstanceOnly = {
+    "Ancient Cavern Gate", "Ancient Gate", "Celestial Platform", "Frosty", "Prince's Favour", "Prince's Scale"
+}
+
+-- Helper function to calculate Euclidean distance between two Vector3 positions
+local function getDistance(pos1, pos2)
+    local success, distance = pcall(function()
+        local dx = pos1.X - pos2.X
+        local dy = pos1.Y - pos2.Y
+        local dz = pos1.Z - pos2.Z
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
+    end)
+    return success and distance or math.huge
+end
+
+-- Fetch NPCs from Workspace/NPCs, handling duplicates by proximity to areas
 local successNPCs, npcs = pcall(function()
     return game:GetService("Workspace").NPCs:GetChildren()
 end)
 if successNPCs then
+    local npcInstances = {} -- Track NPC instances by name
+    local seenFirstInstance = {} -- Track first instance for specific NPCs
     for _, npc in pairs(npcs) do
         local npcNameSuccess, npcName = pcall(function()
             return npc.Name
         end)
         if npcNameSuccess and npcName and not table.find(ignoredNPCs, npcName) then
+            if not npcInstances[npcName] then
+                npcInstances[npcName] = {}
+            end
+            local position = nil
+            local positionSuccess, pos = pcall(function()
+                return npc.WorldPivot.Position
+            end)
+            if not positionSuccess then
+                positionSuccess, pos = pcall(function()
+                    return npc.CFrame.Position
+                end)
+                if positionSuccess then
+                    print("Used CFrame.Position for NPC: " .. npcName)
+                else
+                    print("Failed to get WorldPivot.Position and CFrame.Position for NPC: " .. npcName)
+                end
+            end
+            if positionSuccess then
+                position = pos
+            end
+            table.insert(npcInstances[npcName], {instance = npc, position = position, name = npcName})
+        end
+    end
+
+    -- Process NPCs, handling duplicates and first-instance-only cases
+    for npcName, instances in pairs(npcInstances) do
+        if table.find(firstInstanceOnly, npcName) then
+            -- For specific NPCs, only include the first instance
+            if #instances > 0 and not seenFirstInstance[npcName] then
+                seenFirstInstance[npcName] = true
+                table.insert(npcList, npcName)
+                table.insert(TweenFullList, npcName)
+            end
+        elseif #instances == 1 then
+            -- Single instance, use raw name
+            local instanceData = instances[1]
+            print("Single-instance NPC: " .. npcName .. " added with raw name")
             table.insert(npcList, npcName)
             table.insert(TweenFullList, npcName)
+        else
+            -- Multiple instances, find closest area for each
+            for _, instanceData in pairs(instances) do
+                if instanceData.position then
+                    local closestArea = nil
+                    local minDistance = math.huge
+                    for _, areaName in pairs(areaList) do
+                        local areaSuccess, areaPart = pcall(function()
+                            return game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName]
+                        end)
+                        if areaSuccess and areaPart then
+                            local areaPositionSuccess, areaPosition = pcall(function()
+                                return areaPart.CFrame.Position
+                            end)
+                            if areaPositionSuccess and areaPosition then
+                                print("Area position accessed for " .. areaName .. ": " .. tostring(areaPosition))
+                                local distance = getDistance(instanceData.position, areaPosition)
+                                if distance < minDistance then
+                                    minDistance = distance
+                                    closestArea = areaName
+                                end
+                            else
+                                print("Failed to get CFrame.Position for Area: " .. areaName)
+                            end
+                        end
+                    end
+                    if closestArea then
+                        table.insert(npcList, npcName .. ", " .. closestArea)
+                        table.insert(TweenFullList, npcName .. ", " .. closestArea)
+                    else
+                        table.insert(npcList, npcName)
+                        table.insert(TweenFullList, npcName)
+                    end
+                else
+                    table.insert(npcList, npcName)
+                    table.insert(TweenFullList, npcName)
+                end
+            end
         end
     end
 end
@@ -175,10 +267,9 @@ MainGroup3:AddInput("Search", {
             return results
         end)
         if not success then
-            filteredValues = TweenFullList -- Fallback to full list if filtering fails
+            filteredValues = TweenFullList
         end
 
-        -- Separate filtered values into area and NPC lists
         local areaValues = {}
         local npcValues = {}
         for _, item in pairs(filteredValues) do
@@ -189,25 +280,23 @@ MainGroup3:AddInput("Search", {
             end
         end
 
-        -- Safely update dropdowns
         pcall(function()
             Options.Areas:SetValues(areaValues)
             Options.NPCs:SetValues(npcValues)
         end)
 
-        -- Set default values for dropdowns
         pcall(function()
             if #areaValues > 0 and (Options.Areas.Value == "" or not table.find(areaValues, Options.Areas.Value)) then
-                Options.Areas:SetValue(areaValues[1]) -- Set first area match
+                Options.Areas:SetValue(areaValues[1])
             elseif #areaValues == 0 then
-                Options.Areas:SetValue("") -- Clear if no area match
+                Options.Areas:SetValue("")
             end
         end)
         pcall(function()
             if #npcValues > 0 and (Options.NPCs.Value == "" or not table.find(npcValues, Options.NPCs.Value)) then
-                Options.NPCs:SetValue(npcValues[1]) -- Set first NPC match
+                Options.NPCs:SetValue(npcValues[1])
             elseif #npcValues == 0 then
-                Options.NPCs:SetValue("") -- Clear if no NPC match
+                Options.NPCs:SetValue("")
             end
         end)
     end
