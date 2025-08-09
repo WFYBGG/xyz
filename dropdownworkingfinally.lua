@@ -82,6 +82,7 @@ if successNPCs then
     end
 
     -- Process NPCs, handling duplicates and first-instance-only cases
+    local seenAreaForNPC = {} -- Track {npcName, areaName} to avoid duplicate area assignments
     for npcName, instances in pairs(npcInstances) do
         if table.find(firstInstanceOnly, npcName) then
             -- For specific NPCs, only include the first instance
@@ -97,7 +98,7 @@ if successNPCs then
             table.insert(npcList, npcName)
             table.insert(TweenFullList, npcName)
         else
-            -- Multiple instances, find closest area for each
+            -- Multiple instances, find closest area for each, include only first per area
             for _, instanceData in pairs(instances) do
                 if instanceData.position then
                     local closestArea = nil
@@ -123,8 +124,15 @@ if successNPCs then
                         end
                     end
                     if closestArea then
-                        table.insert(npcList, npcName .. ", " .. closestArea)
-                        table.insert(TweenFullList, npcName .. ", " .. closestArea)
+                        local areaKey = npcName .. "," .. closestArea
+                        if not seenAreaForNPC[areaKey] then
+                            seenAreaForNPC[areaKey] = true
+                            table.insert(npcList, npcName .. ", " .. closestArea)
+                            table.insert(TweenFullList, npcName .. ", " .. closestArea)
+                            print("Added NPC: " .. npcName .. ", " .. closestArea)
+                        else
+                            print("Skipped duplicate NPC in same area: " .. npcName .. ", " .. closestArea)
+                        end
                     else
                         table.insert(npcList, npcName)
                         table.insert(TweenFullList, npcName)
@@ -143,6 +151,7 @@ local successTowns, townFolders = pcall(function()
     return game:GetService("ReplicatedStorage").TownMarkers:GetChildren()
 end)
 if successTowns then
+    local seenTownNPC = {} -- Track {folderName, partName} to avoid duplicate NPCs in same folder
     for _, folder in pairs(townFolders) do
         local folderNameSuccess, folderName = pcall(function()
             return folder.Name
@@ -158,8 +167,15 @@ if successTowns then
                     end)
                     if partNameSuccess and partName and table.find(ignoredNPCs, partName) then
                         local formattedName = folderName .. ", " .. partName
-                        table.insert(npcList, formattedName)
-                        table.insert(TweenFullList, formattedName)
+                        local townKey = folderName .. "," .. partName
+                        if not seenTownNPC[townKey] then
+                            seenTownNPC[townKey] = true
+                            table.insert(npcList, formattedName)
+                            table.insert(TweenFullList, formattedName)
+                            print("Added Town NPC: " .. formattedName)
+                        else
+                            print("Skipped duplicate Town NPC in same folder: " .. formattedName)
+                        end
                     end
                 end
             end
@@ -167,10 +183,10 @@ if successTowns then
     end
 end
 
--- Sort lists for consistency
-table.sort(areaList)
-table.sort(npcList)
-table.sort(TweenFullList)
+-- Sort lists for consistency (case-insensitive)
+table.sort(areaList, function(a, b) return string.lower(a) < string.lower(b) end)
+table.sort(npcList, function(a, b) return string.lower(a) < string.lower(b) end)
+table.sort(TweenFullList, function(a, b) return string.lower(a) < string.lower(b) end)
 
 -- Search bar with filtering logic
 MainGroup3:AddInput("Search", {
