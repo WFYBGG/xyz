@@ -364,5 +364,3 @@ SaveManager:SetFolder("Ratware/Rogueblox")
 SaveManager:BuildConfigSection(Tabs.UI)
 ThemeManager:ApplyToTab(Tabs.UI)
 SaveManager:LoadAutoloadConfig()
-
-Library:Init()
