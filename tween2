@@ -1,0 +1,296 @@
+pcall(function()
+    repeat
+        wait()
+    until game:IsLoaded()
+    repeat
+        wait()
+    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    -- Combined script for fly, noclip, nofall with tween system
+    -- Fly variables
+    _G.originalspeed = 150 -- Match default slider value
+    _G.Speed = _G.originalspeed
+    local flyEnabled = false
+    local flyActive = false
+    local players = game:GetService("Players")
+    local uis = game:GetService("UserInputService")
+    local rs = game:GetService("RunService")
+
+    local function resetHumanoidState()
+        pcall(function()
+            if players.LocalPlayer.Character and players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+                local humanoid = players.LocalPlayer.Character.Humanoid
+                humanoid.JumpPower = 50
+                humanoid.WalkSpeed = 16
+            end
+        end)
+    end
+
+    -- Create platform with increased size
+    local platform = Instance.new("Part")
+    platform.Name = "OldDebris"
+    platform.Size = Vector3.new(10, 1, 10) -- Increased size
+    platform.Anchored = true
+    platform.CanCollide = true
+    platform.Transparency = 0.75
+    platform.Material = Enum.Material.SmoothPlastic
+    platform.BrickColor = BrickColor.new("Bright blue")
+
+    -- Create BodyVelocity
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+    players.LocalPlayer.CharacterAdded:Connect(function(character)
+        repeat
+            wait()
+        until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
+        pcall(function()
+            if flyEnabled then
+                character.Humanoid.JumpPower = 0
+                platform.Parent = workspace
+                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                bodyVelocity.Parent = character.HumanoidRootPart
+            else
+                platform.Parent = nil
+                bodyVelocity.Parent = nil
+            end
+        end)
+    end)
+
+    local function toggleFly(enable)
+        pcall(function()
+            flyEnabled = enable
+            if enable then
+                local character = players.LocalPlayer.Character
+                if character and character:FindFirstChild("Humanoid") then
+                    character.Humanoid.JumpPower = 0
+                end
+                platform.Parent = workspace
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                    bodyVelocity.Parent = character.HumanoidRootPart
+                end
+            else
+                resetHumanoidState()
+                platform.Parent = nil
+                bodyVelocity.Parent = nil
+            end
+        end)
+    end
+
+    -- Noclip variables
+    local noclipEnabled = false
+    local noclipActive = false
+
+    local function resetNoClip()
+        pcall(function()
+            if players.LocalPlayer.Character then
+                for _, part in pairs(players.LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = true end)
+                    end
+                end
+            end
+        end)
+    end
+
+    players.LocalPlayer.CharacterAdded:Connect(function(character)
+        repeat
+            wait()
+        until character:FindFirstChild("HumanoidRootPart")
+        if noclipEnabled then
+            -- Handled in RenderStepped
+        end
+    end)
+
+    local function toggleNoclip(enable)
+        pcall(function()
+            noclipEnabled = enable
+            if not enable then
+                resetNoClip()
+            end
+        end)
+    end
+
+    -- Nofall variables
+    local nofallEnabled = false
+    local fallDamageCD = nil
+    local statusFolder = game.Workspace:WaitForChild("Living"):WaitForChild(players.LocalPlayer.Name):WaitForChild("Status")
+
+    local function toggleNofall(enable)
+        pcall(function()
+            if enable then
+                if fallDamageCD and fallDamageCD.Parent then
+                    fallDamageCD:Destroy()
+                end
+                fallDamageCD = Instance.new("Folder")
+                fallDamageCD.Name = "FallDamageCD"
+                fallDamageCD.Archivable = true
+                fallDamageCD.Parent = statusFolder
+            else
+                if fallDamageCD and fallDamageCD.Parent then
+                    fallDamageCD:Destroy()
+                end
+                fallDamageCD = nil
+            end
+            nofallEnabled = enable
+        end)
+    end
+
+    -- Tween variables
+    _G.tweenActive = false
+    _G.tweenPhase = 0
+    _G.highAltitude = 0
+    _G.tweenTarget = Vector3.new(0, 0, 0)
+
+    -- Main RenderStepped loop combining fly and noclip
+    rs.RenderStepped:Connect(function(delta)
+        pcall(function()
+            local character = players.LocalPlayer.Character
+            local hrp = character and character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character and character:FindFirstChild("Humanoid")
+
+            -- Handle fly
+            if flyEnabled and character and humanoid and hrp then
+                flyActive = true
+                local moveDirection = Vector3.new(0, 0, 0)
+                local up = false
+                local down = false
+
+                if _G.tweenActive then
+                    -- Tween logic
+                    local pos = hrp.Position
+                    if _G.tweenPhase == 1 then -- Ascend
+                        moveDirection = Vector3.new(0, 0, 0)
+                        up = true
+                        down = false
+                        if pos.Y >= _G.highAltitude - 1 then
+                            _G.tweenPhase = 2
+                        end
+                    elseif _G.tweenPhase == 2 then -- Horizontal
+                        local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
+                        local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
+                        if horizontalVec.Magnitude > 5 then
+                            moveDirection = horizontalVec.Unit
+                        else
+                            moveDirection = Vector3.new(0, 0, 0)
+                            _G.tweenPhase = 3
+                        end
+                        up = false
+                        down = false
+                    elseif _G.tweenPhase == 3 then -- Descend
+                        moveDirection = Vector3.new(0, 0, 0)
+                        up = false
+                        down = true
+                        if pos.Y <= _G.tweenTarget.Y + 5 then
+                            _G.tweenActive = false
+                            _G.tweenPhase = 0
+                            toggleFly(false)
+                            toggleNoclip(false)
+                            toggleNofall(false)
+                        end
+                    end
+                end
+
+                -- Apply BodyVelocity
+                local maxSpeedPerFrame = math.min(_G.Speed, 49 / delta)
+                if moveDirection.Magnitude > 0 then
+                    bodyVelocity.Velocity = moveDirection * math.min(_G.Speed * delta, maxSpeedPerFrame)
+                else
+                    bodyVelocity.Velocity = Vector3.new(0, bodyVelocity.Velocity.Y, 0)
+                end
+
+                -- Set JumpPower
+                humanoid.JumpPower = 0
+
+                -- Update platform
+                local flightMove = math.min(_G.Speed * delta, 49 * delta)
+                local yOffset = 0
+                if up then
+                    yOffset = flightMove
+                elseif down then
+                    yOffset = -flightMove
+                end
+                platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0) + Vector3.new(0, yOffset, 0)
+
+                -- Health check
+                if humanoid.Health <= 0 then
+                    resetHumanoidState()
+                    flyEnabled = false
+                    flyActive = false
+                    platform.Parent = nil
+                    bodyVelocity.Parent = nil
+                end
+            else
+                if flyActive then
+                    resetHumanoidState()
+                    flyActive = false
+                    platform.Parent = nil
+                    bodyVelocity.Parent = nil
+                end
+            end
+
+            -- Handle noclip
+            if noclipEnabled and character and hrp then
+                noclipActive = true
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+                -- Optional: disable nearby collisions
+                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
+                for _, part in pairs(region) do
+                    if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+            else
+                if noclipActive then
+                    resetNoClip()
+                    noclipActive = false
+                end
+            end
+        end)
+    end)
+
+    -- Cleanup
+    game:BindToClose(function()
+        pcall(function()
+            toggleFly(false)
+            toggleNoclip(false)
+            toggleNofall(false)
+            bodyVelocity:Destroy()
+            if fallDamageCD then fallDamageCD:Destroy() end
+        end)
+    end)
+
+    -- Expose toggle function for external use
+    _G.CustomTween = function(target)
+        pcall(function()
+            local character = players.LocalPlayer.Character
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            toggleNoclip(true)
+            toggleNofall(true)
+            toggleFly(true)
+
+            _G.tweenTarget = target
+            _G.highAltitude = hrp.Position.Y + 1000
+            _G.tweenPhase = 1
+            _G.tweenActive = true
+        end)
+    end
+
+    _G.StopTween = function()
+        pcall(function()
+            _G.tweenActive = false
+            _G.tweenPhase = 0
+            toggleFly(false)
+            toggleNoclip(false)
+            toggleNofall(false)
+        end)
+    end
+end)
