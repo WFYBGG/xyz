@@ -344,7 +344,8 @@ MainGroup3:AddButton("NPC Tween Start/Stop", function()
     end)
 end)
 
-local MainGroup4 = Tabs.Main:AddLeftGroupbox("Removal")
+
+local MainGroup4 = Tabs.Main:AddLeftGroupbox("Humanoid")
 MainGroup4:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
