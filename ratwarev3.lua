@@ -70,6 +70,7 @@ MainGroup:AddToggle("NoclipToggle", {
     end
 })
 
+
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 -- Initialize lists for Areas and NPCs
@@ -276,7 +277,7 @@ local function getTargetPosition(selection, isNPC)
                 if townFolder then
                     local part = townFolder:FindFirstChild(areaName)
                     if part then
-                        targetPos = part.CFrame.Position -- Use partName's CFrame.Position
+                        targetPos = part.CFrame.Position
                     end
                 else
                     -- Handle Workspace NPCs
@@ -1210,7 +1211,7 @@ pcall(function()
     local rs = game:GetService("RunService")
 
     -- Fly variables
-    _G.originalspeed = 125 -- Match default slider value
+    _G.originalspeed = 125
     _G.Speed = _G.originalspeed
     local flyEnabled = false
     local flyActive = false
@@ -1237,7 +1238,7 @@ pcall(function()
 
     -- Create BodyVelocity
     local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- Increased for vertical movement
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
 
     players.LocalPlayer.CharacterAdded:Connect(function(character)
@@ -1299,13 +1300,25 @@ pcall(function()
             wait()
         until character:FindFirstChild("HumanoidRootPart")
         if noclipEnabled then
-            -- Handled in RenderStepped
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    pcall(function() part.CanCollide = false end)
+                end
+            end
         end
     end)
 
     local function toggleNoclip(enable)
         pcall(function()
             noclipEnabled = enable
+            local character = players.LocalPlayer.Character
+            if character then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = not enable end)
+                    end
+                end
+            end
             if not enable then
                 resetNoClip()
             end
@@ -1358,6 +1371,10 @@ pcall(function()
                 local verticalSpeed = 0
 
                 if _G.tweenActive then
+                    -- Ensure noclip is active during tween
+                    if not noclipEnabled then
+                        toggleNoclip(true)
+                    end
                     -- Tween logic
                     local pos = hrp.Position
                     if _G.tweenPhase == 1 then -- Ascend
@@ -1365,11 +1382,9 @@ pcall(function()
                         local distance = targetY - pos.Y
                         if distance > 1 then
                             verticalSpeed = _G.Speed * delta
-                            if distance < verticalSpeed then
-                                verticalSpeed = distance
-                            end
                             hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
                         else
+                            hrp.CFrame = CFrame.new(Vector3.new(pos.X, targetY, pos.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 2
                         end
                     elseif _G.tweenPhase == 2 then -- Horizontal
@@ -1382,6 +1397,7 @@ pcall(function()
                             end
                             hrp.CFrame = hrp.CFrame + moveDirection
                         else
+                            hrp.CFrame = CFrame.new(Vector3.new(highTarget.X, _G.highAltitude, highTarget.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 3
                         end
                     elseif _G.tweenPhase == 3 then -- Descend
@@ -1389,11 +1405,9 @@ pcall(function()
                         local distance = pos.Y - targetY
                         if distance > 5 then
                             verticalSpeed = -_G.Speed * delta
-                            if distance < -verticalSpeed then
-                                verticalSpeed = -distance
-                            end
                             hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
                         else
+                            hrp.CFrame = CFrame.new(Vector3.new(pos.X, targetY, pos.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenActive = false
                             _G.tweenPhase = 0
                             toggleFly(false)
@@ -1418,7 +1432,7 @@ pcall(function()
 
                 -- Monitor health to detect kill
                 if humanoid.Health <= 0 then
-                    messagebox("Character Dead, Please Try Again", "Error", 0)
+                    Library:Notify("Character Dead, Please Try Again", { Duration = 3 })
                     resetHumanoidState()
                     _G.tweenActive = false
                     _G.tweenPhase = 0
@@ -1484,7 +1498,7 @@ pcall(function()
             -- Create persistent notification
             if not tweenNotification then
                 tweenNotification = Library:Notify("Tween in progress", {
-                    Duration = math.huge -- Persist until manually destroyed
+                    Duration = math.huge
                 })
             end
         end)
