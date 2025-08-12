@@ -1198,7 +1198,6 @@ end)
 
 
 --Universal Tween & Location
-
 pcall(function()
     repeat
         wait()
@@ -1232,7 +1231,7 @@ pcall(function()
     platform.Name = "OldDebris"
     platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
-    platform.CanCollide = false -- Set to false to prevent environmental collisions
+    platform.CanCollide = true -- Reverted to true to avoid anticheat
     platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
@@ -1247,11 +1246,12 @@ pcall(function()
             wait()
         until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
         pcall(function()
-            if flyEnabled then
+            if flyEnabled or _G.tweenActive then -- Check tweenActive to restore fly/noclip after death
                 character.Humanoid.JumpPower = 0
                 platform.Parent = workspace
                 platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
+                toggleNoclip(true) -- Reapply noclip on respawn if tween is active
             else
                 platform.Parent = nil
                 bodyVelocity.Parent = nil
@@ -1300,7 +1300,7 @@ pcall(function()
         repeat
             wait()
         until character:FindFirstChild("HumanoidRootPart")
-        if noclipEnabled then
+        if noclipEnabled or _G.tweenActive then -- Ensure noclip is reapplied if tween is active
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     pcall(function() part.CanCollide = false end)
@@ -1467,8 +1467,16 @@ pcall(function()
                 end
                 local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(10, 10, 10), hrp.Position + Vector3.new(10, 10, 10)))
                 for _, part in pairs(region) do
-                    if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
+                    if part:IsA("BasePart") and part ~= hrp and part ~= platform and not part.Anchored then
                         pcall(function() part.CanCollide = false end)
+                    end
+                end
+                -- Additional collision disable during descent
+                if _G.tweenActive and _G.tweenPhase == 3 then
+                    for _, part in pairs(region) do
+                        if part:IsA("BasePart") and part ~= hrp and part ~= platform then
+                            pcall(function() part.CanCollide = false end)
+                        end
                     end
                 end
             else
@@ -1492,7 +1500,7 @@ pcall(function()
             toggleFly(true)
 
             _G.tweenTarget = target
-            _G.highAltitude = hrp.Position.Y + 500 -- Changed from 1000 to 500
+            _G.highAltitude = hrp.Position.Y + 500
             _G.tweenPhase = 1
             _G.tweenActive = true
 
@@ -1501,6 +1509,13 @@ pcall(function()
                 tweenNotification = Library:Notify("Tween in progress", {
                     Duration = math.huge
                 })
+                if tweenNotification then
+                    print("Notification created: Tween in progress")
+                else
+                    print("Failed to create notification")
+                end
+            else
+                print("Notification already exists, skipping creation")
             end
         end)
     end
@@ -1513,6 +1528,7 @@ pcall(function()
             toggleNoclip(false)
             toggleNofall(false)
             if tweenNotification then
+                print("Destroying notification")
                 tweenNotification:Destroy()
                 tweenNotification = nil
             end
@@ -1528,7 +1544,6 @@ pcall(function()
         end)
     end)
 end)
-
 
 
 
