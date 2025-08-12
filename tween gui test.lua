@@ -18,6 +18,7 @@ local Tabs = {
     UI = Window:AddTab("UI Settings")
 }
 
+
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 -- Initialize lists for Areas and NPCs
@@ -224,7 +225,7 @@ local function getTargetPosition(selection, isNPC)
                 if townFolder then
                     local part = townFolder:FindFirstChild(areaName)
                     if part then
-                        targetPos = part.CFrame.Position
+                        targetPos = part.CFrame.Position -- Use partName's CFrame.Position
                     end
                 else
                     -- Handle Workspace NPCs
@@ -398,7 +399,6 @@ MainGroup3:AddButton("NPC Tween Start/Stop", function()
     end)
 end)
 
-
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -565,8 +565,12 @@ pcall(function()
             local hrp = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
 
+            if not (character and hrp and humanoid) then
+                return
+            end
+
             -- Handle fly
-            if flyEnabled and character and humanoid and hrp then
+            if flyEnabled then
                 flyActive = true
                 local moveDirection = Vector3.new(0, 0, 0)
                 local up = false
@@ -618,7 +622,7 @@ pcall(function()
                 -- Set JumpPower
                 humanoid.JumpPower = 0
 
-                -- Update platform
+                -- Update platform and character position
                 local flightMove = math.min(_G.Speed * delta, 49 * delta)
                 local yOffset = 0
                 if up then
@@ -626,7 +630,10 @@ pcall(function()
                 elseif down then
                     yOffset = -flightMove
                 end
-                platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0) + Vector3.new(0, yOffset, 0)
+                platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
+                if yOffset ~= 0 then
+                    hrp.CFrame = hrp.CFrame + Vector3.new(0, yOffset, 0)
+                end
 
                 -- Health check
                 if humanoid.Health <= 0 then
@@ -635,6 +642,8 @@ pcall(function()
                     flyActive = false
                     platform.Parent = nil
                     bodyVelocity.Parent = nil
+                    _G.tweenActive = false
+                    _G.tweenPhase = 0
                 end
             else
                 if flyActive then
@@ -646,14 +655,13 @@ pcall(function()
             end
 
             -- Handle noclip
-            if noclipEnabled and character and hrp then
+            if noclipEnabled then
                 noclipActive = true
                 for _, part in pairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
                         pcall(function() part.CanCollide = false end)
                     end
                 end
-                -- Optional: disable nearby collisions
                 local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
                 for _, part in pairs(region) do
                     if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
@@ -684,8 +692,15 @@ pcall(function()
     _G.CustomTween = function(target)
         pcall(function()
             local character = players.LocalPlayer.Character
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
+            local hrp = character and character:FindFirstChild("HumanoidRootPart")
+            if not hrp or not target then
+                _G.tweenActive = false
+                _G.tweenPhase = 0
+                toggleFly(false)
+                toggleNoclip(false)
+                toggleNofall(false)
+                return
+            end
 
             toggleNoclip(true)
             toggleNofall(true)
