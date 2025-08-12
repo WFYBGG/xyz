@@ -1515,12 +1515,16 @@ local isLocked = false
 local flyEnabled = false
 local flyPlatform = nil
 local bodyVelocity = nil
+local flyConn = nil
 local noclipEnabled = false
 local nofallEnabled = false
 local nofallFolder = nil
 local heightOffset = 0 -- Matches ATBHeight default
-local zDistance = -3 -- Matches ATBDistance default
+local zDistance = -4 -- Updated default
 local originalSpeed = 150
+local messageDebounce = false
+local currentTween = nil
+local updateCoroutine = nil
 
 -- Utility: Safe get
 local function safeGet(obj, ...)
@@ -1558,8 +1562,13 @@ local function enableFly()
         local humanoid = safeGet(char, "Humanoid")
         if humanoid then
             humanoid.JumpPower = 0
-            humanoid.WalkSpeed = 16
         end
+        flyConn = RunService.RenderStepped:Connect(function()
+            local hrp = safeGet(char, "HumanoidRootPart")
+            if flyPlatform and hrp then
+                flyPlatform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
+            end
+        end)
         return true
     end)
     if not success then
@@ -1572,6 +1581,10 @@ local function disableFly()
     local success, result = pcall(function()
         if not flyEnabled then return true end
         flyEnabled = false
+        if flyConn then
+            flyConn:Disconnect()
+            flyConn = nil
+        end
         if flyPlatform then
             flyPlatform:Destroy()
             flyPlatform = nil
@@ -1636,11 +1649,6 @@ local function disableNofall()
         end
         nofallEnabled = false
         nofallFolder = nil
-        local humanoid = safeGet(char, "Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = 16
-            humanoid.JumpPower = 50
-        end
         return true
     end)
     if not success then
@@ -1680,11 +1688,6 @@ local function disableNoclip()
                 pcall(function() part.CanCollide = true end)
             end
         end
-        local humanoid = safeGet(char, "Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = 16
-            humanoid.JumpPower = 50
-        end
         return true
     end)
     if not success then
@@ -1708,11 +1711,28 @@ local function tweenToBack()
         enableFly()
         enableNofall()
         enableNoclip()
-        local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
-        local tweenTime = distance / originalSpeed
-        local tween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
-        tween:Play()
-        tween.Completed:Wait()
+        local function createTween()
+            local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
+            local tweenTime = distance / originalSpeed
+            currentTween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
+            currentTween:Play()
+        end
+        createTween()
+        updateCoroutine = coroutine.create(function()
+            while isTweening do
+                task.wait(1)
+                if not isTweening then break end
+                if currentTween then
+                    currentTween:Cancel()
+                end
+                targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+                if not targetHrp then break end
+                distance = (hrp.Position - targetHrp.Position).Magnitude
+                createTween()
+            end
+        end)
+        coroutine.resume(updateCoroutine)
+        currentTween.Completed:Wait()
         isLocked = true
         isTweening = false
         disableFly()
@@ -1738,6 +1758,14 @@ local function stopAttach()
             attachConn:Disconnect()
             attachConn = nil
         end
+        if updateCoroutine then
+            coroutine.close(updateCoroutine)
+            updateCoroutine = nil
+        end
+        if currentTween then
+            currentTween:Cancel()
+            currentTween = nil
+        end
         disableNofall()
         disableNoclip()
         disableFly()
@@ -1752,7 +1780,13 @@ end
 local function startAttach()
     local success, result = pcall(function()
         if not targetPlayer then
-            messagebox("Please select a player first!", "Error", 0)
+            if not messageDebounce then
+                messageDebounce = true
+                messagebox("Please select a player first!", "Error", 0)
+                task.delay(2, function()
+                    messageDebounce = false
+                end)
+            end
             return false
         end
         stopAttach()
@@ -1776,7 +1810,7 @@ local function startAttach()
                 return
             end
             if isLocked then
-                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
+                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
             elseif not isTweening then
                 tweenToBack()
             end
@@ -1854,7 +1888,7 @@ local success, result = pcall(function()
         end
     end)
 
-    -- Re-apply nofall on respawn
+    -- Re-apply on respawn
     LocalPlayer.CharacterAdded:Connect(function(char)
         local success, _ = pcall(function()
             if isAttached then
@@ -1909,7 +1943,6 @@ end)
 if not success then
     warn("Setup failed: " .. tostring(result))
 end
-
 --END MODULES
 --END MODULES
 --END MODULES
