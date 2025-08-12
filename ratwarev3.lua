@@ -1198,6 +1198,7 @@ end)
 
 
 --Universal Tween & Location
+
 pcall(function()
     repeat
         wait()
@@ -1215,6 +1216,7 @@ pcall(function()
     _G.Speed = _G.originalspeed
     local flyEnabled = false
     local flyActive = false
+    local lastPosition = nil -- Track position to detect teleportation
 
     local function resetHumanoidState()
         pcall(function()
@@ -1231,7 +1233,7 @@ pcall(function()
     platform.Name = "OldDebris"
     platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
-    platform.CanCollide = true -- Reverted to true to avoid anticheat
+    platform.CanCollide = true -- Must be true to avoid anticheat
     platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
@@ -1246,16 +1248,17 @@ pcall(function()
             wait()
         until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
         pcall(function()
-            if flyEnabled or _G.tweenActive then -- Check tweenActive to restore fly/noclip after death
+            if flyEnabled or _G.tweenActive then
                 character.Humanoid.JumpPower = 0
                 platform.Parent = workspace
                 platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
-                toggleNoclip(true) -- Reapply noclip on respawn if tween is active
+                toggleNoclip(true) -- Reapply noclip on respawn
             else
                 platform.Parent = nil
                 bodyVelocity.Parent = nil
             end
+            lastPosition = character.HumanoidRootPart.Position -- Reset last position
         end)
     end)
 
@@ -1271,6 +1274,7 @@ pcall(function()
                 if character and character:FindFirstChild("HumanoidRootPart") then
                     platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                     bodyVelocity.Parent = character.HumanoidRootPart
+                    lastPosition = character.HumanoidRootPart.Position
                 end
             else
                 resetHumanoidState()
@@ -1300,7 +1304,7 @@ pcall(function()
         repeat
             wait()
         until character:FindFirstChild("HumanoidRootPart")
-        if noclipEnabled or _G.tweenActive then -- Ensure noclip is reapplied if tween is active
+        if noclipEnabled or _G.tweenActive then
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     pcall(function() part.CanCollide = false end)
@@ -1357,6 +1361,7 @@ pcall(function()
     _G.highAltitude = 0
     _G.tweenTarget = Vector3.new(0, 0, 0)
     local tweenNotification = nil
+    local teleportCooldown = 0 -- Cooldown to pause tween after teleport detection
 
     -- Main RenderStepped loop combining fly and noclip
     rs.RenderStepped:Connect(function(delta)
@@ -1371,7 +1376,18 @@ pcall(function()
                 local moveDirection = Vector3.new(0, 0, 0)
                 local verticalSpeed = 0
 
-                if _G.tweenActive then
+                -- Detect teleportation (anti-cheat)
+                if lastPosition and _G.tweenActive then
+                    local currentPosition = hrp.Position
+                    local distanceMoved = (currentPosition - lastPosition).Magnitude
+                    if distanceMoved > 50 then -- Arbitrary threshold for teleport detection
+                        teleportCooldown = 0.5 -- Pause tween for 0.5 seconds
+                        Library:Notify("Teleport detected, pausing tween briefly", { Duration = 2 })
+                    end
+                    lastPosition = currentPosition
+                end
+
+                if _G.tweenActive and teleportCooldown <= 0 then
                     -- Ensure noclip is active during tween
                     if not noclipEnabled then
                         toggleNoclip(true)
@@ -1392,7 +1408,11 @@ pcall(function()
                         local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
                         local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
                         if horizontalVec.Magnitude > 5 then
-                            moveDirection = horizontalVec.Unit * _G.Speed * delta
+                            local stepDistance = _G.Speed * delta
+                            if stepDistance > 10 then -- Cap step size to avoid anti-cheat
+                                stepDistance = 10
+                            end
+                            moveDirection = horizontalVec.Unit * stepDistance
                             if horizontalVec.Magnitude < moveDirection.Magnitude then
                                 moveDirection = horizontalVec
                             end
@@ -1415,11 +1435,14 @@ pcall(function()
                             toggleNoclip(false)
                             toggleNofall(false)
                             if tweenNotification then
+                                print("Destroying notification")
                                 tweenNotification:Destroy()
                                 tweenNotification = nil
                             end
                         end
                     end
+                elseif teleportCooldown > 0 then
+                    teleportCooldown = teleportCooldown - delta
                 end
 
                 -- Apply BodyVelocity for horizontal movement
@@ -1444,6 +1467,7 @@ pcall(function()
                     toggleNoclip(false)
                     toggleNofall(false)
                     if tweenNotification then
+                        print("Destroying notification")
                         tweenNotification:Destroy()
                         tweenNotification = nil
                     end
@@ -1465,14 +1489,14 @@ pcall(function()
                         pcall(function() part.CanCollide = false end)
                     end
                 end
-                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(10, 10, 10), hrp.Position + Vector3.new(10, 10, 10)))
+                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(20, 20, 20), hrp.Position + Vector3.new(20, 20, 20)))
                 for _, part in pairs(region) do
-                    if part:IsA("BasePart") and part ~= hrp and part ~= platform and not part.Anchored then
+                    if part:IsA("BasePart") and part ~= hrp and part ~= platform then
                         pcall(function() part.CanCollide = false end)
                     end
                 end
-                -- Additional collision disable during descent
-                if _G.tweenActive and _G.tweenPhase == 3 then
+                -- Additional noclip pass for ascent and horizontal phases
+                if _G.tweenActive and (_G.tweenPhase == 1 or _G.tweenPhase == 2) then
                     for _, part in pairs(region) do
                         if part:IsA("BasePart") and part ~= hrp and part ~= platform then
                             pcall(function() part.CanCollide = false end)
@@ -1503,6 +1527,7 @@ pcall(function()
             _G.highAltitude = hrp.Position.Y + 500
             _G.tweenPhase = 1
             _G.tweenActive = true
+            lastPosition = hrp.Position -- Initialize last position
 
             -- Create persistent notification
             if not tweenNotification then
@@ -1532,6 +1557,7 @@ pcall(function()
                 tweenNotification:Destroy()
                 tweenNotification = nil
             end
+            teleportCooldown = 0
         end)
     end
 
@@ -1544,7 +1570,6 @@ pcall(function()
         end)
     end)
 end)
-
 
 
 --Attach to back Module [TESTING STILL]
