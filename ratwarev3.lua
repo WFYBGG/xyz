@@ -265,7 +265,7 @@ table.sort(TweenFullList, function(a, b) return string.lower(a) < string.lower(b
 local areaTweenActive = false
 local npcTweenActive = false
 
--- Helper function to get target position
+-- Helper function to get target position (updated to handle duplicate NPCs correctly)
 local function getTargetPosition(selection, isNPC)
     local targetPos = nil
     pcall(function()
@@ -273,30 +273,36 @@ local function getTargetPosition(selection, isNPC)
             local npcName, areaName = selection:match("^(.-), (.+)$")
             if npcName and areaName then
                 -- Handle TownMarkers NPCs
-                local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(npcName)
+                local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(areaName)
                 if townFolder then
-                    local part = townFolder:FindFirstChild(areaName)
+                    local part = townFolder:FindFirstChild(npcName)
                     if part then
                         targetPos = part.CFrame.Position
                     end
                 else
-                    -- Handle Workspace NPCs
+                    -- Handle Workspace NPCs with precise area matching
                     local npcs = game:GetService("Workspace").NPCs:GetChildren()
+                    local minDistance = math.huge
                     for _, npc in pairs(npcs) do
                         if npc.Name == npcName then
-                            local closestArea = nil
-                            local minDistance = math.huge
                             local npcPos = npc.WorldPivot.Position or npc.CFrame.Position
-                            for _, area in pairs(game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:GetChildren()) do
-                                local distance = getDistance(npcPos, area.CFrame.Position)
-                                if distance < minDistance then
-                                    minDistance = distance
-                                    closestArea = area.Name
+                            if npcPos then
+                                local closestArea = nil
+                                local areaMinDistance = math.huge
+                                for _, area in pairs(game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:GetChildren()) do
+                                    local distance = getDistance(npcPos, area.CFrame.Position)
+                                    if distance < areaMinDistance then
+                                        areaMinDistance = distance
+                                        closestArea = area.Name
+                                    end
                                 end
-                            end
-                            if closestArea == areaName then
-                                targetPos = npcPos
-                                break
+                                if closestArea == areaName then
+                                    local distanceToArea = getDistance(npcPos, game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName].CFrame.Position)
+                                    if distanceToArea < minDistance then
+                                        minDistance = distanceToArea
+                                        targetPos = npcPos
+                                    end
+                                end
                             end
                         end
                     end
