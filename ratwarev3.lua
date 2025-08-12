@@ -1624,7 +1624,7 @@ local function tweenToBack()
     isTweening = true
     local success, result = pcall(function()
         local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-        local targetChar = Workspace.Living:FindFirstChild(targetPlayer.Name)
+        local targetChar = targetPlayer and Workspace.Living:FindFirstChild(targetPlayer.Name)
         local hrp = char and safeGet(char, "HumanoidRootPart")
         local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
         if not (hrp and targetHrp) then return false end
@@ -1673,6 +1673,7 @@ local function startAttach()
     local success, result = pcall(function()
         if not targetPlayer then
             messagebox("Please select a player first!", "Error", 0)
+            Toggles.AttachtobackToggle:SetValue(false)
             return false
         end
         stopAttach()
@@ -1682,7 +1683,7 @@ local function startAttach()
         attachConn = RunService.RenderStepped:Connect(function()
             if not isAttached then return end
             local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-            local targetChar = Workspace.Living:FindFirstChild(targetPlayer.Name)
+            local targetChar = targetPlayer and Workspace.Living:FindFirstChild(targetPlayer.Name)
             local hrp = char and safeGet(char, "HumanoidRootPart")
             local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
             if not (hrp and targetHrp) then
@@ -1715,12 +1716,9 @@ local success, result = pcall(function()
     -- Player dropdown
     Options.PlayerDropdown:OnChanged(function(value)
         local success, _ = pcall(function()
-            targetPlayer = Players:FindFirstChild(value)
+            targetPlayer = value and Players:FindFirstChild(value) or nil
             if isAttached and not targetPlayer then
                 stopAttach()
-            end
-            if Toggles.AttachtobackToggle.Value then
-                startAttach()
             end
             return true
         end)
@@ -1816,7 +1814,6 @@ end)
 if not success then
     warn("Setup failed: " .. tostring(result))
 end
-
 
 --END MODULES
 --END MODULES
