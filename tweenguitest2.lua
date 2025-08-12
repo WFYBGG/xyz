@@ -770,6 +770,7 @@ return {
     CustomTween = customTween,
     StopTween = stopTween,
     getTweenState = function() return tweenState end
+end
 }
 
 -- UI Settings Tab
