@@ -98,7 +98,7 @@ local function tweenToBack()
         return
     end
     local distance = (hrp.Position - targetHrp.Position).Magnitude
-    if distance > 100 then
+    if distance > 20000 then
         isTweening = false
         return
     end
@@ -237,7 +237,7 @@ local function startAttach()
             return
         end
         local distance = (hrp.Position - targetHrp.Position).Magnitude
-        if distance > 20000 then
+        if distance > 100 then
             isLocked = false -- Allow re-tweening if target moves back into range
             isTweening = false
             return
