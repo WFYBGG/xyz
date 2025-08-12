@@ -457,27 +457,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- UI Settings Tab
-local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
-MenuGroup:AddButton("Unload", function() Library:Unload() end)
-MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
-    Default = "Insert",
-    NoUI = true,
-    Text = "Menu keybind"
-})
-
-Library.ToggleKeybind = Options.MenuKeybind
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({"MenuKeybind"})
-ThemeManager:SetFolder("Ratware")
-SaveManager:SetFolder("Ratware/Rogueblox")
-SaveManager:BuildConfigSection(Tabs.UI)
-ThemeManager:ApplyToTab(Tabs.UI)
-SaveManager:LoadAutoloadConfig()
-
 -- Cleanup on game exit
 game:BindToClose(function()
     local success, result = pcall(function()
@@ -770,7 +749,6 @@ return {
     CustomTween = customTween,
     StopTween = stopTween,
     getTweenState = function() return tweenState end
-end
 }
 
 -- UI Settings Tab
