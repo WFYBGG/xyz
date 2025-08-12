@@ -265,14 +265,14 @@ table.sort(TweenFullList, function(a, b) return string.lower(a) < string.lower(b
 local areaTweenActive = false
 local npcTweenActive = false
 
--- Helper function to get target position (corrected to handle duplicate NPCs using existing instance data)
+-- Helper function to get target position (simplified to use logged coordinates for [NPC Name, Area Name])
 local function getTargetPosition(selection, isNPC)
     local targetPos = nil
     pcall(function()
         if isNPC then
             local npcName, areaName = selection:match("^(.-), (.+)$")
             if npcName and areaName then
-                -- Handle TownMarkers NPCs (reverted to original logic)
+                -- Handle TownMarkers NPCs (original logic)
                 local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(areaName)
                 if townFolder then
                     local part = townFolder:FindFirstChild(npcName)
@@ -280,19 +280,11 @@ local function getTargetPosition(selection, isNPC)
                         targetPos = part.CFrame.Position
                     end
                 else
-                    -- Handle Workspace NPCs with duplicate support using existing instance data
-                    local npcs = game:GetService("Workspace").NPCs:GetChildren()
-                    for _, npc in pairs(npcs) do
-                        if npc.Name == npcName then
-                            local instanceData = nil
-                            for _, data in pairs(npcInstances[npcName] or {}) do
-                                if data.name == npcName and getDistance(data.position, game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName].CFrame.Position) == 0 then
-                                    instanceData = data
-                                    break
-                                end
-                            end
-                            if instanceData and instanceData.position then
-                                targetPos = instanceData.position
+                    -- Use the logged position from npcInstances for the specific [NPC Name, Area Name] instance
+                    if npcInstances[npcName] then
+                        for _, data in pairs(npcInstances[npcName]) do
+                            if data.name == npcName and getDistance(data.position, game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName].CFrame.Position) < 1 then
+                                targetPos = data.position
                                 break
                             end
                         end
