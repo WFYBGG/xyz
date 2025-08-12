@@ -1,9 +1,3 @@
---Couple of problems:
---1. Any speed over 65 and my character starts falling through the platform while rising. 
---2. Notification immediately disappears and doesn't persist.
---3. When tweening down to target, character gets stuck when it hits a solid part. 
---4. After tween stops, character cannot climb.
-
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
@@ -21,7 +15,6 @@ local Tabs = {
     Visuals = Window:AddTab("Visuals"),
     UI = Window:AddTab("UI Settings")
 }
-
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 local Players = game:GetService("Players")
@@ -457,16 +450,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Cleanup on game exit
-game:BindToClose(function()
-    local success, result = pcall(function()
-        tweenSystem.StopTween()
-    end)
-    if not success then
-        print("Cleanup failed: " .. tostring(result))
-    end
-end)
-
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -771,3 +754,13 @@ SaveManager:SetFolder("Ratware/Rogueblox")
 SaveManager:BuildConfigSection(Tabs.UI)
 ThemeManager:ApplyToTab(Tabs.UI)
 SaveManager:LoadAutoloadConfig()
+
+-- Cleanup on game exit
+game:BindToClose(function()
+    local success, result = pcall(function()
+        tweenSystem.StopTween()
+    end)
+    if not success then
+        print("Cleanup failed: " .. tostring(result))
+    end
+end)
