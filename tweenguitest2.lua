@@ -21,7 +21,32 @@ local Tabs = {
     Visuals = Window:AddTab("Visuals"),
     UI = Window:AddTab("UI Settings")
 }
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "Ratware.exe - 100% By ChatGPT [Press 'Insert' to hide GUI]",
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab("Main"),
+    Visuals = Window:AddTab("Visuals"),
+    UI = Window:AddTab("UI Settings")
+}
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+-- Load tween module
+local tweenSystem = require(game:GetService("ReplicatedStorage").TweenSystem) -- Adjust path as needed
 
 -- Initialize lists for Areas and NPCs
 local areaList = {}
@@ -218,26 +243,26 @@ local npcTweenActive = false
 -- Helper function to get target position
 local function getTargetPosition(selection, isNPC)
     local targetPos = nil
-    pcall(function()
+    local success, result = pcall(function()
         if isNPC then
             local npcName, areaName = selection:match("^(.-), (.+)$")
             if npcName and areaName then
                 -- Handle TownMarkers NPCs
-                local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(npcName)
+                local townFolder = ReplicatedStorage.TownMarkers:FindFirstChild(npcName)
                 if townFolder then
                     local part = townFolder:FindFirstChild(areaName)
                     if part then
-                        targetPos = part.CFrame.Position -- Use partName's CFrame.Position
+                        return part.CFrame.Position
                     end
                 else
                     -- Handle Workspace NPCs
-                    local npcs = game:GetService("Workspace").NPCs:GetChildren()
+                    local npcs = Workspace.NPCs:GetChildren()
                     for _, npc in pairs(npcs) do
                         if npc.Name == npcName then
                             local closestArea = nil
                             local minDistance = math.huge
                             local npcPos = npc.WorldPivot.Position or npc.CFrame.Position
-                            for _, area in pairs(game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:GetChildren()) do
+                            for _, area in pairs(ReplicatedStorage.WorldModel.AreaMarkers:GetChildren()) do
                                 local distance = getDistance(npcPos, area.CFrame.Position)
                                 if distance < minDistance then
                                     minDistance = distance
@@ -245,30 +270,34 @@ local function getTargetPosition(selection, isNPC)
                                 end
                             end
                             if closestArea == areaName then
-                                targetPos = npcPos
-                                break
+                                return npcPos
                             end
                         end
                     end
                 end
             else
                 -- Single instance NPC
-                local npcs = game:GetService("Workspace").NPCs:GetChildren()
+                local npcs = Workspace.NPCs:GetChildren()
                 for _, npc in pairs(npcs) do
                     if npc.Name == selection then
-                        targetPos = npc.WorldPivot.Position or npc.CFrame.Position
-                        break
+                        return npc.WorldPivot.Position or npc.CFrame.Position
                     end
                 end
             end
         else
             -- Area position
-            local areaPart = game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:FindFirstChild(selection)
+            local areaPart = ReplicatedStorage.WorldModel.AreaMarkers:FindFirstChild(selection)
             if areaPart then
-                targetPos = areaPart.CFrame.Position
+                return areaPart.CFrame.Position
             end
         end
     end)
+    if success and result then
+        targetPos = result
+        print("Position for " .. selection .. ": " .. tostring(targetPos))
+    else
+        print("Failed to get position for " .. selection .. ": " .. tostring(result))
+    end
     return targetPos
 end
 
@@ -331,9 +360,12 @@ MainGroup3:AddSlider("UniversalTweenSpeed", {
     Rounding = 0,
     Compact = true,
     Callback = function(value)
-        pcall(function()
+        local success, result = pcall(function()
             _G.Speed = value
         end)
+        if not success then
+            print("Failed to set speed: " .. tostring(result))
+        end
     end
 })
 
@@ -345,30 +377,41 @@ MainGroup3:AddDropdown("Areas", {
 })
 
 MainGroup3:AddButton("Area Tween Start/Stop", function()
-    pcall(function()
+    local success, result = pcall(function()
         if npcTweenActive then
-            messagebox("NPC tween in progress. Stop NPC tween and try again.", "Tween Error", 0)
+            Library:Notify("NPC tween in progress. Stop NPC tween and try again.", 5)
             return
         end
         if Options.Areas.Value == "" then
-            messagebox("No area selected.", "Tween Error", 0)
+            Library:Notify("No area selected.", 5)
             return
         end
         areaTweenActive = not areaTweenActive
         if areaTweenActive then
             local targetPos = getTargetPosition(Options.Areas.Value, false)
             if targetPos then
-                Library:Notify("Area Tween In Progress", "Tweening to " .. Options.Areas.Value, 9999)
-                _G.CustomTween(targetPos)
+                Library:Notify("Tweening to " .. Options.Areas.Value, 0) -- Persist until tween stops
+                task.spawn(function()
+                    tweenSystem.CustomTween(targetPos, _G.Speed or 125)
+                    if areaTweenActive then
+                        Library:Notify("Area Tween Stopped", 5)
+                        areaTweenActive = false
+                    end
+                end)
             else
-                messagebox("Failed to get area position.", "Tween Error", 0)
+                Library:Notify("Failed to get area position.", 5)
                 areaTweenActive = false
             end
         else
-            _G.StopTween()
-            Library:Notify("Area Tween Stopped", "", 5)
+            tweenSystem.StopTween()
+            Library:Notify("Area Tween Stopped", 5)
         end
     end)
+    if not success then
+        print("Area Tween failed: " .. tostring(result))
+        areaTweenActive = false
+        tweenSystem.StopTween()
+    end
 end)
 
 MainGroup3:AddDropdown("NPCs", {
@@ -379,334 +422,371 @@ MainGroup3:AddDropdown("NPCs", {
 })
 
 MainGroup3:AddButton("NPC Tween Start/Stop", function()
-    pcall(function()
+    local success, result = pcall(function()
         if areaTweenActive then
-            messagebox("Area tween in progress. Stop Area tween and try again.", "Tween Error", 0)
+            Library:Notify("Area tween in progress. Stop Area tween and try again.", 5)
             return
         end
         if Options.NPCs.Value == "" then
-            messagebox("No NPC selected.", "Tween Error", 0)
+            Library:Notify("No NPC selected.", 5)
             return
-        end
+        }
         npcTweenActive = not npcTweenActive
         if npcTweenActive then
             local targetPos = getTargetPosition(Options.NPCs.Value, true)
             if targetPos then
-                Library:Notify("NPC Tween In Progress", "Tweening to " .. Options.NPCs.Value, 9999)
-                _G.CustomTween(targetPos)
+                Library:Notify("Tweening to " .. Options.NPCs.Value, 0) -- Persist until tween stops
+                task.spawn(function()
+                    tweenSystem.CustomTween(targetPos, _G.Speed or 125)
+                    if npcTweenActive then
+                        Library:Notify("NPC Tween Stopped", 5)
+                        npcTweenActive = false
+                    end
+                end)
             else
-                messagebox("Failed to get NPC position.", "Tween Error", 0)
+                Library:Notify("Failed to get NPC position.", 5)
                 npcTweenActive = false
             end
         else
-            _G.StopTween()
-            Library:Notify("NPC Tween Stopped", "", 5)
+            tweenSystem.StopTween()
+            Library:Notify("NPC Tween Stopped", 5)
         end
     end)
+    if not success then
+        print("NPC Tween failed: " .. tostring(result))
+        npcTweenActive = false
+        tweenSystem.StopTween()
+    end
 end)
 
 -- Monitor for tween stop to update flags
-game:GetService("RunService").Heartbeat:Connect(function()
-    if not _G.tweenActive then
-        areaTweenActive = false
-        npcTweenActive = false
-    end
-end)
-
-pcall(function()
-    repeat
-        wait()
-    until game:IsLoaded()
-    repeat
-        wait()
-    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-    -- Combined script for fly, noclip, nofall with tween system
-
-    -- Fly variables
-    _G.originalspeed = 125
-    _G.Speed = _G.originalspeed
-    local flyEnabled = false
-    local flyActive = false
-    local players = game:GetService("Players")
-    local rs = game:GetService("RunService")
-
-    local function resetHumanoidState()
-        pcall(function()
-            if players.LocalPlayer.Character and players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local humanoid = players.LocalPlayer.Character.Humanoid
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16
-            end
-        end)
-    end
-
-    -- Create platform with increased size
-    local platform = Instance.new("Part")
-    platform.Name = "OldDebris"
-    platform.Size = Vector3.new(10, 1, 10) -- Increased size
-    platform.Anchored = true
-    platform.CanCollide = true
-    platform.Transparency = 0.75
-    platform.Material = Enum.Material.SmoothPlastic
-    platform.BrickColor = BrickColor.new("Bright blue")
-
-    -- Create BodyVelocity
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-
-    players.LocalPlayer.CharacterAdded:Connect(function(character)
-        repeat
-            wait()
-        until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
-        pcall(function()
-            if flyEnabled then
-                character.Humanoid.JumpPower = 0
-                platform.Parent = workspace
-                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-                bodyVelocity.Parent = character.HumanoidRootPart
-            else
-                platform.Parent = nil
-                bodyVelocity.Parent = nil
-            end
-        end)
-    end)
-
-    local function toggleFly(enable)
-        pcall(function()
-            flyEnabled = enable
-            if enable then
-                local character = players.LocalPlayer.Character
-                if character and character:FindFirstChild("Humanoid") then
-                    character.Humanoid.JumpPower = 0
-                end
-                platform.Parent = workspace
-                if character and character:FindFirstChild("HumanoidRootPart") then
-                    platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-                    bodyVelocity.Parent = character.HumanoidRootPart
-                end
-            else
-                resetHumanoidState()
-                platform.Parent = nil
-                bodyVelocity.Parent = nil
-            end
-        end)
-    end
-
-    -- Noclip variables
-    local noclipEnabled = false
-    local noclipActive = false
-
-    local function resetNoClip()
-        pcall(function()
-            if players.LocalPlayer.Character then
-                for _, part in pairs(players.LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = true end)
-                    end
-                end
-            end
-        end)
-    end
-
-    players.LocalPlayer.CharacterAdded:Connect(function(character)
-        repeat
-            wait()
-        until character:FindFirstChild("HumanoidRootPart")
-        if noclipEnabled then
-            -- Handled in RenderStepped
+RunService.Heartbeat:Connect(function()
+    local success, result = pcall(function()
+        local state = tweenSystem.getTweenState()
+        if not state.tweenActive then
+            areaTweenActive = false
+            npcTweenActive = false
         end
     end)
-
-    local function toggleNoclip(enable)
-        pcall(function()
-            noclipEnabled = enable
-            if not enable then
-                resetNoClip()
-            end
-        end)
+    if not success then
+        print("Heartbeat failed: " .. tostring(result))
     end
-
-    -- Nofall variables
-    local nofallEnabled = false
-    local fallDamageCD = nil
-    local statusFolder = game.Workspace:WaitForChild("Living"):WaitForChild(players.LocalPlayer.Name):WaitForChild("Status")
-
-    local function toggleNofall(enable)
-        pcall(function()
-            if enable then
-                if fallDamageCD and fallDamageCD.Parent then
-                    fallDamageCD:Destroy()
-                end
-                fallDamageCD = Instance.new("Folder")
-                fallDamageCD.Name = "FallDamageCD"
-                fallDamageCD.Archivable = true
-                fallDamageCD.Parent = statusFolder
-            else
-                if fallDamageCD and fallDamageCD.Parent then
-                    fallDamageCD:Destroy()
-                end
-                fallDamageCD = nil
-            end
-            nofallEnabled = enable
-        end)
-    end
-
-    -- Tween variables
-    _G.tweenActive = false
-    _G.tweenPhase = 0
-    _G.highAltitude = 0
-    _G.tweenTarget = Vector3.new(0, 0, 0)
-
-    -- Main RenderStepped loop combining fly and noclip
-    rs.RenderStepped:Connect(function(delta)
-        pcall(function()
-            local character = players.LocalPlayer.Character
-            local hrp = character and character:FindFirstChild("HumanoidRootPart")
-            local humanoid = character and character:FindFirstChild("Humanoid")
-
-            -- Handle fly
-            if flyEnabled and character and humanoid and hrp then
-                flyActive = true
-                local moveDirection = Vector3.new(0, 0, 0)
-                local up = false
-                local down = false
-
-                if _G.tweenActive then
-                    -- Tween logic
-                    local pos = hrp.Position
-                    if _G.tweenPhase == 1 then -- Ascend
-                        moveDirection = Vector3.new(0, 0, 0)
-                        up = true
-                        down = false
-                        if pos.Y >= _G.highAltitude - 1 then
-                            _G.tweenPhase = 2
-                        end
-                    elseif _G.tweenPhase == 2 then -- Horizontal
-                        local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
-                        local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
-                        if horizontalVec.Magnitude > 5 then
-                            moveDirection = horizontalVec.Unit
-                        else
-                            moveDirection = Vector3.new(0, 0, 0)
-                            _G.tweenPhase = 3
-                        end
-                        up = false
-                        down = false
-                    elseif _G.tweenPhase == 3 then -- Descend
-                        moveDirection = Vector3.new(0, 0, 0)
-                        up = false
-                        down = true
-                        if pos.Y <= _G.tweenTarget.Y + 5 then
-                            _G.tweenActive = false
-                            _G.tweenPhase = 0
-                            toggleFly(false)
-                            toggleNoclip(false)
-                            toggleNofall(false)
-                        end
-                    end
-                end
-
-                -- Apply BodyVelocity for horizontal (studs per second)
-                bodyVelocity.Velocity = moveDirection * _G.Speed
-
-                -- Set JumpPower
-                humanoid.JumpPower = 0
-
-                -- Update platform
-                platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
-                local flightMove = _G.Speed * delta
-                if up then
-                    platform.CFrame = platform.CFrame + Vector3.new(0, flightMove, 0)
-                elseif down then
-                    platform.CFrame = platform.CFrame - Vector3.new(0, flightMove, 0)
-                end
-
-                -- Monitor health to detect kill
-                if humanoid.Health <= 0 then
-                    messagebox("Character Dead, Please Try Again", "Error", 0)
-                    resetHumanoidState()
-                    _G.tweenActive = false
-                    _G.tweenPhase = 0
-                    flyEnabled = false
-                    flyActive = false
-                    platform.Parent = nil
-                    bodyVelocity.Parent = nil
-                    toggleNoclip(false)
-                    toggleNofall(false)
-                end
-            else
-                if flyActive then
-                    resetHumanoidState()
-                    flyActive = false
-                    platform.Parent = nil
-                    bodyVelocity.Parent = nil
-                end
-            end
-
-            -- Handle noclip
-            if noclipEnabled and character and hrp then
-                noclipActive = true
-                for _, part in pairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = false end)
-                    end
-                end
-                -- Optional: disable nearby collisions
-                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
-                for _, part in pairs(region) do
-                    if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
-                        pcall(function() part.CanCollide = false end)
-                    end
-                end
-            else
-                if noclipActive then
-                    resetNoClip()
-                    noclipActive = false
-                end
-            end
-        end)
-    end)
-
-    -- Custom Tween function
-    _G.CustomTween = function(target)
-        pcall(function()
-            local character = players.LocalPlayer.Character
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
-
-            toggleNoclip(true)
-            toggleNofall(true)
-            toggleFly(true)
-
-            _G.tweenTarget = target
-            _G.highAltitude = hrp.Position.Y + 1000
-            _G.tweenPhase = 1
-            _G.tweenActive = true
-        end)
-    end
-
-    _G.StopTween = function()
-        pcall(function()
-            _G.tweenActive = false
-            _G.tweenPhase = 0
-            toggleFly(false)
-            toggleNoclip(false)
-            toggleNofall(false)
-        end)
-    end
-
-    -- Cleanup
-    game:BindToClose(function()
-        pcall(function()
-            _G.StopTween()
-            bodyVelocity:Destroy()
-            if fallDamageCD then fallDamageCD:Destroy() end
-        end)
-    end)
 end)
 
+-- UI Settings Tab
+local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
+MenuGroup:AddButton("Unload", function() Library:Unload() end)
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
+    Default = "Insert",
+    NoUI = true,
+    Text = "Menu keybind"
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+ThemeManager:SetFolder("Ratware")
+SaveManager:SetFolder("Ratware/Rogueblox")
+SaveManager:BuildConfigSection(Tabs.UI)
+ThemeManager:ApplyToTab(Tabs.UI)
+SaveManager:LoadAutoloadConfig()
+
+-- Cleanup on game exit
+game:BindToClose(function()
+    local success, result = pcall(function()
+        tweenSystem.StopTween()
+    end)
+    if not success then
+        print("Cleanup failed: " .. tostring(result))
+    end
+end)
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+-- Tween variables
+local tweenState = {
+    tweenActive = false,
+    tweenPhase = 0,
+    highAltitude = 0,
+    tweenTarget = Vector3.new(0, 0, 0),
+    flyEnabled = false,
+    flyActive = false,
+    noclipEnabled = false,
+    noclipActive = false,
+    nofallEnabled = false,
+    nofallActive = false
+}
+
+-- Fly setup
+local platform = Instance.new("Part")
+platform.Name = "FlyPlatform"
+platform.Size = Vector3.new(10, 1, 10) -- Increased size
+platform.Anchored = true
+platform.CanCollide = true
+platform.Transparency = 0.75
+platform.Material = Enum.Material.SmoothPlastic
+platform.BrickColor = BrickColor.new("Bright blue")
+
+local bodyVelocity = Instance.new("BodyVelocity")
+bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+
+-- Nofall setup
+local fallDamageCD = Instance.new("Folder")
+fallDamageCD.Name = "FallDamageCD"
+
+local function resetHumanoidState()
+    local success, result = pcall(function()
+        local character = Players.LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = character.Humanoid
+            local hrp = character.HumanoidRootPart
+            humanoid.JumpPower = 50
+            humanoid.WalkSpeed = 16
+            hrp.Anchored = false
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end)
+    if not success then
+        print("Failed to reset humanoid state: " .. tostring(result))
+    end
+end
+
+local function toggleFly(enable, speed)
+    local success, result = pcall(function()
+        tweenState.flyEnabled = enable
+        if enable then
+            local character = Players.LocalPlayer.Character
+            if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+                character.Humanoid.JumpPower = 0
+                platform.Parent = Workspace
+                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                bodyVelocity.Parent = character.HumanoidRootPart
+                tweenState.flyActive = true
+                print("Fly enabled")
+            end
+        else
+            platform.Parent = nil
+            bodyVelocity.Parent = nil
+            tweenState.flyActive = false
+            resetHumanoidState()
+            print("Fly disabled")
+        end
+    end)
+    if not success then
+        print("Failed to toggle fly: " .. tostring(result))
+        tweenState.flyEnabled = false
+        tweenState.flyActive = false
+    end
+end
+
+local function toggleNoclip(enable)
+    local success, result = pcall(function()
+        tweenState.noclipEnabled = enable
+        if not enable then
+            resetHumanoidState()
+            tweenState.noclipActive = false
+            print("Noclip disabled")
+        end
+    end)
+    if not success then
+        print("Failed to toggle noclip: " .. tostring(result))
+        tweenState.noclipEnabled = false
+        tweenState.noclipActive = false
+    end
+end
+
+local function toggleNofall(enable)
+    local success, result = pcall(function()
+        tweenState.nofallEnabled = enable
+        local character = Players.LocalPlayer.Character
+        local statusFolder = character and character:FindFirstChild("Status")
+        if enable and statusFolder then
+            fallDamageCD.Parent = statusFolder
+            tweenState.nofallActive = true
+            print("Nofall enabled")
+        else
+            fallDamageCD.Parent = nil
+            tweenState.nofallActive = false
+            print("Nofall disabled")
+        end
+    end)
+    if not success then
+        print("Failed to toggle nofall: " .. tostring(result))
+        tweenState.nofallEnabled = false
+        tweenState.nofallActive = false
+    end
+end
+
+-- Custom Tween function
+local function customTween(target, speed)
+    local success, result = pcall(function()
+        local character = Players.LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChild("Humanoid")
+        if not hrp or not humanoid then return end
+
+        toggleNoclip(true)
+        toggleNofall(true)
+        toggleFly(true, speed)
+
+        tweenState.tweenTarget = target
+        tweenState.highAltitude = hrp.Position.Y + 1000
+        tweenState.tweenPhase = 1
+        tweenState.tweenActive = true
+    end)
+    if not success then
+        print("Failed to start tween: " .. tostring(result))
+        tweenState.tweenActive = false
+        toggleFly(false)
+        toggleNoclip(false)
+        toggleNofall(false)
+    end
+end
+
+-- Stop Tween function
+local function stopTween()
+    local success, result = pcall(function()
+        tweenState.tweenActive = false
+        tweenState.tweenPhase = 0
+        toggleFly(false)
+        toggleNoclip(false)
+        toggleNofall(false)
+    end)
+    if not success then
+        print("Failed to stop tween: " .. tostring(result))
+    end
+end
+
+-- Main RenderStepped loop
+RunService.RenderStepped:Connect(function(delta)
+    local success, result = pcall(function()
+        local character = Players.LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChild("Humanoid")
+
+        if tweenState.flyEnabled and character and humanoid and hrp then
+            tweenState.flyActive = true
+            local moveDirection = Vector3.new(0, 0, 0)
+            local up = false
+            local down = false
+            local verticalSpeed = math.min(_G.Speed or 125, 65) -- Cap vertical speed to prevent falling through
+
+            if tweenState.tweenActive then
+                local pos = hrp.Position
+                if tweenState.tweenPhase == 1 then -- Ascend
+                    up = true
+                    down = false
+                    if pos.Y >= tweenState.highAltitude - 1 then
+                        tweenState.tweenPhase = 2
+                    end
+                elseif tweenState.tweenPhase == 2 then -- Horizontal
+                    local highTarget = Vector3.new(tweenState.tweenTarget.X, tweenState.highAltitude, tweenState.tweenTarget.Z)
+                    local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
+                    if horizontalVec.Magnitude > 5 then
+                        moveDirection = horizontalVec.Unit
+                    else
+                        moveDirection = Vector3.new(0, 0, 0)
+                        tweenState.tweenPhase = 3
+                    end
+                    up = false
+                    down = false
+                elseif tweenState.tweenPhase == 3 then -- Descend
+                    moveDirection = Vector3.new(0, 0, 0)
+                    up = false
+                    down = true
+                    if pos.Y <= tweenState.tweenTarget.Y + 10 then -- Stop 10 studs above target
+                        tweenState.tweenActive = false
+                        tweenState.tweenPhase = 0
+                        toggleFly(false)
+                        toggleNoclip(false)
+                        toggleNofall(false)
+                    end
+                end
+            end
+
+            -- Apply BodyVelocity for horizontal movement
+            bodyVelocity.Velocity = moveDirection * (_G.Speed or 125)
+
+            -- Update platform position
+            platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
+            local flightMove = verticalSpeed * delta -- Use capped vertical speed
+            if up then
+                platform.CFrame = platform.CFrame + Vector3.new(0, flightMove, 0)
+            elseif down then
+                platform.CFrame = platform.CFrame - Vector3.new(0, flightMove, 0)
+            end
+
+            -- Monitor health
+            if humanoid and humanoid.Health <= 0 then
+                Library:Notify("Character Dead, Please Try Again", 5)
+                stopTween()
+                resetHumanoidState()
+            end
+        else
+            if tweenState.flyActive then
+                resetHumanoidState()
+                tweenState.flyActive = false
+                platform.Parent = nil
+                bodyVelocity.Parent = nil
+            end
+        end
+
+        -- Enhanced noclip for nearby parts
+        if tweenState.noclipEnabled and character and hrp then
+            tweenState.noclipActive = true
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+            -- Disable collisions for nearby parts, including anchored ones
+            local region = Workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(10, 10, 10), hrp.Position + Vector3.new(10, 10, 10)))
+            for _, part in pairs(region) do
+                if part:IsA("BasePart") and part ~= hrp and part ~= platform then
+                    part.CanCollide = false
+                end
+            end
+        else
+            if tweenState.noclipActive then
+                resetHumanoidState()
+                tweenState.noclipActive = false
+            end
+        end
+    end)
+    if not success then
+        print("RenderStepped failed: " .. tostring(result))
+        stopTween()
+    end
+end)
+
+-- Cleanup
+game:BindToClose(function()
+    local success, result = pcall(function()
+        stopTween()
+        platform:Destroy()
+        bodyVelocity:Destroy()
+        fallDamageCD:Destroy()
+    end)
+    if not success then
+        print("Cleanup failed: " .. tostring(result))
+    end
+end)
+
+return {
+    CustomTween = customTween,
+    StopTween = stopTween,
+    getTweenState = function() return tweenState end
+}
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
