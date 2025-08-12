@@ -20,24 +20,7 @@ local Tabs = {
     Main = Window:AddTab("Main"),
     Visuals = Window:AddTab("Visuals"),
     UI = Window:AddTab("UI Settings")
-}
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
-local Window = Library:CreateWindow({
-    Title = "Ratware.exe - 100% By ChatGPT [Press 'Insert' to hide GUI]",
-    Center = true,
-    AutoShow = true,
-    TabPadding = 8,
-    MenuFadeTime = 0.2
-})
-
-local Tabs = {
-    Main = Window:AddTab("Main"),
-    Visuals = Window:AddTab("Visuals"),
-    UI = Window:AddTab("UI Settings")
-}
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 local Players = game:GetService("Players")
