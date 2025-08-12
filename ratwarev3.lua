@@ -348,6 +348,7 @@ local MainGroup4 = Tabs.Main:AddLeftGroupbox("Removal")
 MainGroup4:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
+})
 
 local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
 MainGroup6:AddDropdown('PlayerDropdown', {
