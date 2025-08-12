@@ -1503,6 +1503,7 @@ end)
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 -- Internal state
@@ -1533,7 +1534,7 @@ end
 local function enableNofall()
     local success, result = pcall(function()
         if nofallEnabled then return true end
-        local char = LocalPlayer.Character
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
         if not char then return false end
         local status = safeGet(char, "Status")
         if not status then
@@ -1560,7 +1561,7 @@ end
 local function disableNofall()
     local success, result = pcall(function()
         if not nofallEnabled then return true end
-        local char = LocalPlayer.Character
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
         if not char then return true end
         local status = safeGet(char, "Status")
         if status then
@@ -1581,7 +1582,7 @@ end
 local function enableNoclip()
     local success, result = pcall(function()
         if noclipEnabled then return true end
-        local char = LocalPlayer.Character
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
         if not char then return false end
         noclipEnabled = true
         for _, part in ipairs(char:GetDescendants()) do
@@ -1600,7 +1601,7 @@ end
 local function disableNoclip()
     local success, result = pcall(function()
         if not noclipEnabled then return true end
-        local char = LocalPlayer.Character
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
         if not char then return true end
         noclipEnabled = false
         for _, part in ipairs(char:GetDescendants()) do
@@ -1622,8 +1623,8 @@ local function tweenToBack()
     if isTweening or isLocked then return false end
     isTweening = true
     local success, result = pcall(function()
-        local char = LocalPlayer.Character
-        local targetChar = targetPlayer and targetPlayer.Character
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        local targetChar = Workspace.Living:FindFirstChild(targetPlayer.Name)
         local hrp = char and safeGet(char, "HumanoidRootPart")
         local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
         if not (hrp and targetHrp) then return false end
@@ -1672,7 +1673,6 @@ local function startAttach()
     local success, result = pcall(function()
         if not targetPlayer then
             messagebox("Please select a player first!", "Error", 0)
-            Toggles.AttachtobackToggle:SetValue(false)
             return false
         end
         stopAttach()
@@ -1681,8 +1681,8 @@ local function startAttach()
         tweenToBack()
         attachConn = RunService.RenderStepped:Connect(function()
             if not isAttached then return end
-            local char = LocalPlayer.Character
-            local targetChar = targetPlayer and targetPlayer.Character
+            local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+            local targetChar = Workspace.Living:FindFirstChild(targetPlayer.Name)
             local hrp = char and safeGet(char, "HumanoidRootPart")
             local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
             if not (hrp and targetHrp) then
@@ -1719,6 +1719,9 @@ local success, result = pcall(function()
             if isAttached and not targetPlayer then
                 stopAttach()
             end
+            if Toggles.AttachtobackToggle.Value then
+                startAttach()
+            end
             return true
         end)
         if not success then
@@ -1753,7 +1756,7 @@ local success, result = pcall(function()
     end)
 
     -- Distance slider
-    Options.ATBDistance:OnChanged(function(value)
+    Options["ATBDistance)"]:OnChanged(function(value)
         local success, _ = pcall(function()
             zDistance = value
             return true
