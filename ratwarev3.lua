@@ -1206,140 +1206,7 @@ pcall(function()
         wait()
     until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-    local Library = {} -- Mock Library table for Notify function
-    local TweenService = game:GetService("TweenService")
-    local TextService = game:GetService("TextService")
-    Library.MainColor = Color3.new(0.1, 0.1, 0.1)
-    Library.OutlineColor = Color3.new(0, 0, 0)
-    Library.AccentColor = Color3.new(0, 0.5, 1)
-    Library.Font = Enum.Font.SourceSans
-    Library.NotificationArea = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
-    Library.Registry = {}
-    
-    function Library:GetTextBounds(text, font, size)
-        return TextService:GetTextSize(text, size, font, Vector2.new(math.huge, math.huge))
-    end
-    
-    function Library:GetDarkerColor(color)
-        return Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
-    end
-    
-    function Library:Create(class, properties)
-        local instance = Instance.new(class)
-        for prop, value in pairs(properties) do
-            instance[prop] = value
-        end
-        return instance
-    end
-    
-    function Library:AddToRegistry(element, props)
-        Library.Registry[element] = props
-    end
-    
-    function Library:CreateLabel(props)
-        local label = Library:Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Library.Font,
-            TextColor3 = Color3.new(1, 1, 1),
-            TextSize = 14
-        })
-        for prop, value in pairs(props) do
-            label[prop] = value
-        end
-        return label
-    end
-    
-    function Library:Notify(Text, Options)
-        local Time = Options and Options.Duration or 5
-        local XSize, YSize = Library:GetTextBounds(Text, Library.Font, 14)
-        YSize = YSize + 7
-    
-        local NotifyOuter = Library:Create('Frame', {
-            BorderColor3 = Color3.new(0, 0, 0),
-            Position = UDim2.new(0, 100, 0, 10),
-            Size = UDim2.new(0, 0, 0, YSize),
-            ClipsDescendants = true,
-            ZIndex = 100,
-            Parent = Library.NotificationArea
-        })
-    
-        local NotifyInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor,
-            BorderColor3 = Library.OutlineColor,
-            BorderMode = Enum.BorderMode.Inset,
-            Size = UDim2.new(1, 0, 1, 0),
-            ZIndex = 101,
-            Parent = NotifyOuter
-        })
-    
-        Library:AddToRegistry(NotifyInner, {
-            BackgroundColor3 = 'MainColor',
-            BorderColor3 = 'OutlineColor'
-        })
-    
-        local InnerFrame = Library:Create('Frame', {
-            BackgroundColor3 = Color3.new(1, 1, 1),
-            BorderSizePixel = 0,
-            Position = UDim2.new(0, 1, 0, 1),
-            Size = UDim2.new(1, -2, 1, -2),
-            ZIndex = 102,
-            Parent = NotifyInner
-        })
-    
-        local Gradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-                ColorSequenceKeypoint.new(1, Library.MainColor)
-            }),
-            Rotation = -90,
-            Parent = InnerFrame
-        })
-    
-        local NotifyLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 4, 0, 0),
-            Size = UDim2.new(1, -4, 1, 0),
-            Text = Text,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextSize = 14,
-            ZIndex = 103,
-            Parent = InnerFrame
-        })
-    
-        local LeftColor = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor,
-            BorderSizePixel = 0,
-            Position = UDim2.new(0, -1, 0, -1),
-            Size = UDim2.new(0, 3, 1, 2),
-            ZIndex = 104,
-            Parent = NotifyOuter
-        })
-    
-        Library:AddToRegistry(LeftColor, {
-            BackgroundColor3 = 'AccentColor'
-        })
-    
-        local tweenIn = TweenService:Create(
-            NotifyOuter,
-            TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            { Size = UDim2.new(0, XSize + 8 + 4, 0, YSize) }
-        )
-        tweenIn:Play()
-    
-        task.spawn(function()
-            wait(Time)
-            local tweenOut = TweenService:Create(
-                NotifyOuter,
-                TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { Size = UDim2.new(0, 0, 0, YSize) }
-            )
-            tweenOut:Play()
-            tweenOut.Completed:Wait()
-            NotifyOuter:Destroy()
-        end)
-    
-        return NotifyOuter -- Return the frame for destruction
-    end
-
+    -- Combined script for fly, noclip, nofall with tween system
     local players = game:GetService("Players")
     local rs = game:GetService("RunService")
 
@@ -1348,8 +1215,9 @@ pcall(function()
     _G.Speed = _G.originalspeed
     local flyEnabled = false
     local flyActive = false
-    local lastPosition = nil
+    local lastPosition = nil -- Track position to detect teleportation
 
+    -- Table to store original CanCollide states of nearby parts
     local originalCollideStates = {}
 
     local function resetHumanoidState()
@@ -1362,15 +1230,17 @@ pcall(function()
         end)
     end
 
+    -- Create platform with increased size
     local platform = Instance.new("Part")
     platform.Name = "OldDebris"
     platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
-    platform.CanCollide = true
+    platform.CanCollide = true -- Must be true to avoid anticheat
     platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
 
+    -- Create BodyVelocity
     local bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
@@ -1385,12 +1255,12 @@ pcall(function()
                 platform.Parent = workspace
                 platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
-                toggleNoclip(true)
+                toggleNoclip(true) -- Reapply noclip on respawn
             else
                 platform.Parent = nil
                 bodyVelocity.Parent = nil
             end
-            lastPosition = character.HumanoidRootPart.Position
+            lastPosition = character.HumanoidRootPart.Position -- Reset last position
         end)
     end)
 
@@ -1416,6 +1286,7 @@ pcall(function()
         end)
     end
 
+    -- Noclip variables
     local noclipEnabled = false
     local noclipActive = false
 
@@ -1428,12 +1299,13 @@ pcall(function()
                     end
                 end
             end
+            -- Restore original CanCollide states for nearby parts
             for part, canCollide in pairs(originalCollideStates) do
                 if part and part.Parent then
                     pcall(function() part.CanCollide = canCollide end)
                 end
             end
-            originalCollideStates = {}
+            originalCollideStates = {} -- Clear the table
         end)
     end
 
@@ -1467,6 +1339,7 @@ pcall(function()
         end)
     end
 
+    -- Nofall variables
     local nofallEnabled = false
     local fallDamageCD = nil
     local statusFolder = game.Workspace:WaitForChild("Living"):WaitForChild(players.LocalPlayer.Name):WaitForChild("Status")
@@ -1491,52 +1364,63 @@ pcall(function()
         end)
     end
 
+    -- Tween variables
     _G.tweenActive = false
     _G.tweenPhase = 0
     _G.highAltitude = 0
     _G.tweenTarget = Vector3.new(0, 0, 0)
     local tweenNotification = nil
-    local teleportCooldown = 0
-    local notificationCheck = 0
+    local teleportCooldown = 0 -- Cooldown to pause tween after teleport detection
+    local notificationCheck = 0 -- Timer to periodically check notification
 
+    -- Main RenderStepped loop combining fly and noclip
     rs.RenderStepped:Connect(function(delta)
         pcall(function()
             local character = players.LocalPlayer.Character
             local hrp = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
 
+            -- Handle fly
             if flyEnabled and character and humanoid and hrp then
                 flyActive = true
                 local moveDirection = Vector3.new(0, 0, 0)
                 local verticalSpeed = 0
 
+                -- Detect teleportation (anti-cheat)
                 if lastPosition and _G.tweenActive then
                     local currentPosition = hrp.Position
                     local distanceMoved = (currentPosition - lastPosition).Magnitude
-                    if distanceMoved > 50 then
-                        teleportCooldown = 0.5
+                    if distanceMoved > 50 then -- Arbitrary threshold for teleport detection
+                        teleportCooldown = 0.5 -- Pause tween for 0.5 seconds
                         Library:Notify("Teleport detected, pausing tween briefly", { Duration = 2 })
                     end
                     lastPosition = currentPosition
                 end
 
+                -- Periodically check and recreate notification if missing
                 if _G.tweenActive then
                     notificationCheck = notificationCheck + delta
                     if notificationCheck >= 1 and (not tweenNotification or not tweenNotification.Parent) then
+                        tweenNotification = Library:Notify("Tween in progress", {
+                            Duration = 9999 -- Fallback to long finite duration
+                        })
                         if tweenNotification then
-                            tweenNotification:Destroy()
+                            print("Notification recreated: Tween in progress")
+                        else
+                            print("Failed to recreate notification")
                         end
-                        tweenNotification = Library:Notify("Tween in progress", { Duration = 9999 })
                         notificationCheck = 0
                     end
                 end
 
                 if _G.tweenActive and teleportCooldown <= 0 then
+                    -- Ensure noclip is active during tween
                     if not noclipEnabled then
                         toggleNoclip(true)
                     end
+                    -- Tween logic
                     local pos = hrp.Position
-                    if _G.tweenPhase == 1 then
+                    if _G.tweenPhase == 1 then -- Ascend
                         local targetY = _G.highAltitude
                         local distance = targetY - pos.Y
                         if distance > 1 then
@@ -1546,12 +1430,12 @@ pcall(function()
                             hrp.CFrame = CFrame.new(Vector3.new(pos.X, targetY, pos.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 2
                         end
-                    elseif _G.tweenPhase == 2 then
+                    elseif _G.tweenPhase == 2 then -- Horizontal
                         local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
                         local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
                         if horizontalVec.Magnitude > 5 then
                             local stepDistance = _G.Speed * delta
-                            if stepDistance > 10 then
+                            if stepDistance > 10 then -- Cap step size to avoid anti-cheat
                                 stepDistance = 10
                             end
                             moveDirection = horizontalVec.Unit * stepDistance
@@ -1563,7 +1447,7 @@ pcall(function()
                             hrp.CFrame = CFrame.new(Vector3.new(highTarget.X, _G.highAltitude, highTarget.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 3
                         end
-                    elseif _G.tweenPhase == 3 then
+                    elseif _G.tweenPhase == 3 then -- Descend
                         local targetY = _G.tweenTarget.Y
                         local distance = pos.Y - targetY
                         if distance > 5 then
@@ -1577,6 +1461,7 @@ pcall(function()
                             toggleNoclip(false)
                             toggleNofall(false)
                             if tweenNotification then
+                                print("Destroying notification")
                                 tweenNotification:Destroy()
                                 tweenNotification = nil
                             end
@@ -1586,10 +1471,16 @@ pcall(function()
                     teleportCooldown = teleportCooldown - delta
                 end
 
+                -- Apply BodyVelocity for horizontal movement
                 bodyVelocity.Velocity = Vector3.new(moveDirection.X, 0, moveDirection.Z)
+
+                -- Set JumpPower
                 humanoid.JumpPower = 0
+
+                -- Update platform to follow character precisely
                 platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
 
+                -- Monitor health to detect kill
                 if humanoid.Health <= 0 then
                     Library:Notify("Character Dead, Please Try Again", { Duration = 3 })
                     resetHumanoidState()
@@ -1602,6 +1493,7 @@ pcall(function()
                     toggleNoclip(false)
                     toggleNofall(false)
                     if tweenNotification then
+                        print("Destroying notification")
                         tweenNotification:Destroy()
                         tweenNotification = nil
                     end
@@ -1615,6 +1507,7 @@ pcall(function()
                 end
             end
 
+            -- Handle noclip
             if noclipEnabled and character and hrp then
                 noclipActive = true
                 for _, part in pairs(character:GetDescendants()) do
@@ -1631,6 +1524,7 @@ pcall(function()
                         pcall(function() part.CanCollide = false end)
                     end
                 end
+                -- Additional noclip pass for ascent and horizontal phases
                 if _G.tweenActive and (_G.tweenPhase == 1 or _G.tweenPhase == 2) then
                     for _, part in pairs(region) do
                         if part:IsA("BasePart") and part ~= hrp and part ~= platform then
@@ -1641,6 +1535,7 @@ pcall(function()
                         end
                     end
                 end
+                -- Additional noclip pass for descent
                 if _G.tweenActive and _G.tweenPhase == 3 then
                     for _, part in pairs(region) do
                         if part:IsA("BasePart") and part ~= hrp and part ~= platform then
@@ -1660,6 +1555,7 @@ pcall(function()
         end)
     end)
 
+    -- Custom Tween function
     _G.CustomTween = function(target)
         pcall(function()
             local character = players.LocalPlayer.Character
@@ -1674,13 +1570,22 @@ pcall(function()
             _G.highAltitude = hrp.Position.Y + 500
             _G.tweenPhase = 1
             _G.tweenActive = true
-            lastPosition = hrp.Position
+            lastPosition = hrp.Position -- Initialize last position
 
-            if tweenNotification then
-                tweenNotification:Destroy()
+            -- Create persistent notification
+            if not tweenNotification then
+                tweenNotification = Library:Notify("Tween in progress", {
+                    Duration = 9999 -- Fallback to long finite duration
+                })
+                if tweenNotification then
+                    print("Notification created: Tween in progress")
+                else
+                    print("Failed to create notification")
+                end
+                notificationCheck = 0
+            else
+                print("Notification already exists, skipping creation")
             end
-            tweenNotification = Library:Notify("Tween in progress", { Duration = 9999 })
-            notificationCheck = 0
         end)
     end
 
@@ -1692,14 +1597,16 @@ pcall(function()
             toggleNoclip(false)
             toggleNofall(false)
             if tweenNotification then
+                print("Destroying notification")
                 tweenNotification:Destroy()
                 tweenNotification = nil
             end
             teleportCooldown = 0
-            resetNoClip()
+            resetNoClip() -- Ensure nearby parts are restored
         end)
     end
 
+    -- Cleanup
     game:BindToClose(function()
         pcall(function()
             _G.StopTween()
