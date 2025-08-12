@@ -70,7 +70,6 @@ MainGroup:AddToggle("NoclipToggle", {
     end
 })
 
-
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 -- Initialize lists for Areas and NPCs
@@ -265,26 +264,37 @@ table.sort(TweenFullList, function(a, b) return string.lower(a) < string.lower(b
 local areaTweenActive = false
 local npcTweenActive = false
 
--- Helper function to get target position (simplified to use logged coordinates for [NPC Name, Area Name])
+-- Helper function to get target position
 local function getTargetPosition(selection, isNPC)
     local targetPos = nil
     pcall(function()
         if isNPC then
             local npcName, areaName = selection:match("^(.-), (.+)$")
             if npcName and areaName then
-                -- Handle TownMarkers NPCs (original logic)
-                local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(areaName)
+                -- Handle TownMarkers NPCs
+                local townFolder = game:GetService("ReplicatedStorage").TownMarkers:FindFirstChild(npcName)
                 if townFolder then
-                    local part = townFolder:FindFirstChild(npcName)
+                    local part = townFolder:FindFirstChild(areaName)
                     if part then
                         targetPos = part.CFrame.Position
                     end
                 else
-                    -- Use the logged position from npcInstances for the specific [NPC Name, Area Name] instance
-                    if npcInstances[npcName] then
-                        for _, data in pairs(npcInstances[npcName]) do
-                            if data.name == npcName and getDistance(data.position, game:GetService("ReplicatedStorage").WorldModel.AreaMarkers[areaName].CFrame.Position) < 1 then
-                                targetPos = data.position
+                    -- Handle Workspace NPCs
+                    local npcs = game:GetService("Workspace").NPCs:GetChildren()
+                    for _, npc in pairs(npcs) do
+                        if npc.Name == npcName then
+                            local closestArea = nil
+                            local minDistance = math.huge
+                            local npcPos = npc.WorldPivot.Position or npc.CFrame.Position
+                            for _, area in pairs(game:GetService("ReplicatedStorage").WorldModel.AreaMarkers:GetChildren()) do
+                                local distance = getDistance(npcPos, area.CFrame.Position)
+                                if distance < minDistance then
+                                    minDistance = distance
+                                    closestArea = area.Name
+                                end
+                            end
+                            if closestArea == areaName then
+                                targetPos = npcPos
                                 break
                             end
                         end
@@ -310,7 +320,6 @@ local function getTargetPosition(selection, isNPC)
     end)
     return targetPos
 end
-
 
 -- Search bar with filtering logic
 MainGroup3:AddInput("Search", {
@@ -448,7 +457,6 @@ game:GetService("RunService").Heartbeat:Connect(function()
         npcTweenActive = false
     end
 end)
-
 
 local MainGroup4 = Tabs.Main:AddLeftGroupbox("Humanoid")
 MainGroup4:AddToggle("NoFallDamage", {
