@@ -374,9 +374,9 @@ MainGroup3:AddInput("Search", {
 
 MainGroup3:AddSlider("UniversalTweenSpeed", {
     Text = "Universal Tween Speed",
-    Default = 150,
+    Default = 125,
     Min = 0,
-    Max = 300,
+    Max = 250,
     Rounding = 0,
     Compact = true,
     Callback = function(value)
@@ -396,11 +396,11 @@ MainGroup3:AddDropdown("Areas", {
 MainGroup3:AddButton("Area Tween Start/Stop", function()
     pcall(function()
         if npcTweenActive then
-            messagebox("NPC tween in progress. Stop NPC tween and try again.", "Tween Error", 0)
+            Library:Notify("NPC tween in progress. Stop NPC tween and try again.", { Duration = 3 })
             return
         end
         if Options.Areas.Value == "" then
-            messagebox("No area selected.", "Tween Error", 0)
+            Library:Notify("No area selected.", { Duration = 3 })
             return
         end
         areaTweenActive = not areaTweenActive
@@ -409,7 +409,7 @@ MainGroup3:AddButton("Area Tween Start/Stop", function()
             if targetPos then
                 _G.CustomTween(targetPos)
             else
-                messagebox("Failed to get area position.", "Tween Error", 0)
+                Library:Notify("Failed to get area position.", { Duration = 3 })
                 areaTweenActive = false
             end
         else
@@ -428,11 +428,11 @@ MainGroup3:AddDropdown("NPCs", {
 MainGroup3:AddButton("NPC Tween Start/Stop", function()
     pcall(function()
         if areaTweenActive then
-            messagebox("Area tween in progress. Stop Area tween and try again.", "Tween Error", 0)
+            Library:Notify("Area tween in progress. Stop Area tween and try again.", { Duration = 3 })
             return
         end
         if Options.NPCs.Value == "" then
-            messagebox("No NPC selected.", "Tween Error", 0)
+            Library:Notify("No NPC selected.", { Duration = 3 })
             return
         end
         npcTweenActive = not npcTweenActive
@@ -441,7 +441,7 @@ MainGroup3:AddButton("NPC Tween Start/Stop", function()
             if targetPos then
                 _G.CustomTween(targetPos)
             else
-                messagebox("Failed to get NPC position.", "Tween Error", 0)
+                Library:Notify("Failed to get NPC position.", { Duration = 3 })
                 npcTweenActive = false
             end
         else
@@ -1206,14 +1206,14 @@ pcall(function()
     until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     -- Combined script for fly, noclip, nofall with tween system
+    local players = game:GetService("Players")
+    local rs = game:GetService("RunService")
 
     -- Fly variables
-    _G.originalspeed = 150
+    _G.originalspeed = 125 -- Match default slider value
     _G.Speed = _G.originalspeed
     local flyEnabled = false
     local flyActive = false
-    local players = game:GetService("Players")
-    local rs = game:GetService("RunService")
 
     local function resetHumanoidState()
         pcall(function()
@@ -1228,7 +1228,7 @@ pcall(function()
     -- Create platform with increased size
     local platform = Instance.new("Part")
     platform.Name = "OldDebris"
-    platform.Size = Vector3.new(10, 1, 10) -- Increased size
+    platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
     platform.CanCollide = true
     platform.Transparency = 0.75
@@ -1237,7 +1237,7 @@ pcall(function()
 
     -- Create BodyVelocity
     local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- Increased for vertical movement
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
 
     players.LocalPlayer.CharacterAdded:Connect(function(character)
@@ -1342,6 +1342,7 @@ pcall(function()
     _G.tweenPhase = 0
     _G.highAltitude = 0
     _G.tweenTarget = Vector3.new(0, 0, 0)
+    local tweenNotification = nil
 
     -- Main RenderStepped loop combining fly and noclip
     rs.RenderStepped:Connect(function(delta)
@@ -1354,63 +1355,66 @@ pcall(function()
             if flyEnabled and character and humanoid and hrp then
                 flyActive = true
                 local moveDirection = Vector3.new(0, 0, 0)
-                local up = false
-                local down = false
+                local verticalSpeed = 0
 
                 if _G.tweenActive then
                     -- Tween logic
                     local pos = hrp.Position
                     if _G.tweenPhase == 1 then -- Ascend
-                        moveDirection = Vector3.new(0, 0, 0)
-                        up = true
-                        down = false
-                        if pos.Y >= _G.highAltitude - 1 then
+                        local targetY = _G.highAltitude
+                        local distance = targetY - pos.Y
+                        if distance > 1 then
+                            verticalSpeed = _G.Speed * delta
+                            if distance < verticalSpeed then
+                                verticalSpeed = distance
+                            end
+                            hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
+                        else
                             _G.tweenPhase = 2
                         end
                     elseif _G.tweenPhase == 2 then -- Horizontal
                         local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
                         local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
                         if horizontalVec.Magnitude > 5 then
-                            moveDirection = horizontalVec.Unit
+                            moveDirection = horizontalVec.Unit * _G.Speed * delta
+                            if horizontalVec.Magnitude < moveDirection.Magnitude then
+                                moveDirection = horizontalVec
+                            end
+                            hrp.CFrame = hrp.CFrame + moveDirection
                         else
-                            moveDirection = Vector3.new(0, 0, 0)
                             _G.tweenPhase = 3
                         end
-                        up = false
-                        down = false
                     elseif _G.tweenPhase == 3 then -- Descend
-                        moveDirection = Vector3.new(0, 0, 0)
-                        up = false
-                        down = true
-                        if pos.Y <= _G.tweenTarget.Y + 5 then
+                        local targetY = _G.tweenTarget.Y
+                        local distance = pos.Y - targetY
+                        if distance > 5 then
+                            verticalSpeed = -_G.Speed * delta
+                            if distance < -verticalSpeed then
+                                verticalSpeed = -distance
+                            end
+                            hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
+                        else
                             _G.tweenActive = false
                             _G.tweenPhase = 0
                             toggleFly(false)
                             toggleNoclip(false)
                             toggleNofall(false)
+                            if tweenNotification then
+                                tweenNotification:Destroy()
+                                tweenNotification = nil
+                            end
                         end
                     end
                 end
 
-                -- Apply BodyVelocity
-                local maxSpeedPerFrame = math.min(_G.Speed, 49 / delta)
-                if moveDirection.Magnitude > 0 then
-                    bodyVelocity.Velocity = moveDirection * maxSpeedPerFrame
-                else
-                    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-                end
+                -- Apply BodyVelocity for horizontal movement
+                bodyVelocity.Velocity = Vector3.new(moveDirection.X, 0, moveDirection.Z)
 
                 -- Set JumpPower
                 humanoid.JumpPower = 0
 
-                -- Update platform
+                -- Update platform to follow character precisely
                 platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
-                local flightMove = math.min(_G.Speed * delta, 49 * delta)
-                if up then
-                    platform.CFrame = platform.CFrame + Vector3.new(0, flightMove, 0)
-                elseif down then
-                    platform.CFrame = platform.CFrame - Vector3.new(0, flightMove, 0)
-                end
 
                 -- Monitor health to detect kill
                 if humanoid.Health <= 0 then
@@ -1424,6 +1428,10 @@ pcall(function()
                     bodyVelocity.Parent = nil
                     toggleNoclip(false)
                     toggleNofall(false)
+                    if tweenNotification then
+                        tweenNotification:Destroy()
+                        tweenNotification = nil
+                    end
                 end
             else
                 if flyActive then
@@ -1442,7 +1450,6 @@ pcall(function()
                         pcall(function() part.CanCollide = false end)
                     end
                 end
-                -- Optional: disable nearby collisions
                 local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
                 for _, part in pairs(region) do
                     if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
@@ -1473,6 +1480,13 @@ pcall(function()
             _G.highAltitude = hrp.Position.Y + 1000
             _G.tweenPhase = 1
             _G.tweenActive = true
+
+            -- Create persistent notification
+            if not tweenNotification then
+                tweenNotification = Library:Notify("Tween in progress", {
+                    Duration = math.huge -- Persist until manually destroyed
+                })
+            end
         end)
     end
 
@@ -1483,6 +1497,10 @@ pcall(function()
             toggleFly(false)
             toggleNoclip(false)
             toggleNofall(false)
+            if tweenNotification then
+                tweenNotification:Destroy()
+                tweenNotification = nil
+            end
         end)
     end
 
