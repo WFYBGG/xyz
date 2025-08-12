@@ -1512,9 +1512,6 @@ local isAttached = false
 local attachConn = nil
 local isTweening = false
 local isLocked = false
-local flyEnabled = false
-local flyPlatform = nil
-local bodyVelocity = nil
 local noclipEnabled = false
 local nofallEnabled = false
 local nofallFolder = nil
@@ -1532,68 +1529,6 @@ local function safeGet(obj, ...)
         if not obj then return nil end
     end
     return obj
-end
-
--- Fly logic
-local function enableFly()
-    local success, result = pcall(function()
-        if flyEnabled then return true end
-        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-        if not char or not safeGet(char, "HumanoidRootPart") then return false end
-        flyEnabled = true
-        flyPlatform = Instance.new("Part")
-        flyPlatform.Name = "OldDebris"
-        flyPlatform.Size = Vector3.new(6, 1, 6)
-        flyPlatform.Anchored = true
-        flyPlatform.CanCollide = true
-        flyPlatform.Transparency = 0.75
-        flyPlatform.Material = Enum.Material.SmoothPlastic
-        flyPlatform.BrickColor = BrickColor.new("Bright blue")
-        flyPlatform.Parent = workspace
-        flyPlatform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.Parent = char.HumanoidRootPart
-        local humanoid = safeGet(char, "Humanoid")
-        if humanoid then
-            humanoid.JumpPower = 0
-            humanoid.WalkSpeed = 16
-        end
-        return true
-    end)
-    if not success then
-        warn("Failed to enable fly: " .. tostring(result))
-    end
-    return success and result
-end
-
-local function disableFly()
-    local success, result = pcall(function()
-        if not flyEnabled then return true end
-        flyEnabled = false
-        if flyPlatform then
-            flyPlatform:Destroy()
-            flyPlatform = nil
-        end
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-            bodyVelocity = nil
-        end
-        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-        if char then
-            local humanoid = safeGet(char, "Humanoid")
-            if humanoid then
-                humanoid.JumpPower = 50
-                humanoid.WalkSpeed = 16
-            end
-        end
-        return true
-    end)
-    if not success then
-        warn("Failed to disable fly: " .. tostring(result))
-    end
-    return success and result
 end
 
 -- Nofall logic
@@ -1636,6 +1571,11 @@ local function disableNofall()
         end
         nofallEnabled = false
         nofallFolder = nil
+        local humanoid = safeGet(char, "Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
         return true
     end)
     if not success then
@@ -1675,6 +1615,11 @@ local function disableNoclip()
                 pcall(function() part.CanCollide = true end)
             end
         end
+        local humanoid = safeGet(char, "Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
         return true
     end)
     if not success then
@@ -1695,9 +1640,8 @@ local function tweenToBack()
         if not (hrp and targetHrp) then return false end
         local distance = (hrp.Position - targetHrp.Position).Magnitude
         if distance > 20000 then return false end
-        enableFly()
-        enableNofall()
         enableNoclip()
+        enableNofall()
         local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
         local tweenTime = distance / originalSpeed
         local tween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
@@ -1705,13 +1649,13 @@ local function tweenToBack()
         tween.Completed:Wait()
         isLocked = true
         isTweening = false
-        disableFly()
+        disableNoclip()
         return true
     end)
     if not success then
         warn("Tween failed: " .. tostring(result))
         isTweening = false
-        disableFly()
+        disableNoclip()
     end
     return success and result
 end
@@ -1728,7 +1672,6 @@ local function stopAttach()
         end
         disableNofall()
         disableNoclip()
-        disableFly()
         Toggles.AttachtobackToggle:SetValue(false)
         return true
     end)
@@ -1782,6 +1725,16 @@ end
 
 -- Linoria GUI integration
 local success, result = pcall(function()
+    -- Ensure clean initial state
+    local success, _ = pcall(function()
+        disableNofall()
+        disableNoclip()
+        return true
+    end)
+    if not success then
+        warn("Failed to ensure clean initial state")
+    end
+
     -- Player dropdown
     Options.PlayerDropdown:OnChanged(function(value)
         local success, _ = pcall(function()
@@ -1840,8 +1793,10 @@ local success, result = pcall(function()
                 enableNofall()
                 if not isLocked then
                     enableNoclip()
-                    enableFly()
                 end
+            else
+                disableNofall()
+                disableNoclip()
             end
             return true
         end)
@@ -1877,17 +1832,6 @@ local success, result = pcall(function()
             warn("Failed to handle player removing")
         end
     end)
-
-    -- Ensure initial state is clean
-    local success, _ = pcall(function()
-        disableNofall()
-        disableNoclip()
-        disableFly()
-        return true
-    end)
-    if not success then
-        warn("Failed to ensure clean initial state")
-    end
 
     return true
 end)
