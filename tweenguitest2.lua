@@ -21,6 +21,23 @@ local Tabs = {
     Visuals = Window:AddTab("Visuals"),
     UI = Window:AddTab("UI Settings")
 
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({
+    Title = "Ratware.exe - 100% By ChatGPT [Press 'Insert' to hide GUI]",
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab("Main"),
+    Visuals = Window:AddTab("Visuals"),
+    UI = Window:AddTab("UI Settings")
+}
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 local Players = game:GetService("Players")
@@ -235,7 +252,7 @@ local function getTargetPosition(selection, isNPC)
                 if townFolder then
                     local part = townFolder:FindFirstChild(areaName)
                     if part then
-                        return part.CFrame.Position
+                        return part.CFrame.Position -- Use partName's CFrame.Position
                     end
                 else
                     -- Handle Workspace NPCs
@@ -413,7 +430,7 @@ MainGroup3:AddButton("NPC Tween Start/Stop", function()
         if Options.NPCs.Value == "" then
             Library:Notify("No NPC selected.", 5)
             return
-        }
+        end
         npcTweenActive = not npcTweenActive
         if npcTweenActive then
             local targetPos = getTargetPosition(Options.NPCs.Value, true)
@@ -770,6 +787,7 @@ return {
     StopTween = stopTween,
     getTweenState = function() return tweenState end
 }
+
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
