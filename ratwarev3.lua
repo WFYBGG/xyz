@@ -1198,7 +1198,6 @@ end)
 
 
 --Universal Tween & Location
-
 pcall(function()
     repeat
         wait()
@@ -1217,6 +1216,9 @@ pcall(function()
     local flyEnabled = false
     local flyActive = false
     local lastPosition = nil -- Track position to detect teleportation
+
+    -- Table to store original CanCollide states of nearby parts
+    local originalCollideStates = {}
 
     local function resetHumanoidState()
         pcall(function()
@@ -1297,6 +1299,13 @@ pcall(function()
                     end
                 end
             end
+            -- Restore original CanCollide states for nearby parts
+            for part, canCollide in pairs(originalCollideStates) do
+                if part and part.Parent then
+                    pcall(function() part.CanCollide = canCollide end)
+                end
+            end
+            originalCollideStates = {} -- Clear the table
         end)
     end
 
@@ -1362,6 +1371,7 @@ pcall(function()
     _G.tweenTarget = Vector3.new(0, 0, 0)
     local tweenNotification = nil
     local teleportCooldown = 0 -- Cooldown to pause tween after teleport detection
+    local notificationCheck = 0 -- Timer to periodically check notification
 
     -- Main RenderStepped loop combining fly and noclip
     rs.RenderStepped:Connect(function(delta)
@@ -1385,6 +1395,22 @@ pcall(function()
                         Library:Notify("Teleport detected, pausing tween briefly", { Duration = 2 })
                     end
                     lastPosition = currentPosition
+                end
+
+                -- Periodically check and recreate notification if missing
+                if _G.tweenActive then
+                    notificationCheck = notificationCheck + delta
+                    if notificationCheck >= 1 and (not tweenNotification or not tweenNotification.Parent) then
+                        tweenNotification = Library:Notify("Tween in progress", {
+                            Duration = 9999 -- Fallback to long finite duration
+                        })
+                        if tweenNotification then
+                            print("Notification recreated: Tween in progress")
+                        else
+                            print("Failed to recreate notification")
+                        end
+                        notificationCheck = 0
+                    end
                 end
 
                 if _G.tweenActive and teleportCooldown <= 0 then
@@ -1492,6 +1518,9 @@ pcall(function()
                 local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(20, 20, 20), hrp.Position + Vector3.new(20, 20, 20)))
                 for _, part in pairs(region) do
                     if part:IsA("BasePart") and part ~= hrp and part ~= platform then
+                        if not originalCollideStates[part] then
+                            originalCollideStates[part] = part.CanCollide
+                        end
                         pcall(function() part.CanCollide = false end)
                     end
                 end
@@ -1499,6 +1528,20 @@ pcall(function()
                 if _G.tweenActive and (_G.tweenPhase == 1 or _G.tweenPhase == 2) then
                     for _, part in pairs(region) do
                         if part:IsA("BasePart") and part ~= hrp and part ~= platform then
+                            if not originalCollideStates[part] then
+                                originalCollideStates[part] = part.CanCollide
+                            end
+                            pcall(function() part.CanCollide = false end)
+                        end
+                    end
+                end
+                -- Additional noclip pass for descent
+                if _G.tweenActive and _G.tweenPhase == 3 then
+                    for _, part in pairs(region) do
+                        if part:IsA("BasePart") and part ~= hrp and part ~= platform then
+                            if not originalCollideStates[part] then
+                                originalCollideStates[part] = part.CanCollide
+                            end
                             pcall(function() part.CanCollide = false end)
                         end
                     end
@@ -1532,13 +1575,14 @@ pcall(function()
             -- Create persistent notification
             if not tweenNotification then
                 tweenNotification = Library:Notify("Tween in progress", {
-                    Duration = math.huge
+                    Duration = 9999 -- Fallback to long finite duration
                 })
                 if tweenNotification then
                     print("Notification created: Tween in progress")
                 else
                     print("Failed to create notification")
                 end
+                notificationCheck = 0
             else
                 print("Notification already exists, skipping creation")
             end
@@ -1558,6 +1602,7 @@ pcall(function()
                 tweenNotification = nil
             end
             teleportCooldown = 0
+            resetNoClip() -- Ensure nearby parts are restored
         end)
     end
 
