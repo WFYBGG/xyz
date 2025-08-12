@@ -1198,6 +1198,7 @@ end)
 
 
 --Universal Tween & Location
+
 pcall(function()
     repeat
         wait()
@@ -1231,7 +1232,7 @@ pcall(function()
     platform.Name = "OldDebris"
     platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
-    platform.CanCollide = true
+    platform.CanCollide = false -- Set to false to prevent environmental collisions
     platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
@@ -1464,7 +1465,7 @@ pcall(function()
                         pcall(function() part.CanCollide = false end)
                     end
                 end
-                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(5, 5, 5), hrp.Position + Vector3.new(5, 5, 5)))
+                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(10, 10, 10), hrp.Position + Vector3.new(10, 10, 10)))
                 for _, part in pairs(region) do
                     if part:IsA("BasePart") and part ~= hrp and not part.Anchored then
                         pcall(function() part.CanCollide = false end)
@@ -1491,7 +1492,7 @@ pcall(function()
             toggleFly(true)
 
             _G.tweenTarget = target
-            _G.highAltitude = hrp.Position.Y + 1000
+            _G.highAltitude = hrp.Position.Y + 500 -- Changed from 1000 to 500
             _G.tweenPhase = 1
             _G.tweenActive = true
 
