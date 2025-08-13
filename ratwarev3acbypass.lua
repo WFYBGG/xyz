@@ -896,11 +896,31 @@ end)
 
 -- Water Duplicate Module
 pcall(function()
-    local Workspace = game:GetService("Workspace")
-    local PhysicsService = game:GetService("PhysicsService")
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LocalPlayer = Players.LocalPlayer
+    local success, Workspace = pcall(function() return game:GetService("Workspace") end)
+    if not success then
+        warn("[Water Duplicate] Failed to get Workspace: " .. tostring(Workspace))
+        return
+    end
+    local success, PhysicsService = pcall(function() return game:GetService("PhysicsService") end)
+    if not success then
+        warn("[Water Duplicate] Failed to get PhysicsService: " .. tostring(PhysicsService))
+        return
+    end
+    local success, Players = pcall(function() return game:GetService("Players") end)
+    if not success then
+        warn("[Water Duplicate] Failed to get Players: " .. tostring(Players))
+        return
+    end
+    local success, RunService = pcall(function() return game:GetService("RunService") end)
+    if not success then
+        warn("[Water Duplicate] Failed to get RunService: " .. tostring(RunService))
+        return
+    end
+    local success, LocalPlayer = pcall(function() return Players.LocalPlayer end)
+    if not success then
+        warn("[Water Duplicate] Failed to get LocalPlayer: " .. tostring(LocalPlayer))
+        return
+    end
 
     local duplicatePart = nil
     local isEnabled = false
@@ -912,12 +932,12 @@ pcall(function()
         for i, v in ipairs(args) do
             local ok, res = pcall(function() return obj[v] end)
             if not ok then
-                print("[Water Duplicate] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                warn("[Water Duplicate] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
                 return nil
             end
             obj = res
             if not obj then
-                print("[Water Duplicate] safeGet returned nil for " .. tostring(v))
+                warn("[Water Duplicate] safeGet returned nil for " .. tostring(v))
                 return nil
             end
         end
@@ -926,25 +946,38 @@ pcall(function()
 
     local function createCollisionGroups()
         pcall(function()
-            PhysicsService:CreateCollisionGroup(collisionGroupCharacter)
-            PhysicsService:CreateCollisionGroup(collisionGroupWater)
-            PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, collisionGroupCharacter, true)
-            PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, "Default", false)
-            print("[Water Duplicate] Collision groups created")
+            local success1 = pcall(function() PhysicsService:CreateCollisionGroup(collisionGroupCharacter) end)
+            local success2 = pcall(function() PhysicsService:CreateCollisionGroup(collisionGroupWater) end)
+            local success3 = pcall(function() PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, collisionGroupCharacter, true) end)
+            local success4 = pcall(function() PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, "Default", false) end)
+            if success1 and success2 and success3 and success4 then
+                print("[Water Duplicate] Collision groups created")
+            else
+                warn("[Water Duplicate] Failed to create collision groups")
+            end
         end)
     end
 
     local function setCharacterCollisionGroup()
         pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
+            local char = safeGet(LocalPlayer, "Character")
+            if not char then
+                warn("[Water Duplicate] Character not found")
+                return
+            end
+            local success, descendants = pcall(function() return char:GetDescendants() end)
+            if not success then
+                warn("[Water Duplicate] Failed to get character descendants: " .. tostring(descendants))
+                return
+            end
+            for _, part in ipairs(descendants) do
+                pcall(function()
                     if part:IsA("BasePart") then
                         PhysicsService:SetPartCollisionGroup(part, collisionGroupCharacter)
                     end
-                end
-                print("[Water Duplicate] Character parts set to collision group")
+                end)
             end
+            print("[Water Duplicate] Character parts set to collision group")
         end)
     end
 
@@ -954,50 +987,73 @@ pcall(function()
             return
         end
         isEnabled = true
-        createCollisionGroups()
-        setCharacterCollisionGroup()
+        pcall(createCollisionGroups)
+        pcall(setCharacterCollisionGroup)
 
-        local success, result = pcall(function()
+        pcall(function()
             local waterPart = Workspace:FindFirstChild("water", true)
             if not waterPart or not waterPart:IsA("Part") then
-                print("[Water Duplicate] No 'water' part found")
+                warn("[Water Duplicate] No 'water' part found")
                 return
             end
-            duplicatePart = waterPart:Clone()
-            duplicatePart.Name = "DuplicateWater"
-            duplicatePart.Size = Vector3.new(10, 1, 10)
-            duplicatePart.CanCollide = true
-            duplicatePart.Anchored = true
-            PhysicsService:SetPartCollisionGroup(duplicatePart, collisionGroupWater)
-            duplicatePart.Parent = Workspace
+            local success, clonedPart = pcall(function() return waterPart:Clone() end)
+            if not success or not clonedPart then
+                warn("[Water Duplicate] Failed to clone water part: " .. tostring(clonedPart))
+                return
+            end
+            duplicatePart = clonedPart
+            pcall(function()
+                duplicatePart.Name = "DuplicateWater"
+                duplicatePart.Size = Vector3.new(10, 1, 10)
+                duplicatePart.CanCollide = true
+                duplicatePart.Anchored = true
+                PhysicsService:SetPartCollisionGroup(duplicatePart, collisionGroupWater)
+                duplicatePart.Parent = Workspace
+            end)
 
-            LocalPlayer.CharacterAdded:Connect(function(char)
-                pcall(function()
-                    task.wait(1)
-                    setCharacterCollisionGroup()
-                    updatePosition()
+            local success, charConn = pcall(function()
+                return LocalPlayer.CharacterAdded:Connect(function(char)
+                    pcall(function()
+                        task.wait(1)
+                        setCharacterCollisionGroup()
+                        updatePosition()
+                    end)
                 end)
             end)
+            if not success then
+                warn("[Water Duplicate] Failed to connect CharacterAdded: " .. tostring(charConn))
+            end
 
-            RunService.RenderStepped:Connect(function()
-                if isEnabled then
-                    updatePosition()
-                end
+            local success, renderConn = pcall(function()
+                return RunService.RenderStepped:Connect(function()
+                    if isEnabled then
+                        pcall(updatePosition)
+                    end
+                end)
             end)
+            if not success then
+                warn("[Water Duplicate] Failed to connect RenderStepped: " .. tostring(renderConn))
+            end
 
             print("[Water Duplicate] Enabled and duplicate created")
         end)
-        if not success then
-            warn("[Water Duplicate] Failed to enable: " .. tostring(result))
-        end
     end
 
     local function updatePosition()
         pcall(function()
-            local char = LocalPlayer.Character
+            local char = safeGet(LocalPlayer, "Character")
             local hrp = char and safeGet(char, "HumanoidRootPart")
             if hrp and duplicatePart then
-                duplicatePart.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - (hrp.Size.Y / 2 + duplicatePart.Size.Y / 2), hrp.Position.Z)
+                local success = pcall(function()
+                    duplicatePart.CFrame = CFrame.new(
+                        hrp.Position.X,
+                        hrp.Position.Y - (hrp.Size.Y / 2 + duplicatePart.Size.Y / 2),
+                        hrp.Position.Z
+                    )
+                end)
+                if not success then
+                    warn("[Water Duplicate] Failed to update position")
+                end
             end
         end)
     end
@@ -1008,27 +1064,34 @@ pcall(function()
             return
         end
         isEnabled = false
-        if duplicatePart then
-            duplicatePart:Destroy()
-            duplicatePart = nil
-        end
-        print("[Water Duplicate] Disabled and duplicate destroyed")
+        pcall(function()
+            if duplicatePart then
+                duplicatePart:Destroy()
+                duplicatePart = nil
+            end
+            print("[Water Duplicate] Disabled and duplicate destroyed")
+        end)
     end
 
-    Toggles.WaterDuplicateToggle:OnChanged(function(value)
-        pcall(function()
-            print("[Water Duplicate] Toggle changed to: " .. tostring(value))
-            if value then
-                enableDuplicate()
-            else
-                disableDuplicate()
-            end
+    local success, _ = pcall(function()
+        Toggles.WaterDuplicateToggle:OnChanged(function(value)
+            pcall(function()
+                print("[Water Duplicate] Toggle changed to: " .. tostring(value))
+                if value then
+                    enableDuplicate()
+                else
+                    disableDuplicate()
+                end
+            end)
         end)
     end)
+    if not success then
+        warn("[Water Duplicate] Failed to set toggle callback")
+    end
 
-    game:BindToClose(function()
-        pcall(function()
-            disableDuplicate()
+    pcall(function()
+        game:BindToClose(function()
+            pcall(disableDuplicate)
         end)
     end)
 end)
