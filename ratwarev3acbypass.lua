@@ -1,3 +1,9 @@
+if _G.RatwareLoaded then
+    Library:Unload()
+    return
+end
+_G.RatwareLoaded = true
+
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
@@ -462,24 +468,36 @@ end)
 
 local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
 MainGroup6:AddDropdown('PlayerDropdown', {
-    SpecialType = 'Player',
-    Text = 'Select Player',
-    Tooltip = 'Attach to [Selected Username]',
-    Callback = function(Value)
-        print('[cb] Player dropdown got changed:', Value)
-    end
-})
-MainGroup6:AddToggle("AttachtobackToggle", {
-    Text = "Attach To Back",
-    Default = false
-}):AddKeyPicker("Attachtobackbind", {
-    Default = "",
-    Mode = "Toggle",
-    Text = "N/A",
-    Callback = function(value)
-        Toggles.AttachtobackToggle:SetValue(value)
-    end
-})
+        SpecialType = 'Player',
+        Text = 'Select Player',
+        Tooltip = 'Attach to [Selected Username]',
+        Callback = function(Value)
+            pcall(function()
+                targetPlayer = Players:FindFirstChild(Value)
+                print('[cb] Player dropdown got changed:', Value)
+            end)
+        end
+    })
+    MainGroup6:AddToggle("AttachtobackToggle", {
+        Text = "Attach To Back",
+        Default = false,
+        Callback = function(Value)
+            pcall(function()
+                if Value then
+                    startAttach()
+                else
+                    stopAttach()
+                end
+            end)
+        end
+    }):AddKeyPicker("Attachtobackbind", {
+        Default = "",
+        Mode = "Toggle",
+        Text = "N/A",
+        Callback = function(value)
+            Toggles.AttachtobackToggle:SetValue(value)
+        end
+    })
 MainGroup6:AddSlider("ATBHeight", {
     Text = "Height",
     Default = 0,
@@ -1650,43 +1668,16 @@ pcall(function()
         end)
     end
 
-    MainGroup6:AddDropdown('PlayerDropdown', {
-        SpecialType = 'Player',
-        Text = 'Select Player',
-        Tooltip = 'Attach to [Selected Username]',
-        Callback = function(Value)
-            pcall(function()
-                targetPlayer = Players:FindFirstChild(Value)
-                print('[cb] Player dropdown got changed:', Value)
-            end)
-        end
-    })
-    MainGroup6:AddToggle("AttachtobackToggle", {
-        Text = "Attach To Back",
-        Default = false,
-        Callback = function(Value)
-            pcall(function()
-                if Value then
-                    startAttach()
-                else
-                    stopAttach()
-                end
-            end)
-        end
-    }):AddKeyPicker("Attachtobackbind", {
-        Default = "",
-        Mode = "Toggle",
-        Text = "N/A",
-        Callback = function(value)
-            Toggles.AttachtobackToggle:SetValue(value)
-        end
-    })
-
     Players.PlayerAdded:Connect(function()
         pcall(function()
-            Options.PlayerDropdown:Refresh()
+            local playerList = {}
+            for _, plr in ipairs(Players:GetPlayers()) do
+                table.insert(playerList, plr.Name)
+            end
+            table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
+            Options.PlayerDropdown:SetValues(playerList)
         end)
-    })
+    end)
     Players.PlayerRemoving:Connect(function(player)
         pcall(function()
             if player == targetPlayer then
@@ -1694,7 +1685,12 @@ pcall(function()
                 stopAttach()
                 Options.PlayerDropdown:SetValue("")
             end
-            Options.PlayerDropdown:Refresh()
+            local playerList = {}
+            for _, plr in ipairs(Players:GetPlayers()) do
+                table.insert(playerList, plr.Name)
+            end
+            table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
+            Options.PlayerDropdown:SetValues(playerList)
         end)
     end)
 
