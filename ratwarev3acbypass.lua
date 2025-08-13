@@ -470,26 +470,15 @@ local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
 MainGroup6:AddDropdown('PlayerDropdown', {
     SpecialType = 'Player',
     Text = 'Select Player',
-    Tooltip = 'Attach to [Selected Username]',
+    Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
+
     Callback = function(Value)
-        pcall(function()
-            targetPlayer = Players:FindFirstChild(Value)
-            print('[cb] Player dropdown got changed:', Value)
-        end)
+        print('[cb] Player dropdown got changed:', Value)
     end
 })
 MainGroup6:AddToggle("AttachtobackToggle", {
     Text = "Attach To Back",
-    Default = false,
-    Callback = function(Value)
-        pcall(function()
-            if Value then
-                startAttach()
-            else
-                stopAttach()
-            end
-        end)
-    end
+    Default = false
 }):AddKeyPicker("Attachtobackbind", {
     Default = "",
     Mode = "Toggle",
@@ -506,7 +495,7 @@ MainGroup6:AddSlider("ATBHeight", {
     Rounding = 0,
     Compact = true
 })
-MainGroup6:AddSlider("ATBDistance", {
+MainGroup6:AddSlider("ATBDistance)", {
     Text = "Distance",
     Default = -3,
     Min = -100,
@@ -862,7 +851,7 @@ pcall(function()
     end)
 end)
 
--- Player ESP Module
+--Player ESP Module
 pcall(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
@@ -914,7 +903,7 @@ pcall(function()
                         pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
                     end
                 else
-                    pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
+                    pcall(function() if typeof(obj) == "userdata" and v.Remove then obj:Remove() end end)
                 end
             end
             pcall(function() ESPObjects[player] = nil end)
@@ -926,44 +915,52 @@ pcall(function()
         pcall(function()
             if ESPObjects[player] then cleanupESP(player) end
 
-            local boxLines = {}
-            for i = 1, 4 do
-                local line = Drawing.new("Line")
-                line.Visible = false
-                line.Thickness = 2
-                line.Color = Color3.fromRGB(255, 25, 25)
-                table.insert(boxLines, line)
-            end
+            local box, nameText, healthText, distText, chamBox
 
-            local nameText = Drawing.new("Text")
-            nameText.Size = 14
-            nameText.Center = true
-            nameText.Outline = true
-            nameText.Color = Color3.fromRGB(255, 255, 255)
-            nameText.Visible = false
+            pcall(function()
+                box = Drawing.new("Line")
+                box.Visible = false
+                box.Thickness = 2
+                box.Color = Color3.fromRGB(255, 25, 25)
+            end)
 
-            local healthText = Drawing.new("Text")
-            healthText.Size = 13
-            healthText.Center = true
-            healthText.Outline = true
-            healthText.Color = Color3.fromRGB(0, 255, 0)
-            healthText.Visible = false
+            pcall(function()
+                nameText = Drawing.new("Text")
+                nameText.Size = 14
+                nameText.Center = true
+                nameText.Outline = true
+                nameText.Color = Color3.fromRGB(255, 255, 255)
+                nameText.Visible = false
+            end)
 
-            local distText = Drawing.new("Text")
-            distText.Size = 13
-            distText.Center = true
-            distText.Outline = true
-            distText.Color = Color3.fromRGB(200, 200, 200)
-            distText.Visible = false
+            pcall(function()
+                healthText = Drawing.new("Text")
+                healthText.Size = 13
+                healthText.Center = true
+                healthText.Outline = true
+                healthText.Color = Color3.fromRGB(0, 255, 0)
+                healthText.Visible = false
+            end)
 
-            local chamBox = Drawing.new("Square")
-            chamBox.Visible = false
-            chamBox.Color = Color3.fromRGB(255, 0, 0)
-            chamBox.Transparency = 0.2
-            chamBox.Filled = true
+            pcall(function()
+                distText = Drawing.new("Text")
+                distText.Size = 13
+                distText.Center = true
+                distText.Outline = true
+                distText.Color = Color3.fromRGB(200, 200, 200)
+                distText.Visible = false
+            end)
+
+            pcall(function()
+                chamBox = Drawing.new("Square")
+                chamBox.Visible = false
+                chamBox.Color = Color3.fromRGB(255, 0, 0)
+                chamBox.Transparency = 0.2
+                chamBox.Filled = true
+            end)
 
             ESPObjects[player] = {
-                BoxLines = boxLines,
+                Box = box,
                 Name = nameText,
                 Health = healthText,
                 Distance = distText,
@@ -1024,6 +1021,7 @@ pcall(function()
         ESPObjects[player].Skeleton = skeleton
     end
 
+    -- Player join/leave management
     pcall(function()
         Players.PlayerAdded:Connect(function(plr)
             if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
@@ -1047,9 +1045,9 @@ pcall(function()
                 streamedPlayers[player] = true
                 pcall(function()
                     local char = getCharacterModel(player)
-                    local boxLines, nameText, healthText, distText, chamBox
+                    local box, nameText, healthText, distText, chamBox
                     pcall(function()
-                        boxLines = tbl.BoxLines
+                        box = tbl.Box
                         nameText = tbl.Name
                         healthText = tbl.Health
                         distText = tbl.Distance
@@ -1085,6 +1083,7 @@ pcall(function()
                         end)
 
                         if Toggles.PlayerESP.Value and onScreen and onScreen1 and onScreen2 and health > 0 then
+                            -- Chams box (drawn behind ESP box)
                             pcall(function()
                                 chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
                                 chamBox.Size = Vector2.new(width, height)
@@ -1093,30 +1092,21 @@ pcall(function()
                                 chamBox.Visible = true
                             end)
 
-                            local topLeft = Vector2.new(topW.X - width/2, topW.Y)
-                            local topRight = Vector2.new(topW.X + width/2, topW.Y)
-                            local botLeft = Vector2.new(botW.X - width/2, botW.Y)
-                            local botRight = Vector2.new(botW.X + width/2, botW.Y)
+                            -- Draw box (top horizontal line)
+                            pcall(function()
+                                box.From = Vector2.new(topW.X - width/2, topW.Y)
+                                box.To = Vector2.new(topW.X + width/2, topW.Y)
+                                box.Visible = true
+                            end)
 
-                            boxLines[1].From = topLeft
-                            boxLines[1].To = topRight
-                            boxLines[2].From = topLeft
-                            boxLines[2].To = botLeft
-                            boxLines[3].From = topRight
-                            boxLines[3].To = botRight
-                            boxLines[4].From = botLeft
-                            boxLines[4].To = botRight
-
-                            for _, line in ipairs(boxLines) do
-                                line.Visible = true
-                            end
-
+                            -- Draw name
                             pcall(function()
                                 nameText.Text = player.Name
                                 nameText.Position = Vector2.new(pos.X, topW.Y - 16)
                                 nameText.Visible = true
                             end)
 
+                            -- Draw health/maxhealth
                             pcall(function()
                                 healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
                                 healthText.Position = Vector2.new(pos.X, topW.Y - 2)
@@ -1126,6 +1116,7 @@ pcall(function()
                                 healthText.Visible = true
                             end)
 
+                            -- Draw distance
                             pcall(function()
                                 local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
                                 distText.Text = "[" .. math.floor(dist) .. "m]"
@@ -1133,15 +1124,15 @@ pcall(function()
                                 distText.Visible = true
                             end)
 
+                            -- Draw skeleton
                             drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
                         else
-                            for _, line in ipairs(boxLines or {}) do
-                                line.Visible = false
-                            end
+                            pcall(function() box.Visible = false end)
                             pcall(function() nameText.Visible = false end)
                             pcall(function() healthText.Visible = false end)
                             pcall(function() distText.Visible = false end)
                             pcall(function() chamBox.Visible = false end)
+                            -- Hide skeleton lines
                             if tbl.Skeleton then
                                 for _, line in pairs(tbl.Skeleton) do
                                     pcall(function() line.Visible = false end)
@@ -1149,13 +1140,12 @@ pcall(function()
                             end
                         end
                     else
-                        for _, line in ipairs(boxLines or {}) do
-                            line.Visible = false
-                        end
+                        pcall(function() box.Visible = false end)
                         pcall(function() nameText.Visible = false end)
                         pcall(function() healthText.Visible = false end)
                         pcall(function() distText.Visible = false end)
                         pcall(function() chamBox.Visible = false end)
+                        -- Hide skeleton lines
                         if tbl.Skeleton then
                             for _, line in pairs(tbl.Skeleton) do
                                 pcall(function() line.Visible = false end)
@@ -1164,6 +1154,7 @@ pcall(function()
                     end
                 end)
             end
+            -- Robust cleanup: remove ESP for any player no longer in Players
             for playerRef in pairs(ESPObjects) do
                 local found = false
                 pcall(function()
@@ -1181,7 +1172,10 @@ pcall(function()
         end)
     end)
 
+    -- Log script start
     print("[ESP] Script initialized at " .. os.date("%H:%M:%S"))
+end, function(err)
+    print("[ESP] Initialization error: " .. tostring(err))
 end)
 
 -- Universal Tween & Location
@@ -1495,288 +1489,450 @@ pcall(function()
     end)
 end)
 
--- Attach to Back Module
-pcall(function()
-    local Players = game:GetService("Players")
-    local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
-    local Workspace = game:GetService("Workspace")
-    local LocalPlayer = Players.LocalPlayer
+--Attach to back Module [TESTING STILL]
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
-    _G.targetPlayer = nil
-    _G.isAttached = false
-    local attachConn = nil
-    local isTweening = false
-    local isLocked = false
-    local messageDebounce = false
-    local heightOffset = 0 -- Matches ATBHeight default
-    local zDistance = -4 -- Matches ATBDistance default
-    local originalSpeed = 150
+-- Internal state
+local targetPlayer = nil
+local isAttached = false
+local attachConn = nil
+local isTweening = false
+local isLocked = false
+local flyEnabled = false
+local flyPlatform = nil
+local bodyVelocity = nil
+local flyConn = nil
+local noclipEnabled = false
+local nofallEnabled = false
+local nofallFolder = nil
+local heightOffset = 0 -- Matches ATBHeight default
+local zDistance = -4 -- Updated default
+local originalSpeed = 150
+local messageDebounce = false
+local currentTween = nil
+local updateCoroutine = nil
 
-    local function safeGet(obj, ...)
-        local args = {...}
-        for i, v in ipairs(args) do
-            local ok, res = pcall(function() return obj[v] end)
-            if not ok then
-                print("[Attach to Back] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
-                return nil
+-- Utility: Safe get
+local function safeGet(obj, ...)
+    local args = {...}
+    for i, v in ipairs(args) do
+        local ok, res = pcall(function() return obj[v] end)
+        if not ok then return nil end
+        obj = res
+        if not obj then return nil end
+    end
+    return obj
+end
+
+-- Fly logic
+local function enableFly()
+    local success, result = pcall(function()
+        if flyEnabled then return true end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if not char or not safeGet(char, "HumanoidRootPart") then return false end
+        flyEnabled = true
+        flyPlatform = Instance.new("Part")
+        flyPlatform.Name = "OldDebris"
+        flyPlatform.Size = Vector3.new(6, 1, 6)
+        flyPlatform.Anchored = true
+        flyPlatform.CanCollide = true
+        flyPlatform.Transparency = 0.75
+        flyPlatform.Material = Enum.Material.SmoothPlastic
+        flyPlatform.BrickColor = BrickColor.new("Bright blue")
+        flyPlatform.Parent = workspace
+        flyPlatform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.Parent = char.HumanoidRootPart
+        local humanoid = safeGet(char, "Humanoid")
+        if humanoid then
+            humanoid.JumpPower = 0
+        end
+        flyConn = RunService.RenderStepped:Connect(function()
+            local hrp = safeGet(char, "HumanoidRootPart")
+            if flyPlatform and hrp then
+                flyPlatform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
             end
-            obj = res
-            if not obj then
-                print("[Attach to Back] safeGet returned nil for " .. tostring(v))
-                return nil
+        end)
+        return true
+    end)
+    if not success then
+        warn("Failed to enable fly: " .. tostring(result))
+    end
+    return success and result
+end
+
+local function disableFly()
+    local success, result = pcall(function()
+        if not flyEnabled then return true end
+        flyEnabled = false
+        if flyConn then
+            flyConn:Disconnect()
+            flyConn = nil
+        end
+        if flyPlatform then
+            flyPlatform:Destroy()
+            flyPlatform = nil
+        end
+        if bodyVelocity then
+            bodyVelocity:Destroy()
+            bodyVelocity = nil
+        end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if char then
+            local humanoid = safeGet(char, "Humanoid")
+            if humanoid then
+                humanoid.JumpPower = 50
+                humanoid.WalkSpeed = 16
             end
         end
-        return obj
+        return true
+    end)
+    if not success then
+        warn("Failed to disable fly: " .. tostring(result))
     end
+    return success and result
+end
 
-    local function tweenToBack()
-        if isTweening or isLocked then
-            print("[Attach to Back] tweenToBack skipped: isTweening=" .. tostring(isTweening) .. ", isLocked=" .. tostring(isLocked))
+-- Nofall logic
+local function enableNofall()
+    local success, result = pcall(function()
+        if nofallEnabled then return true end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if not char then return false end
+        local status = safeGet(char, "Status")
+        if not status then
+            status = Instance.new("Folder")
+            status.Name = "Status"
+            status.Parent = char
+        end
+        if not status:FindFirstChild("FallDamageCD") then
+            nofallFolder = Instance.new("Folder")
+            nofallFolder.Name = "FallDamageCD"
+            nofallFolder.Parent = status
+        else
+            nofallFolder = status:FindFirstChild("FallDamageCD")
+        end
+        nofallEnabled = true
+        return true
+    end)
+    if not success then
+        warn("Failed to enable nofall: " .. tostring(result))
+    end
+    return success and result
+end
+
+local function disableNofall()
+    local success, result = pcall(function()
+        if not nofallEnabled then return true end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if not char then return true end
+        local status = safeGet(char, "Status")
+        if status then
+            local fd = status:FindFirstChild("FallDamageCD")
+            if fd then fd:Destroy() end
+        end
+        nofallEnabled = false
+        nofallFolder = nil
+        return true
+    end)
+    if not success then
+        warn("Failed to disable nofall: " .. tostring(result))
+    end
+    return success and result
+end
+
+-- Noclip logic
+local function enableNoclip()
+    local success, result = pcall(function()
+        if noclipEnabled then return true end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if not char then return false end
+        noclipEnabled = true
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.CanCollide = false end)
+            end
+        end
+        return true
+    end)
+    if not success then
+        warn("Failed to enable noclip: " .. tostring(result))
+    end
+    return success and result
+end
+
+local function disableNoclip()
+    local success, result = pcall(function()
+        if not noclipEnabled then return true end
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        if not char then return true end
+        noclipEnabled = false
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part.CanCollide = true end)
+            end
+        end
+        return true
+    end)
+    if not success then
+        warn("Failed to disable noclip: " .. tostring(result))
+    end
+    return success and result
+end
+
+-- Tween logic
+local function tweenToBack()
+    if isTweening or isLocked then return false end
+    isTweening = true
+    local success, result = pcall(function()
+        local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+        local targetChar = targetPlayer and Workspace.Living:FindFirstChild(targetPlayer.Name)
+        local hrp = char and safeGet(char, "HumanoidRootPart")
+        local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+        if not (hrp and targetHrp) then return false end
+        local distance = (hrp.Position - targetHrp.Position).Magnitude
+        if distance > 20000 then return false end
+        enableFly()
+        enableNofall()
+        enableNoclip()
+        local function createTween()
+            local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
+            local tweenTime = distance / originalSpeed
+            currentTween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
+            currentTween:Play()
+        end
+        createTween()
+        updateCoroutine = coroutine.create(function()
+            while isTweening do
+                task.wait(1)
+                if not isTweening then break end
+                if currentTween then
+                    currentTween:Cancel()
+                end
+                targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
+                if not targetHrp then break end
+                distance = (hrp.Position - targetHrp.Position).Magnitude
+                createTween()
+            end
+        end)
+        coroutine.resume(updateCoroutine)
+        currentTween.Completed:Wait()
+        isLocked = true
+        isTweening = false
+        disableFly()
+        disableNoclip()
+        return true
+    end)
+    if not success then
+        warn("Tween failed: " .. tostring(result))
+        isTweening = false
+        disableFly()
+        disableNoclip()
+    end
+    return success and result
+end
+
+-- Attach/Detach logic
+local function stopAttach()
+    local success, result = pcall(function()
+        isAttached = false
+        isLocked = false
+        isTweening = false
+        if attachConn then
+            attachConn:Disconnect()
+            attachConn = nil
+        end
+        if updateCoroutine then
+            coroutine.close(updateCoroutine)
+            updateCoroutine = nil
+        end
+        if currentTween then
+            currentTween:Cancel()
+            currentTween = nil
+        end
+        disableNofall()
+        disableNoclip()
+        disableFly()
+        return true
+    end)
+    if not success then
+        warn("Failed to stop attach: " .. tostring(result))
+    end
+    return success and result
+end
+
+local function startAttach()
+    local success, result = pcall(function()
+        if not targetPlayer then
+            if not messageDebounce then
+                messageDebounce = true
+                messagebox("Please select a player first!", "Error", 0)
+                task.delay(2, function()
+                    messageDebounce = false
+                end)
+            end
             return false
         end
-        isTweening = true
-        local success, result = pcall(function()
+        stopAttach()
+        isAttached = true
+        enableNofall()
+        tweenToBack()
+        attachConn = RunService.RenderStepped:Connect(function()
+            if not isAttached then return end
             local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-            local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
+            local targetChar = targetPlayer and Workspace.Living:FindFirstChild(targetPlayer.Name)
             local hrp = char and safeGet(char, "HumanoidRootPart")
             local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
             if not (hrp and targetHrp) then
-                Library:Notify("Failed to find player or target character!", { Duration = 3 })
-                print("[Attach to Back] Tween failed: hrp=" .. tostring(hrp) .. ", targetHrp=" .. tostring(targetHrp))
-                return false
+                stopAttach()
+                return
             end
             local distance = (hrp.Position - targetHrp.Position).Magnitude
-            if distance > 20000 then
-                Library:Notify("Target too far away!", { Duration = 3 })
-                print("[Attach to Back] Tween failed: Distance too large (" .. distance .. ")")
-                return false
+            if distance > 100 then
+                isLocked = false
+                isTweening = false
+                return
             end
-            _G.toggleNoclip(true)
-            _G.toggleNofall(true)
-            local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
-            local tweenTime = distance / originalSpeed
-            local tween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
-            print("[Attach to Back] Starting tween to " .. tostring(backGoal.Position) .. ", time=" .. tweenTime)
-            tween:Play()
-            tween.Completed:Wait()
-            isLocked = true
-            isTweening = false
-            _G.toggleNoclip(false)
-            print("[Attach to Back] Tween completed, locked to target")
-            return true
+            if isLocked then
+                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
+            elseif not isTweening then
+                tweenToBack()
+            end
         end)
-        if not success then
-            warn("[Attach to Back] Tween failed: " .. tostring(result))
-            isTweening = false
-            _G.toggleNoclip(false)
-        end
-        return success and result
-    end
-
-    _G.stopAttach = function()
-        local success, result = pcall(function()
-            _G.isAttached = false
-            isLocked = false
-            isTweening = false
-            if attachConn then
-                attachConn:Disconnect()
-                attachConn = nil
-                print("[Attach to Back] Disconnected RenderStepped")
-            end
-            _G.toggleNofall(false)
-            _G.toggleNoclip(false)
-            Library:Notify("Attach to Back stopped.", { Duration = 3 })
-            print("[Attach to Back] Stopped attach")
-            return true
-        end)
-        if not success then
-            warn("[Attach to Back] Failed to stop attach: " .. tostring(result))
-        end
-        return success and result
-    end
-
-    _G.startAttach = function()
-        local success, result = pcall(function()
-            if not _G.targetPlayer then
-                if not messageDebounce then
-                    messageDebounce = true
-                    Library:Notify("Please select a player first!", { Duration = 3 })
-                    task.delay(2, function()
-                        messageDebounce = false
-                    end)
-                    print("[Attach to Back] Failed: No target player selected")
-                end
-                Toggles.AttachtobackToggle:SetValue(false)
-                return false
-            end
-            local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
-            if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
-                if not messageDebounce then
-                    messageDebounce = true
-                    Library:Notify("Target player has no character!", { Duration = 3 })
-                    task.delay(2, function()
-                        messageDebounce = false
-                    end)
-                    print("[Attach to Back] Failed: Target has no character or HRP")
-                end
-                Toggles.AttachtobackToggle:SetValue(false)
-                return false
-            end
-            _G.stopAttach()
-            _G.isAttached = true
-            _G.toggleNofall(true)
-            tweenToBack()
-            attachConn = RunService.RenderStepped:Connect(function()
-                if not _G.isAttached then
-                    print("[Attach to Back] RenderStepped stopped: isAttached=false")
-                    return
-                end
-                local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
-                local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
-                local hrp = char and safeGet(char, "HumanoidRootPart")
-                local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
-                if not (hrp and targetHrp) then
-                    _G.stopAttach()
-                    Toggles.AttachtobackToggle:SetValue(false)
-                    Library:Notify("Target player lost or character missing!", { Duration = 3 })
-                    print("[Attach to Back] Stopped: Missing HRP or target HRP")
-                    return
-                end
-                local distance = (hrp.Position - targetHrp.Position).Magnitude
-                if distance > 100 then
-                    isLocked = false
-                    isTweening = false
-                    print("[Attach to Back] Distance too large (" .. distance .. "), unlocking")
-                    return
-                end
-                if isLocked then
-                    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
-                elseif not isTweening then
-                    tweenToBack()
-                end
-            end)
-            Library:Notify("Attach to Back started for " .. _G.targetPlayer.Name, { Duration = 3 })
-            print("[Attach to Back] Started for " .. _G.targetPlayer.Name)
-            return true
-        end)
-        if not success then
-            warn("[Attach to Back] Failed to start attach: " .. tostring(result))
-            _G.stopAttach()
-        end
-        return success and result
-    end
-
-    -- Initialize PlayerDropdown with current players
-    pcall(function()
-        local playerList = {}
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                table.insert(playerList, plr.Name)
-            end
-        end
-        table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
-        Options.PlayerDropdown:SetValues(playerList)
-        print("[Attach to Back] PlayerDropdown initialized with: " .. table.concat(playerList, ", "))
+        return true
     end)
+    if not success then
+        warn("Failed to start attach: " .. tostring(result))
+        stopAttach()
+    end
+    return success and result
+end
 
-    -- GUI Integration
+-- Linoria GUI integration
+local success, result = pcall(function()
+    -- Ensure clean initial state
+    local success, _ = pcall(function()
+        disableNofall()
+        disableNoclip()
+        disableFly()
+        return true
+    end)
+    if not success then
+        warn("Failed to ensure clean initial state")
+    end
+
+    -- Player dropdown
     Options.PlayerDropdown:OnChanged(function(value)
-        pcall(function()
-            _G.targetPlayer = value and Players:FindFirstChild(value) or nil
-            if _G.isAttached and not _G.targetPlayer then
-                _G.stopAttach()
-                Toggles.AttachtobackToggle:SetValue(false)
-                Library:Notify("Target player cleared!", { Duration = 3 })
-                print("[Attach to Back] PlayerDropdown cleared, stopped attach")
+        local success, _ = pcall(function()
+            targetPlayer = value and Players:FindFirstChild(value) or nil
+            if isAttached and not targetPlayer then
+                stopAttach()
             end
-            print("[Attach to Back] PlayerDropdown changed to: " .. tostring(value))
+            return true
         end)
+        if not success then
+            warn("Failed to update target player")
+        end
     end)
 
+    -- Toggle
     Toggles.AttachtobackToggle:OnChanged(function(value)
-        pcall(function()
-            print("[Attach to Back] Toggle changed to: " .. tostring(value))
+        local success, _ = pcall(function()
             if value then
-                _G.startAttach()
+                startAttach()
             else
-                _G.stopAttach()
+                stopAttach()
             end
+            return true
         end)
+        if not success then
+            warn("Failed to toggle attach")
+        end
     end)
 
+    -- Height slider
     Options.ATBHeight:OnChanged(function(value)
-        pcall(function()
+        local success, _ = pcall(function()
             heightOffset = value
-            print("[Attach to Back] Height offset updated to: " .. value)
+            return true
         end)
+        if not success then
+            warn("Failed to update height offset")
+        end
     end)
 
+    -- Distance slider
     Options["ATBDistance)"]:OnChanged(function(value)
-        pcall(function()
+        local success, _ = pcall(function()
             zDistance = value
-            print("[Attach to Back] Distance updated to: " .. value)
+            return true
         end)
+        if not success then
+            warn("Failed to update distance")
+        end
     end)
 
-    Players.PlayerAdded:Connect(function(plr)
-        pcall(function()
-            if plr == LocalPlayer then return end
-            local playerList = {}
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    table.insert(playerList, p.Name)
-                end
-            end
-            table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
-            Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player added (" .. plr.Name .. "), updated dropdown: " .. table.concat(playerList, ", "))
-        end)
-    end)
-
-    Players.PlayerRemoving:Connect(function(player)
-        pcall(function()
-            if player == _G.targetPlayer then
-                _G.targetPlayer = nil
-                _G.stopAttach()
-                Options.PlayerDropdown:SetValue("")
-                Library:Notify("Target player left the game!", { Duration = 3 })
-                print("[Attach to Back] Target (" .. player.Name .. ") left, stopped attach")
-            end
-            local playerList = {}
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer then
-                    table.insert(playerList, plr.Name)
-                end
-            end
-            table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
-            Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player removed (" .. player.Name .. "), updated dropdown: " .. table.concat(playerList, ", "))
-        end)
-    end)
-
+    -- Re-apply on respawn
     LocalPlayer.CharacterAdded:Connect(function(char)
-        pcall(function()
-            repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
-            if _G.isAttached then
-                _G.toggleNofall(true)
+        local success, _ = pcall(function()
+            if isAttached then
+                enableNofall()
                 if not isLocked then
-                    _G.toggleNoclip(true)
+                    enableNoclip()
+                    enableFly()
                 end
-                print("[Attach to Back] Character respawned, maintaining attach state")
             else
-                _G.toggleNofall(false)
-                _G.toggleNoclip(false)
+                disableNofall()
+                disableNoclip()
+                disableFly()
             end
+            return true
         end)
+        if not success then
+            warn("Failed to handle character respawn")
+        end
     end)
 
-    game:BindToClose(function()
-        pcall(function()
-            _G.stopAttach()
-        end)
+    -- Cleanup when local player leaves
+    LocalPlayer.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            local success, _ = pcall(function()
+                stopAttach()
+                return true
+            end)
+            if not success then
+                warn("Failed to clean up on leave")
+            end
+        end
     end)
+
+    -- Handle player leave
+    Players.PlayerRemoving:Connect(function(player)
+        local success, _ = pcall(function()
+            if player == targetPlayer then
+                targetPlayer = nil
+                stopAttach()
+                Options.PlayerDropdown:SetValue(nil)
+            end
+            return true
+        end)
+        if not success then
+            warn("Failed to handle player removing")
+        end
+    end)
+
+    return true
 end)
+
+if not success then
+    warn("Setup failed: " .. tostring(result))
+end
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
