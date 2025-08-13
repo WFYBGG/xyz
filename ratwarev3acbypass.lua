@@ -80,7 +80,7 @@ MainGroup1:AddToggle("NoFallDamage", {
     Default = false
 })
 -- Moderator Notifier GUI
-local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Notifications")
+local NotificationsGroup = Tabs.Main:AddRightGroupbox("Notifications")
 NotificationsGroup:AddToggle("ModeratorNotifierToggle", {
     Text = "Moderator Notifier",
     Default = false,
