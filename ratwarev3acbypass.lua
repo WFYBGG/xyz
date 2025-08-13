@@ -90,7 +90,7 @@ MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
-MainGroup1:AddToggle("DisableTouchToggle", {
+MainGroup1:AddToggle("DisableCharacterTouchToggle", {
     Text = "No Killbricks",
     Default = false
 })
@@ -898,208 +898,66 @@ end)
 
 -- No Killbricks/Disable Touch Module
 pcall(function()
-    local success, Workspace = pcall(function() return game:GetService("Workspace") end)
+    local success, Players = pcall(function() return game:GetService("Players") end)
     if not success then
-        warn("[Disable Touch] Failed to get Workspace: " .. tostring(Workspace))
+        warn("[Disable Character Touch] Failed to get Players: " .. tostring(Players))
         return
     end
-    local success, RunService = pcall(function() return game:GetService("RunService") end)
+    local success, LocalPlayer = pcall(function() return Players.LocalPlayer end)
     if not success then
-        warn("[Disable Touch] Failed to get RunService: " .. tostring(RunService))
+        warn("[Disable Character Touch] Failed to get LocalPlayer: " .. tostring(LocalPlayer))
         return
     end
 
     local isEnabled = false
-    local affectedParts = {} -- Store parts and their original CanTouch state
-    local targetFolders = {"Burning", "Knocked", "HealthPackCD", "FallRagdoll"}
-    local targetColorTurquoise = BrickColor.new("Turquoise")
-    local targetColorPersimmon = BrickColor.new("Persimmon")
-    local scanInterval = 10 -- Increased to 10 seconds for less frequent scans
-    local maxPartsPerScan = 100 -- Cap on parts processed per scan
-    local scanConnection = nil
-    local lastScanTime = 0
+    local affectedParts = {} -- Store character parts and their original CanTouch state
+    local characterConn = nil
 
     local function safeGet(obj, ...)
         local args = {...}
         for i, v in ipairs(args) do
             local ok, res = pcall(function() return obj[v] end)
             if not ok then
-                warn("[Disable Touch] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                warn("[Disable Character Touch] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
                 return nil
             end
             obj = res
             if not obj then
-                warn("[Disable Touch] safeGet returned nil for " .. tostring(v))
+                warn("[Disable Character Touch] safeGet returned nil for " .. tostring(v))
                 return nil
             end
         end
         return obj
     end
 
-    local function isTargetPart(part)
-        local success, isBasePart = pcall(function() return part:IsA("BasePart") or part:IsA("MeshPart") end)
-        if not success or not isBasePart then return false end
-
-        local successName, name = pcall(function() return part.Name end)
-        local successColor, color = pcall(function() return part.BrickColor end)
-        local successMaterial, material = pcall(function() return part.Material end)
-
-        -- Check moundkillbricks
-        local successMound, mound = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map", "moundkillbricks")) end)
-        if successMound and mound then
-            return true
-        end
-
-        -- Check BanditCampfire
-        local successCampfire, campfire = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Debris", "BanditCampfire")) end)
-        if successCampfire and campfire then
-            return true
-        end
-
-        -- Check Turquoise Neon
-        if successColor and successMaterial and color == targetColorTurquoise and material == Enum.Material.Neon then
-            return true
-        end
-
-        -- Check part named "void"
-        if successName and name == "void" then
-            return true
-        end
-
-        -- Check Persimmon Neon under Workspace.Map
-        local successMap, isMap = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map")) end)
-        if successMap and isMap and successColor and successMaterial and color == targetColorPersimmon and material == Enum.Material.Neon then
-            return true
-        end
-
-        return false
-    end
-
-    local function scanAndDisableTouch()
+    local function disableCharacterTouch()
         pcall(function()
-            local partsProcessed = 0
-
-            -- Scan specific folders
-            local success, workspaceChildren = pcall(function() return Workspace:GetChildren() end)
-            if success then
-                for _, folder in ipairs(workspaceChildren) do
-                    if partsProcessed >= maxPartsPerScan then break end
-                    pcall(function()
-                        local successName, folderName = pcall(function() return folder.Name end)
-                        if successName and table.find(targetFolders, folderName) then
-                            local successDescendants, descendants = pcall(function() return folder:GetDescendants() end)
-                            if successDescendants then
-                                for _, part in ipairs(descendants) do
-                                    if partsProcessed >= maxPartsPerScan then break end
-                                    pcall(function()
-                                        if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
-                                            local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                            if successCanTouch then
-                                                affectedParts[part] = canTouch
-                                                pcall(function() part.CanTouch = false end)
-                                                partsProcessed = partsProcessed + 1
-                                            end
-                                        end
-                                    end)
-                                end
-                            end
+            local char = safeGet(LocalPlayer, "Character")
+            if not char then
+                warn("[Disable Character Touch] Character not found")
+                return
+            end
+            local success, descendants = pcall(function() return char:GetDescendants() end)
+            if not success then
+                warn("[Disable Character Touch] Failed to get character descendants: " .. tostring(descendants))
+                return
+            end
+            for _, part in ipairs(descendants) do
+                pcall(function()
+                    if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
+                        local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                        if successCanTouch then
+                            affectedParts[part] = canTouch
+                            pcall(function() part.CanTouch = false end)
                         end
-                    end)
-                end
-            end
-
-            -- Scan moundkillbricks
-            local moundFolder = safeGet(Workspace, "Map", "moundkillbricks")
-            if moundFolder then
-                local successDescendants, descendants = pcall(function() return moundFolder:GetDescendants() end)
-                if successDescendants then
-                    for _, part in ipairs(descendants) do
-                        if partsProcessed >= maxPartsPerScan then break end
-                        pcall(function()
-                            if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
-                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                if successCanTouch then
-                                    affectedParts[part] = canTouch
-                                    pcall(function() part.CanTouch = false end)
-                                    partsProcessed = partsProcessed + 1
-                                end
-                            end
-                        end)
                     end
-                end
+                end)
             end
-
-            -- Scan BanditCampfire
-            local campfireFolder = safeGet(Workspace, "Debris", "BanditCampfire")
-            if campfireFolder then
-                local successDescendants, descendants = pcall(function() return campfireFolder:GetDescendants() end)
-                if successDescendants then
-                    for _, part in ipairs(descendants) do
-                        if partsProcessed >= maxPartsPerScan then break end
-                        pcall(function()
-                            if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
-                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                if successCanTouch then
-                                    affectedParts[part] = canTouch
-                                    pcall(function() part.CanTouch = false end)
-                                    partsProcessed = partsProcessed + 1
-                                end
-                            end
-                        end)
-                    end
-                end
-            end
-
-            -- Scan Workspace.Map for Persimmon Neon and void parts
-            local mapFolder = safeGet(Workspace, "Map")
-            if mapFolder then
-                local successDescendants, descendants = pcall(function() return mapFolder:GetDescendants() end)
-                if successDescendants then
-                    for _, part in ipairs(descendants) do
-                        if partsProcessed >= maxPartsPerScan then break end
-                        pcall(function()
-                            if isTargetPart(part) and not affectedParts[part] then
-                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                if successCanTouch then
-                                    affectedParts[part] = canTouch
-                                    pcall(function() part.CanTouch = false end)
-                                    partsProcessed = partsProcessed + 1
-                                end
-                            end
-                        end)
-                    end
-                end
-            end
-
-            -- Scan Workspace for void and Turquoise Neon parts
-            local successDescendants, allDescendants = pcall(function() return Workspace:GetDescendants() end)
-            if successDescendants then
-                for _, part in ipairs(allDescendants) do
-                    if partsProcessed >= maxPartsPerScan then break end
-                    pcall(function()
-                        local successName, name = pcall(function() return part.Name end)
-                        local successColor, color = pcall(function() return part.BrickColor end)
-                        local successMaterial, material = pcall(function() return part.Material end)
-                        if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
-                            if (successName and name == "void") or
-                               (successColor and successMaterial and color == targetColorTurquoise and material == Enum.Material.Neon) then
-                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                if successCanTouch then
-                                    affectedParts[part] = canTouch
-                                    pcall(function() part.CanTouch = false end)
-                                    partsProcessed = partsProcessed + 1
-                                end
-                            end
-                        end
-                    end)
-                end
-            end
-
-            print("[Disable Touch] Disabled touch for " .. partsProcessed .. " parts in scan")
+            print("[Disable Character Touch] Disabled touch for character parts")
         end)
     end
 
-    local function restoreTouch()
+    local function restoreCharacterTouch()
         pcall(function()
             for part, originalCanTouch in pairs(affectedParts) do
                 pcall(function()
@@ -1109,84 +967,64 @@ pcall(function()
                 end)
             end
             affectedParts = {}
-            print("[Disable Touch] Restored touch for parts")
+            print("[Disable Character Touch] Restored touch for character parts")
         end)
     end
 
     local function enableDisableTouch()
         if isEnabled then
-            print("[Disable Touch] Already enabled")
+            print("[Disable Character Touch] Already enabled")
             return
         end
         isEnabled = true
-        pcall(scanAndDisableTouch)
+        pcall(disableCharacterTouch)
 
-        -- Periodic scan for new parts
-        local success, conn = pcall(function()
-            return RunService.Heartbeat:Connect(function(deltaTime)
-                pcall(function()
-                    if isEnabled then
-                        local currentTime = tick()
-                        if currentTime - lastScanTime >= scanInterval then
-                            scanAndDisableTouch()
-                            lastScanTime = currentTime
+        -- Handle character respawn
+        pcall(function()
+            if characterConn then
+                pcall(function() characterConn:Disconnect() end)
+            end
+            local success, conn = pcall(function()
+                return LocalPlayer.CharacterAdded:Connect(function()
+                    pcall(function()
+                        task.wait(1) -- Wait for character to fully load
+                        if isEnabled then
+                            disableCharacterTouch()
+                            print("[Disable Character Touch] Reapplied touch disable after respawn")
                         end
-                    end
+                    end)
                 end)
             end)
+            if success then
+                characterConn = conn
+                print("[Disable Character Touch] CharacterAdded connected")
+            else
+                warn("[Disable Character Touch] Failed to connect CharacterAdded: " .. tostring(conn))
+            end
         end)
-        if success then
-            scanConnection = conn
-            print("[Disable Touch] Periodic scan enabled")
-        else
-            warn("[Disable Touch] Failed to connect Heartbeat: " .. tostring(conn))
-        end
-
-        -- Monitor specific folders for new parts
-        local successDescendant, descendantConn = pcall(function()
-            return Workspace.DescendantAdded:Connect(function(descendant)
-                pcall(function()
-                    if isEnabled and (descendant:IsDescendantOf(safeGet(Workspace, "Map")) or
-                                     descendant:IsDescendantOf(safeGet(Workspace, "Debris")) or
-                                     table.find(targetFolders, safeGet(descendant, "Parent", "Name") or "")) then
-                        if isTargetPart(descendant) and not affectedParts[descendant] then
-                            local successCanTouch, canTouch = pcall(function() return descendant.CanTouch end)
-                            if successCanTouch then
-                                affectedParts[descendant] = canTouch
-                                pcall(function() descendant.CanTouch = false end)
-                                print("[Disable Touch] Disabled touch for new part: " .. tostring(descendant.Name))
-                            end
-                        end
-                    end
-                end)
-            end)
-        end)
-        if not successDescendant then
-            warn("[Disable Touch] Failed to connect DescendantAdded: " .. tostring(descendantConn))
-        end
-        print("[Disable Touch] Enabled")
+        print("[Disable Character Touch] Enabled")
     end
 
     local function disableDisableTouch()
         if not isEnabled then
-            print("[Disable Touch] Already disabled")
+            print("[Disable Character Touch] Already disabled")
             return
         end
         isEnabled = false
         pcall(function()
-            if scanConnection then
-                pcall(function() scanConnection:Disconnect() end)
-                scanConnection = nil
+            if characterConn then
+                pcall(function() characterConn:Disconnect() end)
+                characterConn = nil
             end
-            restoreTouch()
-            print("[Disable Touch] Disabled")
+            restoreCharacterTouch()
+            print("[Disable Character Touch] Disabled")
         end)
     end
 
     local success, _ = pcall(function()
-        Toggles.DisableTouchToggle:OnChanged(function(value)
+        Toggles.DisableCharacterTouchToggle:OnChanged(function(value)
             pcall(function()
-                print("[Disable Touch] Toggle changed to: " .. tostring(value))
+                print("[Disable Character Touch] Toggle changed to: " .. tostring(value))
                 if value then
                     enableDisableTouch()
                 else
@@ -1196,7 +1034,7 @@ pcall(function()
         end)
     end)
     if not success then
-        warn("[Disable Touch] Failed to set toggle callback")
+        warn("[Disable Character Touch] Failed to set toggle callback")
     end
 
     pcall(function()
