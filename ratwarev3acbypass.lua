@@ -912,9 +912,10 @@ pcall(function()
     local isEnabled = false
     local affectedParts = {} -- Store parts and their original CanTouch state
     local targetFolders = {"Burning", "Knocked", "HealthPackCD", "FallRagdoll"}
-    local targetColorTurquoise = Color3.fromRGB(120, 255, 181)
-    local targetColorPersimmon = Color3.fromRGB(255, 91, 62)
-    local scanInterval = 5 -- Seconds between scans
+    local targetColorTurquoise = BrickColor.new("Turquoise")
+    local targetColorPersimmon = BrickColor.new("Persimmon")
+    local scanInterval = 10 -- Increased to 10 seconds for less frequent scans
+    local maxPartsPerScan = 100 -- Cap on parts processed per scan
     local scanConnection = nil
     local lastScanTime = 0
 
@@ -939,6 +940,10 @@ pcall(function()
         local success, isBasePart = pcall(function() return part:IsA("BasePart") or part:IsA("MeshPart") end)
         if not success or not isBasePart then return false end
 
+        local successName, name = pcall(function() return part.Name end)
+        local successColor, color = pcall(function() return part.BrickColor end)
+        local successMaterial, material = pcall(function() return part.Material end)
+
         -- Check moundkillbricks
         local successMound, mound = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map", "moundkillbricks")) end)
         if successMound and mound then
@@ -952,21 +957,18 @@ pcall(function()
         end
 
         -- Check Turquoise Neon
-        local successColor, color = pcall(function() return part.BrickColor end)
-        local successMaterial, material = pcall(function() return part.Material end)
-        if successColor and successMaterial and color == BrickColor.new("Turquoise") and material == Enum.Material.Neon then
+        if successColor and successMaterial and color == targetColorTurquoise and material == Enum.Material.Neon then
             return true
         end
 
         -- Check part named "void"
-        local successName, name = pcall(function() return part.Name end)
         if successName and name == "void" then
             return true
         end
 
         -- Check Persimmon Neon under Workspace.Map
         local successMap, isMap = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map")) end)
-        if successMap and isMap and successColor and successMaterial and color == BrickColor.new("Persimmon") and material == Enum.Material.Neon then
+        if successMap and isMap and successColor and successMaterial and color == targetColorPersimmon and material == Enum.Material.Neon then
             return true
         end
 
@@ -975,51 +977,125 @@ pcall(function()
 
     local function scanAndDisableTouch()
         pcall(function()
-            -- Scan Workspace for folders
-            local success, workspaceChildren = pcall(function() return Workspace:GetChildren() end)
-            if not success then
-                warn("[Disable Touch] Failed to get Workspace children: " .. tostring(workspaceChildren))
-                return
-            end
-            for _, folder in ipairs(workspaceChildren) do
-                pcall(function()
-                    local successName, folderName = pcall(function() return folder.Name end)
-                    if successName and table.find(targetFolders, folderName) then
-                        local successDescendants, descendants = pcall(function() return folder:GetDescendants() end)
-                        if successDescendants then
-                            for _, part in ipairs(descendants) do
-                                pcall(function()
-                                    if part:IsA("BasePart") or part:IsA("MeshPart") then
-                                        local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                                        if successCanTouch and not affectedParts[part] then
-                                            affectedParts[part] = canTouch
-                                            pcall(function() part.CanTouch = false end)
-                                        end
-                                    end
-                                end)
-                            end
-                        end
-                    end
-                end)
-            end
+            local partsProcessed = 0
 
-            -- Scan Workspace for specific parts
-            local successDescendants, allDescendants = pcall(function() return Workspace:GetDescendants() end)
-            if successDescendants then
-                for _, part in ipairs(allDescendants) do
+            -- Scan specific folders
+            local success, workspaceChildren = pcall(function() return Workspace:GetChildren() end)
+            if success then
+                for _, folder in ipairs(workspaceChildren) do
+                    if partsProcessed >= maxPartsPerScan then break end
                     pcall(function()
-                        if isTargetPart(part) then
-                            local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
-                            if successCanTouch and not affectedParts[part] then
-                                affectedParts[part] = canTouch
-                                pcall(function() part.CanTouch = false end)
+                        local successName, folderName = pcall(function() return folder.Name end)
+                        if successName and table.find(targetFolders, folderName) then
+                            local successDescendants, descendants = pcall(function() return folder:GetDescendants() end)
+                            if successDescendants then
+                                for _, part in ipairs(descendants) do
+                                    if partsProcessed >= maxPartsPerScan then break end
+                                    pcall(function()
+                                        if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
+                                            local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                            if successCanTouch then
+                                                affectedParts[part] = canTouch
+                                                pcall(function() part.CanTouch = false end)
+                                                partsProcessed = partsProcessed + 1
+                                            end
+                                        end
+                                    end)
+                                end
                             end
                         end
                     end)
                 end
             end
 
-            print("[Disable Touch] Disabled touch for " .. tostring(table.getn(affectedParts)) .. " parts")
+            -- Scan moundkillbricks
+            local moundFolder = safeGet(Workspace, "Map", "moundkillbricks")
+            if moundFolder then
+                local successDescendants, descendants = pcall(function() return moundFolder:GetDescendants() end)
+                if successDescendants then
+                    for _, part in ipairs(descendants) do
+                        if partsProcessed >= maxPartsPerScan then break end
+                        pcall(function()
+                            if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
+                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                if successCanTouch then
+                                    affectedParts[part] = canTouch
+                                    pcall(function() part.CanTouch = false end)
+                                    partsProcessed = partsProcessed + 1
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+
+            -- Scan BanditCampfire
+            local campfireFolder = safeGet(Workspace, "Debris", "BanditCampfire")
+            if campfireFolder then
+                local successDescendants, descendants = pcall(function() return campfireFolder:GetDescendants() end)
+                if successDescendants then
+                    for _, part in ipairs(descendants) do
+                        if partsProcessed >= maxPartsPerScan then break end
+                        pcall(function()
+                            if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
+                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                if successCanTouch then
+                                    affectedParts[part] = canTouch
+                                    pcall(function() part.CanTouch = false end)
+                                    partsProcessed = partsProcessed + 1
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+
+            -- Scan Workspace.Map for Persimmon Neon and void parts
+            local mapFolder = safeGet(Workspace, "Map")
+            if mapFolder then
+                local successDescendants, descendants = pcall(function() return mapFolder:GetDescendants() end)
+                if successDescendants then
+                    for _, part in ipairs(descendants) do
+                        if partsProcessed >= maxPartsPerScan then break end
+                        pcall(function()
+                            if isTargetPart(part) and not affectedParts[part] then
+                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                if successCanTouch then
+                                    affectedParts[part] = canTouch
+                                    pcall(function() part.CanTouch = false end)
+                                    partsProcessed = partsProcessed + 1
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+
+            -- Scan Workspace for void and Turquoise Neon parts
+            local successDescendants, allDescendants = pcall(function() return Workspace:GetDescendants() end)
+            if successDescendants then
+                for _, part in ipairs(allDescendants) do
+                    if partsProcessed >= maxPartsPerScan then break end
+                    pcall(function()
+                        local successName, name = pcall(function() return part.Name end)
+                        local successColor, color = pcall(function() return part.BrickColor end)
+                        local successMaterial, material = pcall(function() return part.Material end)
+                        if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
+                            if (successName and name == "void") or
+                               (successColor and successMaterial and color == targetColorTurquoise and material == Enum.Material.Neon) then
+                                local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                if successCanTouch then
+                                    affectedParts[part] = canTouch
+                                    pcall(function() part.CanTouch = false end)
+                                    partsProcessed = partsProcessed + 1
+                                end
+                            end
+                        end
+                    end)
+                end
+            end
+
+            print("[Disable Touch] Disabled touch for " .. partsProcessed .. " parts in scan")
         end)
     end
 
@@ -1066,16 +1142,20 @@ pcall(function()
             warn("[Disable Touch] Failed to connect Heartbeat: " .. tostring(conn))
         end
 
-        -- Monitor for new parts
+        -- Monitor specific folders for new parts
         local successDescendant, descendantConn = pcall(function()
             return Workspace.DescendantAdded:Connect(function(descendant)
                 pcall(function()
-                    if isEnabled and isTargetPart(descendant) then
-                        local successCanTouch, canTouch = pcall(function() return descendant.CanTouch end)
-                        if successCanTouch and not affectedParts[descendant] then
-                            affectedParts[descendant] = canTouch
-                            pcall(function() descendant.CanTouch = false end)
-                            print("[Disable Touch] Disabled touch for new part: " .. tostring(descendant.Name))
+                    if isEnabled and (descendant:IsDescendantOf(safeGet(Workspace, "Map")) or
+                                     descendant:IsDescendantOf(safeGet(Workspace, "Debris")) or
+                                     table.find(targetFolders, safeGet(descendant, "Parent", "Name") or "")) then
+                        if isTargetPart(descendant) and not affectedParts[descendant] then
+                            local successCanTouch, canTouch = pcall(function() return descendant.CanTouch end)
+                            if successCanTouch then
+                                affectedParts[descendant] = canTouch
+                                pcall(function() descendant.CanTouch = false end)
+                                print("[Disable Touch] Disabled touch for new part: " .. tostring(descendant.Name))
+                            end
                         end
                     end
                 end)
