@@ -79,10 +79,9 @@ MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
-
 -- Moderator Notifier GUI
-local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Moderators")
-ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
+local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Notifications")
+NotificationsGroup:AddToggle("ModeratorNotifierToggle", {
     Text = "Moderator Notifier",
     Default = false,
     Tooltip = "Shows a popup when moderators are in the server",
@@ -93,6 +92,20 @@ ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
         end)
     end
 })
+-- Auto Kick GUI
+pcall(function()
+    NotificationsGroup:AddToggle("AutoKickToggle", {
+        Text = "Auto Kick on Staff Detection",
+        Default = false,
+        Tooltip = "Kicks you from the game if Developers, Community Managers, Moderators, or The Hydra are detected",
+        Callback = function(value)
+            pcall(function()
+                _G.toggleAutoKick(value)
+                print("[Auto Kick GUI] Toggle set to: " .. tostring(value))
+            end)
+        end
+    })
+end)
 
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
@@ -2397,6 +2410,125 @@ pcall(function()
     game:BindToClose(function()
         pcall(function()
             stopMonitoring()
+        end)
+    end)
+end)
+
+-- Auto Kick Module
+pcall(function()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local IsKickingEnabled = false
+    local MonitorConn = nil
+    local TargetRoles = {
+        "Developers",
+        "Community Manager",
+        "Senior Moderator",
+        "The Hydra",
+        "Junior Moderator",
+        "Moderator"
+    }
+
+    -- Reference the MonitoredUsers table from ModeratorNotifier
+    local MonitoredUsers = _G.MonitoredUsers or {}
+    local UserCache = {} -- Cache: {UserId = {username, roleName}}
+
+    local function safeGet(obj, ...)
+        local args = {...}
+        for i, v in ipairs(args) do
+            local ok, res = pcall(function() return obj[v] end)
+            if not ok then
+                print("[Auto Kick] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                return nil
+            end
+            obj = res
+            if not obj then
+                print("[Auto Kick] safeGet returned nil for " .. tostring(v))
+                return nil
+            end
+        end
+        return obj
+    end
+
+    local function getPlayerRole(player)
+        if not player then return nil end
+        if UserCache[player.UserId] then
+            UserCache[player.UserId].username = player.Name
+            print("[Auto Kick] Using cached role for " .. player.Name .. ": " .. tostring(UserCache[player.UserId].roleName))
+            return UserCache[player.UserId]
+        end
+        for _, user in ipairs(MonitoredUsers) do
+            if user.userId == player.UserId then
+                UserCache[player.UserId] = {username = player.Name, roleName = user.roleName}
+                print("[Auto Kick] Found role for " .. player.Name .. ": " .. user.roleName .. " (UserId " .. user.userId .. ")")
+                return UserCache[player.UserId]
+            end
+        end
+        UserCache[player.UserId] = {username = player.Name, roleName = "None"}
+        return nil
+    end
+
+    local function checkAndKick()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local role = getPlayerRole(player)
+                if role and table.find(TargetRoles, role.roleName) then
+                    print("[Auto Kick] Detected " .. role.roleName .. ": " .. player.Name .. ", kicking player")
+                    LocalPlayer:Kick("Detected staff member: " .. role.roleName .. " (" .. player.Name .. ")")
+                    return
+                end
+            end
+        end
+    end
+
+    local function startKicking()
+        if IsKickingEnabled then
+            print("[Auto Kick] Kicking already active")
+            return
+        end
+        IsKickingEnabled = true
+        print("[Auto Kick] Starting kick monitoring")
+        checkAndKick()
+        MonitorConn = Players.PlayerAdded:Connect(function(player)
+            pcall(function()
+                if player == LocalPlayer then return end
+                local role = getPlayerRole(player)
+                if role and table.find(TargetRoles, role.roleName) then
+                    print("[Auto Kick] Player added with target role: " .. player.Name .. " (" .. role.roleName .. "), kicking")
+                    LocalPlayer:Kick("Detected staff member: " .. role.roleName .. " (" .. player.Name .. ")")
+                end
+            end)
+        end)
+    end
+
+    local function stopKicking()
+        if not IsKickingEnabled then
+            print("[Auto Kick] Kicking not active")
+            return
+        end
+        IsKickingEnabled = false
+        if MonitorConn then
+            MonitorConn:Disconnect()
+            MonitorConn = nil
+        end
+        UserCache = {}
+        print("[Auto Kick] Stopped kicking")
+    end
+
+    _G.toggleAutoKick = function(value)
+        pcall(function()
+            print("[Auto Kick] Toggle changed to: " .. tostring(value))
+            if value then
+                startKicking()
+            else
+                stopKicking()
+            end
+        end)
+    end
+
+    game:BindToClose(function()
+        pcall(function()
+            stopKicking()
         end)
     end)
 end)
