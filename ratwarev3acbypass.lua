@@ -85,19 +85,12 @@ local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Moderators")
 ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
     Text = "Moderator Notifier",
     Default = false,
-    Tooltip = "Notifies when moderators are in the server",
+    Tooltip = "Shows a popup when moderators are in the server",
     Callback = function(value)
         pcall(function()
             _G.toggleModeratorNotifier(value)
             print("[Moderator Notifier GUI] Toggle set to: " .. tostring(value))
         end)
-    end
-}):AddKeyPicker("ModeratorNotifierBind", {
-    Default = "",
-    Mode = "Toggle",
-    Text = "N/A",
-    Callback = function(value)
-        Toggles.ModeratorNotifierToggle:SetValue(value)
     end
 })
 
@@ -1961,6 +1954,7 @@ end
 pcall(function()
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
     local LocalPlayer = Players.LocalPlayer
     local GroupId = 5161694
     local MonitoredRoles = {
@@ -1977,7 +1971,8 @@ pcall(function()
         {id = 34381140, name = "The Hydra"}
     }
     local RoleCache = {} -- Cache: {PlayerId = {roleId, roleName}}
-    local ActiveNotifications = {} -- Tracks active notifications: {NotificationId = true}
+    local NotificationGui = nil
+    local NotificationLabel = nil
     local IsMonitoring = false
     local MonitorConn = nil
 
@@ -1996,6 +1991,64 @@ pcall(function()
             end
         end
         return obj
+    end
+
+    local function createNotificationGui()
+        if NotificationGui then
+            NotificationGui:Destroy()
+        end
+        NotificationGui = Instance.new("ScreenGui")
+        NotificationGui.Name = "ModeratorNotifierGui"
+        NotificationGui.Parent = game:GetService("CoreGui")
+        NotificationGui.IgnoreGuiInset = true
+        NotificationGui.Enabled = false
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 100)
+        frame.Position = UDim2.new(0.5, -150, 0.1, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        frame.Parent = NotificationGui
+
+        local uiCorner = Instance.new("UICorner")
+        uiCorner.CornerRadius = UDim.new(0, 8)
+        uiCorner.Parent = frame
+
+        NotificationLabel = Instance.new("TextLabel")
+        NotificationLabel.Size = UDim2.new(1, -20, 1, -20)
+        NotificationLabel.Position = UDim2.new(0, 10, 0, 10)
+        NotificationLabel.BackgroundTransparency = 1
+        NotificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NotificationLabel.TextScaled = true
+        NotificationLabel.TextWrapped = true
+        NotificationLabel.Font = Enum.Font.SourceSans
+        NotificationLabel.Text = ""
+        NotificationLabel.Parent = frame
+    end
+
+    local function updateNotification()
+        local rolePlayers = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local role = getPlayerRole(player)
+                if role then
+                    table.insert(rolePlayers, role.roleName .. " is in server: " .. player.Name)
+                end
+            end
+        end
+        if #rolePlayers > 0 then
+            if not NotificationGui then
+                createNotificationGui()
+            end
+            NotificationGui.Enabled = true
+            NotificationLabel.Text = table.concat(rolePlayers, ", ")
+            print("[Moderator Notifier] Notification shown: " .. NotificationLabel.Text)
+        elseif NotificationGui then
+            NotificationGui.Enabled = false
+            NotificationLabel.Text = ""
+            print("[Moderator Notifier] No moderators, notification hidden")
+        end
     end
 
     local function getPlayerRole(player)
@@ -2030,40 +2083,6 @@ pcall(function()
         return nil
     end
 
-    local function updateNotification()
-        local rolePlayers = {}
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local role = getPlayerRole(player)
-                if role then
-                    table.insert(rolePlayers, player.Name .. " (" .. role.roleName .. ")")
-                end
-            end
-        end
-        local message = #rolePlayers > 0 and "Moderators in server: " .. table.concat(rolePlayers, ", ") or nil
-        local existingNotif = next(ActiveNotifications)
-        if message and not existingNotif then
-            local notifId = HttpService:GenerateGUID(false)
-            ActiveNotifications[notifId] = true
-            Library:Notify(message, {Duration = 9999})
-            print("[Moderator Notifier] Notification shown: " .. message)
-        elseif not message and existingNotif then
-            for notifId in pairs(ActiveNotifications) do
-                ActiveNotifications[notifId] = nil
-            end
-            Library:Notify("No moderators in server.", {Duration = 3})
-            print("[Moderator Notifier] All moderators left, notification cleared")
-        elseif message and existingNotif then
-            for notifId in pairs(ActiveNotifications) do
-                ActiveNotifications[notifId] = nil
-            end
-            local notifId = HttpService:GenerateGUID(false)
-            ActiveNotifications[notifId] = true
-            Library:Notify(message, {Duration = 9999})
-            print("[Moderator Notifier] Notification updated: " .. message)
-        end
-    end
-
     local function startMonitoring()
         if IsMonitoring then
             print("[Moderator Notifier] Monitoring already active")
@@ -2092,7 +2111,6 @@ pcall(function()
                 print("[Moderator Notifier] Player removed: " .. player.Name)
             end)
         end)
-        Library:Notify("Moderator Notifier enabled.", {Duration = 3})
     end
 
     local function stopMonitoring()
@@ -2105,11 +2123,12 @@ pcall(function()
             MonitorConn:Disconnect()
             MonitorConn = nil
         end
-        for notifId in pairs(ActiveNotifications) do
-            ActiveNotifications[notifId] = nil
+        if NotificationGui then
+            NotificationGui:Destroy()
+            NotificationGui = nil
+            NotificationLabel = nil
         end
         RoleCache = {}
-        Library:Notify("Moderator Notifier disabled.", {Duration = 3})
         print("[Moderator Notifier] Stopped monitoring")
     end
 
