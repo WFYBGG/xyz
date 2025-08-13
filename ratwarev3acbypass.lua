@@ -540,7 +540,7 @@ MainGroup6:AddSlider("ATBHeight", {
     Rounding = 0,
     Compact = true
 })
-MainGroup6:AddSlider("ATBDistance)", {
+MainGroup6:AddSlider("ATBDistance", {
     Text = "Distance",
     Default = -3,
     Min = -100,
