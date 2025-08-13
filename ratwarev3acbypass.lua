@@ -893,7 +893,7 @@ pcall(function()
     end)
 end)
 
--- Swim Status Module
+-- Anti-AA Bypass/No Fire/Swim Status Module
 pcall(function()
     local success, ReplicatedStorage = pcall(function() return game:GetService("ReplicatedStorage") end)
     if not success then
@@ -912,6 +912,7 @@ pcall(function()
     end
 
     local isEnabled = false
+    local characterConn = nil
 
     local function safeGet(obj, ...)
         local args = {...}
@@ -930,21 +931,16 @@ pcall(function()
         return obj
     end
 
-    local function enableSwimStatus()
-        if isEnabled then
-            print("[Swim Status] Already enabled")
-            return
-        end
-        isEnabled = true
+    local function fireSwimStatus(state)
         pcall(function()
             local remotes = safeGet(ReplicatedStorage, "Remotes")
             local mainRemote = remotes and safeGet(remotes, "Main")
             if mainRemote then
                 local success, result = pcall(function()
-                    mainRemote:FireServer("swim", true)
+                    mainRemote:FireServer("swim", state)
                 end)
                 if success then
-                    print("[Swim Status] Swim status enabled")
+                    print("[Swim Status] Swim status set to: " .. tostring(state))
                 else
                     warn("[Swim Status] Failed to fire swim status remote: " .. tostring(result))
                 end
@@ -954,28 +950,53 @@ pcall(function()
         end)
     end
 
+    local function enableSwimStatus()
+        if isEnabled then
+            print("[Swim Status] Already enabled")
+            return
+        end
+        isEnabled = true
+        fireSwimStatus(true)
+
+        -- Handle character respawn
+        pcall(function()
+            if characterConn then
+                characterConn:Disconnect()
+            end
+            local success, conn = pcall(function()
+                return LocalPlayer.CharacterAdded:Connect(function()
+                    pcall(function()
+                        if isEnabled then
+                            task.wait(1) -- Wait for character to fully load
+                            fireSwimStatus(true)
+                            print("[Swim Status] Swim status reactivated on character respawn")
+                        end
+                    end)
+                end)
+            end)
+            if not success then
+                warn("[Swim Status] Failed to connect CharacterAdded: " .. tostring(conn))
+            else
+                characterConn = conn
+            end
+        end)
+        print("[Swim Status] Enabled")
+    end
+
     local function disableSwimStatus()
         if not isEnabled then
             print("[Swim Status] Already disabled")
             return
         end
         isEnabled = false
+        fireSwimStatus(false)
         pcall(function()
-            local remotes = safeGet(ReplicatedStorage, "Remotes")
-            local mainRemote = remotes and safeGet(remotes, "Main")
-            if mainRemote then
-                local success, result = pcall(function()
-                    mainRemote:FireServer("swim", false)
-                end)
-                if success then
-                    print("[Swim Status] Swim status disabled")
-                else
-                    warn("[Swim Status] Failed to fire swim status remote: " .. tostring(result))
-                end
-            else
-                warn("[Swim Status] Main remote not found")
+            if characterConn then
+                characterConn:Disconnect()
+                characterConn = nil
             end
         end)
+        print("[Swim Status] Disabled")
     end
 
     local success, _ = pcall(function()
