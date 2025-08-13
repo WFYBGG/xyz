@@ -84,7 +84,7 @@ MainGroup1:AddToggle("NoFallDamage", {
 local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Moderators")
 ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
     Text = "Moderator Notifier",
-    Default = true,
+    Default = false,
     Tooltip = "Shows a popup when moderators are in the server",
     Callback = function(value)
         pcall(function()
@@ -1955,7 +1955,7 @@ pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local MonitoredUsers = {
-        {userId = 1844780990, username = "NotA5H", roleName = "Ratware.exe"},
+        {userId = 1273903270, username = "drexx66", roleName = "Developers"},
         {userId = 116279325, username = "MichaelpizzaXD", roleName = "Developers"},
         {userId = 101557551, username = "MlgArcOfOz", roleName = "Developers"},
         {userId = 66885812, username = "MiniTomBomb", roleName = "Developers"},
@@ -2005,7 +2005,7 @@ pcall(function()
         {userId = 6056339939, username = "NotAhmi4", roleName = "Junior Moderator"},
         {userId = 475990670, username = "blzz4rd", roleName = "Junior Moderator"},
         {userId = 1834007574, username = "MintyKobold", roleName = "Junior Moderator"},
-        {userId = 1745860240, username = "AstralZix", roleName = "Junior Moderator"},
+        {userId = 174586024 Ableton, username = "AstralZix", roleName = "Junior Moderator"},
         {userId = 985681917, username = "PikaNubby", roleName = "Junior Moderator"},
         {userId = 33242043, username = "piercingTYB", roleName = "Junior Moderator"},
         {userId = 83742361, username = "0utcastGhost", roleName = "Junior Moderator"},
@@ -2269,7 +2269,7 @@ pcall(function()
         NotificationGui.Enabled = false
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 200, 0, 60) -- Smaller popup size
+        frame.Size = UDim2.new(0, 200, 0, 60)
         frame.Position = UDim2.new(0.5, -100, 0.1, 0)
         frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         frame.BackgroundTransparency = 0.3
@@ -2284,9 +2284,11 @@ pcall(function()
         NotificationLabel.Size = UDim2.new(1, -10, 1, -10)
         NotificationLabel.Position = UDim2.new(0, 5, 0, 5)
         NotificationLabel.BackgroundTransparency = 1
-        NotificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Default, will be overridden
+        NotificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         NotificationLabel.TextScaled = true
         NotificationLabel.TextWrapped = true
+        NotificationLabel.TextXAlignment = Enum.TextXAlignment.Left
+        NotificationLabel.TextYAlignment = Enum.TextYAlignment.Center
         NotificationLabel.Font = Enum.Font.SourceSans
         NotificationLabel.Text = ""
         NotificationLabel.Parent = frame
@@ -2295,7 +2297,6 @@ pcall(function()
     local function getPlayerRole(player)
         if not player then return nil end
         if UserCache[player.UserId] then
-            -- Update username from player object to ensure it's current
             UserCache[player.UserId].username = player.Name
             print("[Moderator Notifier] Using cached role for " .. player.Name .. ": " .. tostring(UserCache[player.UserId].roleName))
             return UserCache[player.UserId]
@@ -2327,7 +2328,7 @@ pcall(function()
             end
             NotificationGui.Enabled = true
             NotificationLabel.TextColor3 = Color3.fromRGB(255, 20, 20) -- Neon red
-            NotificationLabel.Text = table.concat(rolePlayers, "\n")
+            NotificationLabel.Text = table.concat(rolePlayers, ", ")
             print("[Moderator Notifier] Notification shown: " .. NotificationLabel.Text)
         else
             if not NotificationGui then
