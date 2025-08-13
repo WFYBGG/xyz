@@ -79,19 +79,45 @@ MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
--- Water Duplicate GUI
-MainGroup1:AddToggle("WaterDuplicateToggle", {
-    Text = "Anti-AA",
-    Default = false,
-    Tooltip = "Duplicates the 'water' part below your humanoid"
-}):AddKeyPicker("WaterDuplicateBind", {
-    Default = "",
-    Mode = "Toggle",
-    Text = "N/A",
-    Callback = function(value)
-        Toggles.WaterDuplicateToggle:SetValue(value)
+-- Swim Status GUI
+pcall(function()
+    local success, Group = pcall(function()
+        return Tabs.Main:AddLeftGroupbox("Swim Status")
+    end)
+    if not success or not Group then
+        warn("[Swim Status GUI] Failed to create groupbox: " .. tostring(Group))
+        return
     end
-})
+
+    local success, toggle = pcall(function()
+        return Group:AddToggle("SwimStatusToggle", {
+            Text = "Swim Status",
+            Default = false,
+            Tooltip = "Toggles swim status via remote event"
+        })
+    end)
+    if not success or not toggle then
+        warn("[Swim Status GUI] Failed to create toggle: " .. tostring(toggle))
+        return
+    end
+
+    local success, keybind = pcall(function()
+        return toggle:AddKeyPicker("SwimStatusBind", {
+            Default = "",
+            Mode = "Toggle",
+            Text = "N/A",
+            Callback = function(value)
+                pcall(function()
+                    Toggles.SwimStatusToggle:SetValue(value)
+                    print("[Swim Status GUI] Keybind toggled to: " .. tostring(value))
+                end)
+            end
+        })
+    end)
+    if not success then
+        warn("[Swim Status GUI] Failed to create keybind: " .. tostring(keybind))
+    end)
+end)
 
 -- Moderator Notifier GUI
 local NotificationsGroup = Tabs.Main:AddRightGroupbox("Notifications")
@@ -894,204 +920,110 @@ pcall(function()
     end)
 end)
 
--- Water Duplicate Module
+-- Swim Status Module
 pcall(function()
-    local success, Workspace = pcall(function() return game:GetService("Workspace") end)
+    local success, ReplicatedStorage = pcall(function() return game:GetService("ReplicatedStorage") end)
     if not success then
-        warn("[Water Duplicate] Failed to get Workspace: " .. tostring(Workspace))
-        return
-    end
-    local success, PhysicsService = pcall(function() return game:GetService("PhysicsService") end)
-    if not success then
-        warn("[Water Duplicate] Failed to get PhysicsService: " .. tostring(PhysicsService))
+        warn("[Swim Status] Failed to get ReplicatedStorage: " .. tostring(ReplicatedStorage))
         return
     end
     local success, Players = pcall(function() return game:GetService("Players") end)
     if not success then
-        warn("[Water Duplicate] Failed to get Players: " .. tostring(Players))
-        return
-    end
-    local success, RunService = pcall(function() return game:GetService("RunService") end)
-    if not success then
-        warn("[Water Duplicate] Failed to get RunService: " .. tostring(RunService))
+        warn("[Swim Status] Failed to get Players: " .. tostring(Players))
         return
     end
     local success, LocalPlayer = pcall(function() return Players.LocalPlayer end)
     if not success then
-        warn("[Water Duplicate] Failed to get LocalPlayer: " .. tostring(LocalPlayer))
+        warn("[Swim Status] Failed to get LocalPlayer: " .. tostring(LocalPlayer))
         return
     end
 
-    local duplicatePart = nil
     local isEnabled = false
-    local collisionGroupCharacter = "Character"
-    local collisionGroupWater = "WaterPart"
 
     local function safeGet(obj, ...)
         local args = {...}
         for i, v in ipairs(args) do
             local ok, res = pcall(function() return obj[v] end)
             if not ok then
-                warn("[Water Duplicate] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                warn("[Swim Status] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
                 return nil
             end
             obj = res
             if not obj then
-                warn("[Water Duplicate] safeGet returned nil for " .. tostring(v))
+                warn("[Swim Status] safeGet returned nil for " .. tostring(v))
                 return nil
             end
         end
         return obj
     end
 
-    local function createCollisionGroups()
-        pcall(function()
-            local success1 = pcall(function() PhysicsService:CreateCollisionGroup(collisionGroupCharacter) end)
-            local success2 = pcall(function() PhysicsService:CreateCollisionGroup(collisionGroupWater) end)
-            local success3 = pcall(function() PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, collisionGroupCharacter, true) end)
-            local success4 = pcall(function() PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, "Default", false) end)
-            if success1 and success2 and success3 and success4 then
-                print("[Water Duplicate] Collision groups created")
-            else
-                warn("[Water Duplicate] Failed to create collision groups")
-            end
-        end)
-    end
-
-    local function setCharacterCollisionGroup()
-        pcall(function()
-            local char = safeGet(LocalPlayer, "Character")
-            if not char then
-                warn("[Water Duplicate] Character not found")
-                return
-            end
-            local success, descendants = pcall(function() return char:GetDescendants() end)
-            if not success then
-                warn("[Water Duplicate] Failed to get character descendants: " .. tostring(descendants))
-                return
-            end
-            for _, part in ipairs(descendants) do
-                pcall(function()
-                    if part:IsA("BasePart") then
-                        PhysicsService:SetPartCollisionGroup(part, collisionGroupCharacter)
-                    end
-                end)
-            end
-            print("[Water Duplicate] Character parts set to collision group")
-        end)
-    end
-
-    local function enableDuplicate()
+    local function enableSwimStatus()
         if isEnabled then
-            print("[Water Duplicate] Already enabled")
+            print("[Swim Status] Already enabled")
             return
         end
         isEnabled = true
-        pcall(createCollisionGroups)
-        pcall(setCharacterCollisionGroup)
-
         pcall(function()
-            local waterPart = Workspace:FindFirstChild("water", true)
-            if not waterPart or not waterPart:IsA("Part") then
-                warn("[Water Duplicate] No 'water' part found")
-                return
-            end
-            local success, clonedPart = pcall(function() return waterPart:Clone() end)
-            if not success or not clonedPart then
-                warn("[Water Duplicate] Failed to clone water part: " .. tostring(clonedPart))
-                return
-            end
-            duplicatePart = clonedPart
-            pcall(function()
-                duplicatePart.Name = "DuplicateWater"
-                duplicatePart.Size = Vector3.new(10, 1, 10)
-                duplicatePart.CanCollide = true
-                duplicatePart.Anchored = true
-                PhysicsService:SetPartCollisionGroup(duplicatePart, collisionGroupWater)
-                duplicatePart.Parent = Workspace
-            end)
-
-            local success, charConn = pcall(function()
-                return LocalPlayer.CharacterAdded:Connect(function(char)
-                    pcall(function()
-                        task.wait(1)
-                        setCharacterCollisionGroup()
-                        updatePosition()
-                    end)
+            local remotes = safeGet(ReplicatedStorage, "Remotes")
+            local mainRemote = remotes and safeGet(remotes, "Main")
+            if mainRemote then
+                local success, result = pcall(function()
+                    mainRemote:FireServer("swim", true)
                 end)
-            end)
-            if not success then
-                warn("[Water Duplicate] Failed to connect CharacterAdded: " .. tostring(charConn))
-            end
-
-            local success, renderConn = pcall(function()
-                return RunService.RenderStepped:Connect(function()
-                    if isEnabled then
-                        pcall(updatePosition)
-                    end
-                end)
-            end)
-            if not success then
-                warn("[Water Duplicate] Failed to connect RenderStepped: " .. tostring(renderConn))
-            end
-
-            print("[Water Duplicate] Enabled and duplicate created")
-        end)
-    end
-
-    local function updatePosition()
-        pcall(function()
-            local char = safeGet(LocalPlayer, "Character")
-            local hrp = char and safeGet(char, "HumanoidRootPart")
-            if hrp and duplicatePart then
-                local success = pcall(function()
-                    duplicatePart.CFrame = CFrame.new(
-                        hrp.Position.X,
-                        hrp.Position.Y - (hrp.Size.Y / 2 + duplicatePart.Size.Y / 2),
-                        hrp.Position.Z
-                    )
-                end)
-                if not success then
-                    warn("[Water Duplicate] Failed to update position")
+                if success then
+                    print("[Swim Status] Swim status enabled")
+                else
+                    warn("[Swim Status] Failed to fire swim status remote: " .. tostring(result))
                 end
+            else
+                warn("[Swim Status] Main remote not found")
             end
         end)
     end
 
-    local function disableDuplicate()
+    local function disableSwimStatus()
         if not isEnabled then
-            print("[Water Duplicate] Already disabled")
+            print("[Swim Status] Already disabled")
             return
         end
         isEnabled = false
         pcall(function()
-            if duplicatePart then
-                duplicatePart:Destroy()
-                duplicatePart = nil
+            local remotes = safeGet(ReplicatedStorage, "Remotes")
+            local mainRemote = remotes and safeGet(remotes, "Main")
+            if mainRemote then
+                local success, result = pcall(function()
+                    mainRemote:FireServer("swim", false)
+                end)
+                if success then
+                    print("[Swim Status] Swim status disabled")
+                else
+                    warn("[Swim Status] Failed to fire swim status remote: " .. tostring(result))
+                end
+            else
+                warn("[Swim Status] Main remote not found")
             end
-            print("[Water Duplicate] Disabled and duplicate destroyed")
         end)
     end
 
     local success, _ = pcall(function()
-        Toggles.WaterDuplicateToggle:OnChanged(function(value)
+        Toggles.SwimStatusToggle:OnChanged(function(value)
             pcall(function()
-                print("[Water Duplicate] Toggle changed to: " .. tostring(value))
+                print("[Swim Status] Toggle changed to: " .. tostring(value))
                 if value then
-                    enableDuplicate()
+                    enableSwimStatus()
                 else
-                    disableDuplicate()
+                    disableSwimStatus()
                 end
             end)
         end)
     end)
     if not success then
-        warn("[Water Duplicate] Failed to set toggle callback")
+        warn("[Swim Status] Failed to set toggle callback")
     end
 
     pcall(function()
         game:BindToClose(function()
-            pcall(disableDuplicate)
+            pcall(disableSwimStatus)
         end)
     end)
 end)
