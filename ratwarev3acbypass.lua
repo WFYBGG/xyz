@@ -1500,6 +1500,7 @@ pcall(function()
     local Players = game:GetService("Players")
     local TweenService = game:GetService("TweenService")
     local RunService = game:GetService("RunService")
+    local Workspace = game:GetService("Workspace")
     local LocalPlayer = Players.LocalPlayer
 
     _G.targetPlayer = nil
@@ -1507,43 +1508,56 @@ pcall(function()
     local attachConn = nil
     local isTweening = false
     local isLocked = false
+    local messageDebounce = false
+    local heightOffset = 0 -- Matches ATBHeight default
+    local zDistance = -4 -- Matches ATBDistance default
     local originalSpeed = 150
 
     local function safeGet(obj, ...)
         local args = {...}
         for i, v in ipairs(args) do
             local ok, res = pcall(function() return obj[v] end)
-            if not ok then return nil end
+            if not ok then
+                print("[Attach to Back] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                return nil
+            end
             obj = res
-            if not obj then return nil end
+            if not obj then
+                print("[Attach to Back] safeGet returned nil for " .. tostring(v))
+                return nil
+            end
         end
         return obj
     end
 
     local function tweenToBack()
-        if isTweening or isLocked then return false end
+        if isTweening or isLocked then
+            print("[Attach to Back] tweenToBack skipped: isTweening=" .. tostring(isTweening) .. ", isLocked=" .. tostring(isLocked))
+            return false
+        end
         isTweening = true
         local success, result = pcall(function()
-            local char = LocalPlayer.Character
-            local targetChar = _G.targetPlayer and _G.targetPlayer.Character
+            local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+            local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
             local hrp = char and safeGet(char, "HumanoidRootPart")
             local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
             if not (hrp and targetHrp) then
                 Library:Notify("Failed to find player or target character!", { Duration = 3 })
-                print("[Attach to Back] Tween failed: Missing HRP or target HRP")
+                print("[Attach to Back] Tween failed: hrp=" .. tostring(hrp) .. ", targetHrp=" .. tostring(targetHrp))
                 return false
             end
             local distance = (hrp.Position - targetHrp.Position).Magnitude
             if distance > 20000 then
                 Library:Notify("Target too far away!", { Duration = 3 })
-                print("[Attach to Back] Tween failed: Target too far (" .. distance .. ")")
+                print("[Attach to Back] Tween failed: Distance too large (" .. distance .. ")")
                 return false
             end
             _G.toggleNoclip(true)
             _G.toggleNofall(true)
-            local backGoal = targetHrp.CFrame * CFrame.new(0, Options.ATBHeight.Value, Options.ATBDistance.Value)
+            local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
             local tweenTime = distance / originalSpeed
             local tween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
+            print("[Attach to Back] Starting tween to " .. tostring(backGoal.Position) .. ", time=" .. tweenTime)
             tween:Play()
             tween.Completed:Wait()
             isLocked = true
@@ -1568,6 +1582,7 @@ pcall(function()
             if attachConn then
                 attachConn:Disconnect()
                 attachConn = nil
+                print("[Attach to Back] Disconnected RenderStepped")
             end
             _G.toggleNofall(false)
             _G.toggleNoclip(false)
@@ -1584,16 +1599,28 @@ pcall(function()
     _G.startAttach = function()
         local success, result = pcall(function()
             if not _G.targetPlayer then
-                Library:Notify("Please select a player first!", { Duration = 3 })
+                if not messageDebounce then
+                    messageDebounce = true
+                    Library:Notify("Please select a player first!", { Duration = 3 })
+                    task.delay(2, function()
+                        messageDebounce = false
+                    end)
+                    print("[Attach to Back] Failed: No target player selected")
+                end
                 Toggles.AttachtobackToggle:SetValue(false)
-                print("[Attach to Back] Failed: No target player selected")
                 return false
             end
-            local targetChar = _G.targetPlayer.Character
+            local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
             if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
-                Library:Notify("Target player has no character!", { Duration = 3 })
+                if not messageDebounce then
+                    messageDebounce = true
+                    Library:Notify("Target player has no character!", { Duration = 3 })
+                    task.delay(2, function()
+                        messageDebounce = false
+                    end)
+                    print("[Attach to Back] Failed: Target has no character or HRP")
+                end
                 Toggles.AttachtobackToggle:SetValue(false)
-                print("[Attach to Back] Failed: Target has no character or HRP")
                 return false
             end
             _G.stopAttach()
@@ -1601,9 +1628,12 @@ pcall(function()
             _G.toggleNofall(true)
             tweenToBack()
             attachConn = RunService.RenderStepped:Connect(function()
-                if not _G.isAttached then return end
-                local char = LocalPlayer.Character
-                local targetChar = _G.targetPlayer and _G.targetPlayer.Character
+                if not _G.isAttached then
+                    print("[Attach to Back] RenderStepped stopped: isAttached=false")
+                    return
+                end
+                local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
+                local targetChar = _G.targetPlayer and Workspace.Living:FindFirstChild(_G.targetPlayer.Name)
                 local hrp = char and safeGet(char, "HumanoidRootPart")
                 local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
                 if not (hrp and targetHrp) then
@@ -1621,7 +1651,7 @@ pcall(function()
                     return
                 end
                 if isLocked then
-                    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, Options.ATBHeight.Value, Options.ATBDistance.Value)
+                    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
                 elseif not isTweening then
                     tweenToBack()
                 end
@@ -1647,37 +1677,46 @@ pcall(function()
         end
         table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
         Options.PlayerDropdown:SetValues(playerList)
-        print("[Attach to Back] PlayerDropdown initialized with:", table.concat(playerList, ", "))
+        print("[Attach to Back] PlayerDropdown initialized with: " .. table.concat(playerList, ", "))
     end)
 
     -- GUI Integration
     Options.PlayerDropdown:OnChanged(function(value)
-        local success, _ = pcall(function()
+        pcall(function()
             _G.targetPlayer = value and Players:FindFirstChild(value) or nil
             if _G.isAttached and not _G.targetPlayer then
                 _G.stopAttach()
                 Toggles.AttachtobackToggle:SetValue(false)
+                Library:Notify("Target player cleared!", { Duration = 3 })
+                print("[Attach to Back] PlayerDropdown cleared, stopped attach")
             end
-            print("[Attach to Back] PlayerDropdown changed to:", value or "nil")
-            return true
+            print("[Attach to Back] PlayerDropdown changed to: " .. tostring(value))
         end)
-        if not success then
-            warn("[Attach to Back] Failed to update target player")
-        end
     end)
 
     Toggles.AttachtobackToggle:OnChanged(function(value)
-        local success, _ = pcall(function()
+        pcall(function()
+            print("[Attach to Back] Toggle changed to: " .. tostring(value))
             if value then
                 _G.startAttach()
             else
                 _G.stopAttach()
             end
-            return true
         end)
-        if not success then
-            warn("[Attach to Back] Failed to toggle attach")
-        end
+    end)
+
+    Options.ATBHeight:OnChanged(function(value)
+        pcall(function()
+            heightOffset = value
+            print("[Attach to Back] Height offset updated to: " .. value)
+        end)
+    end)
+
+    Options["ATBDistance)"]:OnChanged(function(value)
+        pcall(function()
+            zDistance = value
+            print("[Attach to Back] Distance updated to: " .. value)
+        end)
     end)
 
     Players.PlayerAdded:Connect(function(plr)
@@ -1691,7 +1730,7 @@ pcall(function()
             end
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player added (" .. plr.Name .. "), updated dropdown:", table.concat(playerList, ", "))
+            print("[Attach to Back] Player added (" .. plr.Name .. "), updated dropdown: " .. table.concat(playerList, ", "))
         end)
     end)
 
@@ -1712,7 +1751,7 @@ pcall(function()
             end
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player removed (" .. player.Name .. "), updated dropdown:", table.concat(playerList, ", "))
+            print("[Attach to Back] Player removed (" .. player.Name .. "), updated dropdown: " .. table.concat(playerList, ", "))
         end)
     end)
 
