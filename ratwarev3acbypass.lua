@@ -2005,7 +2005,7 @@ pcall(function()
         {userId = 6056339939, username = "NotAhmi4", roleName = "Junior Moderator"},
         {userId = 475990670, username = "blzz4rd", roleName = "Junior Moderator"},
         {userId = 1834007574, username = "MintyKobold", roleName = "Junior Moderator"},
-        {userId = 174586024 Ableton, username = "AstralZix", roleName = "Junior Moderator"},
+        {userId = 174586024, username = "AstralZix", roleName = "Junior Moderator"},
         {userId = 985681917, username = "PikaNubby", roleName = "Junior Moderator"},
         {userId = 33242043, username = "piercingTYB", roleName = "Junior Moderator"},
         {userId = 83742361, username = "0utcastGhost", roleName = "Junior Moderator"},
