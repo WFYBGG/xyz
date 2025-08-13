@@ -894,6 +894,7 @@ pcall(function()
 end)
 
 -- Anti-AA Bypass/No Fire/Swim Status Module
+-- Swim Status Module
 pcall(function()
     local success, ReplicatedStorage = pcall(function() return game:GetService("ReplicatedStorage") end)
     if not success then
@@ -956,28 +957,27 @@ pcall(function()
             return
         end
         isEnabled = true
-        fireSwimStatus(true)
-
-        -- Handle character respawn
         pcall(function()
+            fireSwimStatus(true)
             if characterConn then
-                characterConn:Disconnect()
+                pcall(function() characterConn:Disconnect() end)
             end
             local success, conn = pcall(function()
                 return LocalPlayer.CharacterAdded:Connect(function()
                     pcall(function()
+                        task.wait(1) -- Wait for character to fully load
                         if isEnabled then
-                            task.wait(1) -- Wait for character to fully load
                             fireSwimStatus(true)
-                            print("[Swim Status] Swim status reactivated on character respawn")
+                            print("[Swim Status] Swim status reactivated after character death")
                         end
                     end)
                 end)
             end)
-            if not success then
-                warn("[Swim Status] Failed to connect CharacterAdded: " .. tostring(conn))
-            else
+            if success then
                 characterConn = conn
+                print("[Swim Status] CharacterAdded connected")
+            else
+                warn("[Swim Status] Failed to connect CharacterAdded: " .. tostring(conn))
             end
         end)
         print("[Swim Status] Enabled")
@@ -989,14 +989,15 @@ pcall(function()
             return
         end
         isEnabled = false
-        fireSwimStatus(false)
         pcall(function()
+            fireSwimStatus(false)
             if characterConn then
-                characterConn:Disconnect()
+                pcall(function() characterConn:Disconnect() end)
                 characterConn = nil
+                print("[Swim Status] CharacterAdded disconnected")
             end
+            print("[Swim Status] Disabled")
         end)
-        print("[Swim Status] Disabled")
     end
 
     local success, _ = pcall(function()
