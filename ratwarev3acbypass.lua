@@ -1228,10 +1228,10 @@ pcall(function()
 
     local platform = Instance.new("Part")
     platform.Name = "OldDebris"
-    platform.Size = Vector3.new(30, 5, 30)
+    platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
     platform.CanCollide = true
-    platform.Transparency = 1.00
+    platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
 
