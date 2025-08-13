@@ -95,7 +95,7 @@ NotificationsGroup:AddToggle("ModeratorNotifierToggle", {
 -- Auto Kick GUI
 pcall(function()
     NotificationsGroup:AddToggle("AutoKickToggle", {
-        Text = "Auto Kick on Staff Detection",
+        Text = "Auto Kick on Detection",
         Default = false,
         Tooltip = "Kicks you from the game if Developers, Community Managers, Moderators, or The Hydra are detected",
         Callback = function(value)
