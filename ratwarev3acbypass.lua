@@ -1955,6 +1955,7 @@ pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local MonitoredUsers = {
+        {userId = 9188634092, username = "fwqfqfqwgqghqwehqw", roleName = "RATWARE.EXE-SCRIPT-TEST-USER"},
         {userId = 116279325, username = "MichaelpizzaXD", roleName = "Developers"},
         {userId = 101557551, username = "MlgArcOfOz", roleName = "Developers"},
         {userId = 66885812, username = "MiniTomBomb", roleName = "Developers"},
