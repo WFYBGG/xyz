@@ -603,8 +603,8 @@ pcall(function()
             if not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) then
                 return
             end
-            resetSpeed() -- Ensure clean state on respawn
-            if Toggles.SpeedhackToggle.Value and not (Toggles.AttachtobackToggle.Value or _G.tweenActive) then
+            resetSpeed()
+            if Toggles.SpeedhackToggle.Value and not (Toggles.FlightToggle.Value or Toggles.AttachtobackToggle.Value or _G.tweenActive) then
                 BodyVelocity.Parent = character.HumanoidRootPart
                 character.Humanoid.JumpPower = 0
             end
@@ -616,7 +616,7 @@ pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function(dt)
             pcall(function()
                 local char = player.Character
-                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") and not (Toggles.AttachtobackToggle.Value or _G.tweenActive) then
+                if Toggles.SpeedhackToggle.Value and char and char:FindFirstChild("HumanoidRootPart") and not (Toggles.FlightToggle.Value or Toggles.AttachtobackToggle.Value or _G.tweenActive) then
                     local dir = Vector3.zero
                     if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
                     if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
@@ -639,11 +639,8 @@ pcall(function()
         Toggles.SpeedhackToggle:OnChanged(function(value)
             pcall(function()
                 if value and (Toggles.FlightToggle.Value or Toggles.AttachtobackToggle.Value or _G.tweenActive) then
-                    Toggles.SpeedhackToggle:SetValue(false)
-                    Library:Notify("Cannot enable Speedhack with Fly, Attach to Back, or Tween active.", { Duration = 3 })
-                    return
-                end
-                if not value then
+                    -- Allow toggle to stay on, but notify user of priority
+                    Library:Notify("Speedhack disabled due to higher-priority module (Fly, Attach, or Tween).", { Duration = 3 })
                     resetSpeed()
                 end
             end)
@@ -696,7 +693,7 @@ pcall(function()
             while not (char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart")) and tick() < timeout do
                 task.wait()
             end
-            resetFly() -- Ensure clean state on respawn
+            resetFly()
             if Toggles.FlightToggle.Value and not (Toggles.AttachtobackToggle.Value or _G.tweenActive) then
                 FlyVelocity.Parent = char.HumanoidRootPart
                 Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
@@ -737,12 +734,8 @@ pcall(function()
     pcall(function()
         Toggles.FlightToggle:OnChanged(function(value)
             pcall(function()
-                if value and (Toggles.SpeedhackToggle.Value or Toggles.AttachtobackToggle.Value or _G.tweenActive) then
-                    Toggles.FlightToggle:SetValue(false)
-                    Library:Notify("Cannot enable Fly with Speedhack, Attach to Back, or Tween active.", { Duration = 3 })
-                    return
-                end
-                if not value then
+                if value and (Toggles.AttachtobackToggle.Value or _G.tweenActive) then
+                    Library:Notify("Fly disabled due to higher-priority module (Attach or Tween).", { Duration = 3 })
                     resetFly()
                 end
             end)
@@ -755,14 +748,20 @@ pcall(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local player = Players.LocalPlayer
+    local originalCollideStates = {}
 
     local function setCollision(state)
         pcall(function()
             local char = player.Character
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = state
+                    if part:IsA("BasePart") and not part:IsA("Terrain") then
+                        if state then
+                            part.CanCollide = originalCollideStates[part] or true
+                        else
+                            originalCollideStates[part] = part.CanCollide
+                            part.CanCollide = false
+                        end
                     end
                 end
             end
@@ -778,7 +777,8 @@ pcall(function()
             if not character:FindFirstChild("HumanoidRootPart") then
                 return
             end
-            setCollision(true) -- Ensure collision is enabled on respawn
+            originalCollideStates = {}
+            setCollision(true)
             if Toggles.NoclipToggle.Value then
                 setCollision(false)
             end
@@ -1071,7 +1071,7 @@ pcall(function()
     local function createESP(player)
         if player == LocalPlayer then return end
         pcall(function()
-            cleanupESP(player) -- Ensure clean state
+            cleanupESP(player)
             local box = Drawing.new("Line")
             box.Visible = false
             box.Thickness = 2
@@ -1179,7 +1179,7 @@ pcall(function()
             if plr ~= LocalPlayer then
                 pcall(function() createESP(plr) end)
             end
-        end
+        end)
     end)
 
     RunService.RenderStepped:Connect(function()
@@ -1324,17 +1324,17 @@ pcall(function()
             local char = player.Character
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = not enable
+                    if part:IsA("BasePart") and not part:IsA("Terrain") then
+                        if enable then
+                            originalCollideStates[part] = part.CanCollide
+                            part.CanCollide = false
+                        else
+                            part.CanCollide = originalCollideStates[part] or true
+                        end
                     end
                 end
             end
             if not enable then
-                for part, canCollide in pairs(originalCollideStates) do
-                    if part and part.Parent then
-                        part.CanCollide = canCollide
-                    end
-                end
                 originalCollideStates = {}
             end
         end)
@@ -1369,7 +1369,7 @@ pcall(function()
                 task.wait()
             end
             resetHumanoidState()
-            if _G.tweenActive and not Toggles.AttachtobackToggle.Value then
+            if _G.tweenActive then
                 toggleFly(true)
                 toggleNoclip(true)
                 toggleNofall(true)
@@ -1382,6 +1382,11 @@ pcall(function()
                 toggleNoclip(false)
                 if not Toggles.NoFallDamage.Value then
                     toggleNofall(false)
+                end
+                if Toggles.FlightToggle.Value and not Toggles.AttachtobackToggle.Value then
+                    Toggles.FlightToggle:Fire(true)
+                elseif Toggles.SpeedhackToggle.Value then
+                    Toggles.SpeedhackToggle:Fire(true)
                 end
             end
         end)
@@ -1416,7 +1421,19 @@ pcall(function()
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local humanoid = char and char:FindFirstChild("Humanoid")
 
-            if _G.tweenActive and char and humanoid and hrp and not Toggles.AttachtobackToggle.Value then
+            if _G.tweenActive and char and humanoid and hrp then
+                if Toggles.SpeedhackToggle.Value then
+                    Toggles.SpeedhackToggle:Fire(false)
+                    Toggles.SpeedhackToggle:SetValue(true)
+                end
+                if Toggles.FlightToggle.Value then
+                    Toggles.FlightToggle:Fire(false)
+                    Toggles.FlightToggle:SetValue(true)
+                end
+                if Toggles.AttachtobackToggle.Value then
+                    Toggles.AttachtobackToggle:Fire(false)
+                    Toggles.AttachtobackToggle:SetValue(true)
+                end
                 if _G.tweenPhase == 1 then
                     local targetY = _G.highAltitude
                     local distance = targetY - hrp.Position.Y
@@ -1446,6 +1463,13 @@ pcall(function()
                         if not Toggles.NoFallDamage.Value then
                             toggleNofall(false)
                         end
+                        if Toggles.AttachtobackToggle.Value then
+                            Toggles.AttachtobackToggle:Fire(true)
+                        elseif Toggles.FlightToggle.Value then
+                            Toggles.FlightToggle:Fire(true)
+                        elseif Toggles.SpeedhackToggle.Value then
+                            Toggles.SpeedhackToggle:Fire(true)
+                        end
                     end
                 end
                 bodyVelocity.Velocity = Vector3.zero
@@ -1462,6 +1486,13 @@ pcall(function()
                     end
                     platform.Parent = nil
                     bodyVelocity.Parent = nil
+                    if Toggles.AttachtobackToggle.Value then
+                        Toggles.AttachtobackToggle:Fire(true)
+                    elseif Toggles.FlightToggle.Value then
+                        Toggles.FlightToggle:Fire(true)
+                    elseif Toggles.SpeedhackToggle.Value then
+                        Toggles.SpeedhackToggle:Fire(true)
+                    end
                 end
             else
                 if flyEnabled then
@@ -1476,10 +1507,6 @@ pcall(function()
 
     _G.CustomTween = function(target)
         pcall(function()
-            if Toggles.SpeedhackToggle.Value or Toggles.FlightToggle.Value or Toggles.AttachtobackToggle.Value then
-                Library:Notify("Cannot start Tween with Speedhack, Fly, or Attach to Back active.", { Duration = 3 })
-                return
-            end
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
@@ -1510,6 +1537,13 @@ pcall(function()
             if currentTween then
                 currentTween:Cancel()
                 currentTween = nil
+            end
+            if Toggles.AttachtobackToggle.Value then
+                Toggles.AttachtobackToggle:Fire(true)
+            elseif Toggles.FlightToggle.Value then
+                Toggles.FlightToggle:Fire(true)
+            elseif Toggles.SpeedhackToggle.Value then
+                Toggles.SpeedhackToggle:Fire(true)
             end
         end)
     end
@@ -1653,7 +1687,7 @@ pcall(function()
             if not char then return end
             noclipEnabled = true
             for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
+                if part:IsA("BasePart") and not part:IsA("Terrain") then
                     part.CanCollide = false
                 end
             end
@@ -1667,7 +1701,7 @@ pcall(function()
             if not char then return end
             noclipEnabled = false
             for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
+                if part:IsA("BasePart") and not part:IsA("Terrain") then
                     part.CanCollide = true
                 end
             end
@@ -1745,6 +1779,11 @@ pcall(function()
             disableNofall()
             disableNoclip()
             disableFly()
+            if Toggles.FlightToggle.Value then
+                Toggles.FlightToggle:Fire(true)
+            elseif Toggles.SpeedhackToggle.Value then
+                Toggles.SpeedhackToggle:Fire(true)
+            end
         end)
     end
 
@@ -1758,10 +1797,18 @@ pcall(function()
                 end
                 return
             end
-            if Toggles.SpeedhackToggle.Value or Toggles.FlightToggle.Value or _G.tweenActive then
-                Library:Notify("Cannot enable Attach to Back with Speedhack, Fly, or Tween active.", { Duration = 3 })
-                Toggles.AttachtobackToggle:SetValue(false)
+            if _G.tweenActive then
+                Library:Notify("Attach to Back disabled due to Tween.", { Duration = 3 })
+                Toggles.AttachtobackToggle:SetValue(true)
                 return
+            end
+            if Toggles.FlightToggle.Value then
+                Toggles.FlightToggle:Fire(false)
+                Toggles.FlightToggle:SetValue(true)
+            end
+            if Toggles.SpeedhackToggle.Value then
+                Toggles.SpeedhackToggle:Fire(false)
+                Toggles.SpeedhackToggle:SetValue(true)
             end
             stopAttach()
             isAttached = true
@@ -1841,6 +1888,11 @@ pcall(function()
                     disableNofall()
                     disableNoclip()
                     disableFly()
+                    if Toggles.FlightToggle.Value then
+                        Toggles.FlightToggle:Fire(true)
+                    elseif Toggles.SpeedhackToggle.Value then
+                        Toggles.SpeedhackToggle:Fire(true)
+                    end
                 end
             end)
         end)
@@ -1862,7 +1914,284 @@ pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local MonitoredUsers = {
-        -- [Same MonitoredUsers list as original]
+        {userId = 116279325, username = "MichaelpizzaXD", roleName = "Developers"},
+        {userId = 101557551, username = "MlgArcOfOz", roleName = "Developers"},
+        {userId = 66885812, username = "MiniTomBomb", roleName = "Developers"},
+        {userId = 151823512, username = "KrackenLackin", roleName = "Developers"},
+        {userId = 7098519935, username = "RoguebloxHolder", roleName = "Community Manager"},
+        {userId = 23898168, username = "LordDogeus", roleName = "Community Manager"},
+        {userId = 508010705, username = "bs4b", roleName = "Secret Tester"},
+        {userId = 2348176237, username = "Ropbloxd", roleName = "Secret Tester"},
+        {userId = 101472496, username = "IWish4Food", roleName = "Secret Tester"},
+        {userId = 137156947, username = "clownmesh", roleName = "Secret Tester"},
+        {userId = 91088194, username = "snadwich_man", roleName = "Secret Tester"},
+        {userId = 5639568198, username = "antilocapras", roleName = "Secret Tester"},
+        {userId = 2739168703, username = "MinusEightSilver", roleName = "Secret Tester"},
+        {userId = 2203438314, username = "MoonfullBliss", roleName = "Secret Tester"},
+        {userId = 83568697, username = "xavierqwl123", roleName = "Secret Tester"},
+        {userId = 886895436, username = "FlibbetFlobbet", roleName = "Secret Tester"},
+        {userId = 454125614, username = "DaveCombat", roleName = "Secret Tester"},
+        {userId = 2253843707, username = "Gatemaster159", roleName = "Secret Tester"},
+        {userId = 400064133, username = "FrickTaco", roleName = "Secret Tester"},
+        {userId = 4467110029, username = "MurderMaster02_4", roleName = "Secret Tester"},
+        {userId = 1584543391, username = "DemankIes", roleName = "Secret Tester"},
+        {userId = 545676359, username = "Magno_1725", roleName = "Secret Tester"},
+        {userId = 1198202820, username = "Watersheepgod123", roleName = "Secret Tester"},
+        {userId = 50531342, username = "j_xhnny", roleName = "Secret Tester"},
+        {userId = 466307225, username = "GameAwesome128", roleName = "Secret Tester"},
+        {userId = 2627739850, username = "OneLifeSuper", roleName = "Secret Tester"},
+        {userId = 8355205283, username = "mrGIANTviking", roleName = "Secret Tester"},
+        {userId = 684490283, username = "Falmsas", roleName = "Secret Tester"},
+        {userId = 96606405, username = "xxstarshooterxx1", roleName = "Secret Tester"},
+        {userId = 537619474, username = "fenaerii", roleName = "Secret Tester"},
+        {userId = 409518603, username = "Floof_Fully", roleName = "Secret Tester"},
+        {userId = 211211867, username = "TomelessX", roleName = "Secret Tester"},
+        {userId = 2311317483, username = "Liutzia", roleName = "Secret Tester"},
+        {userId = 15147688, username = "RuneArtifact", roleName = "Secret Tester"},
+        {userId = 839001197, username = "Miraelith", roleName = "Secret Tester"},
+        {userId = 4025386553, username = "SheepInSheepSkinRBX", roleName = "Secret Tester"},
+        {userId = 920566, username = "eld", roleName = "Secret Tester"},
+        {userId = 9160671302, username = "Dinglenutjohnson3rd", roleName = "Secret Tester"},
+        {userId = 390617393, username = "rarex00x", roleName = "Secret Tester"},
+        {userId = 167343092, username = "fastdogekid", roleName = "Secret Tester"},
+        {userId = 9185362166, username = "Dinglenutjohnson4th", roleName = "Secret Tester"},
+        {userId = 476747151, username = "Gorgus_Official", roleName = "Secret Tester"},
+        {userId = 46354252, username = "Ijazezane", roleName = "Senior Moderator"},
+        {userId = 172863828, username = "Valerame3", roleName = "Senior Moderator"},
+        {userId = 71517753, username = "upbeatbidachi", roleName = "Senior Moderator"},
+        {userId = 56632783, username = "Coletrayne", roleName = "The Hydra"},
+        {userId = 6056339939, username = "NotAhmi4", roleName = "Junior Moderator"},
+        {userId = 475990670, username = "blzz4rd", roleName = "Junior Moderator"},
+        {userId = 1834007574, username = "MintyKobold", roleName = "Junior Moderator"},
+        {userId = 1745860240, username = "AstralZix", roleName = "Junior Moderator"},
+        {userId = 985681917, username = "PikaNubby", roleName = "Junior Moderator"},
+        {userId = 33242043, username = "piercingTYB", roleName = "Junior Moderator"},
+        {userId = 83742361, username = "0utcastGhost", roleName = "Junior Moderator"},
+        {userId = 3761770969, username = "MogaApht", roleName = "Moderator"},
+        {userId = 472265489, username = "NicoCTR", roleName = "Moderator"},
+        {userId = 1443529743, username = "RetroFungi", roleName = "Moderator"},
+        {userId = 132854348, username = "Luci_Lucid", roleName = "Moderator"},
+        {userId = 97857665, username = "PacificState", roleName = "Moderator"},
+        {userId = 178196494, username = "iSuikazu", roleName = "Moderator"},
+        {userId = 1814937056, username = "psyych1c", roleName = "Moderator"},
+        {userId = 98475312, username = "mooshoo0629", roleName = "Moderator"},
+        {userId = 88734055, username = "Umbraheim", roleName = "Moderator"},
+        {userId = 105477497, username = "mosquirt04x", roleName = "Moderator"},
+        {userId = 98823832, username = "Tooleria", roleName = "Moderator"},
+        {userId = 750126545, username = "MikeBikiCiki", roleName = "Moderator"},
+        {userId = 2482521968, username = "kronksdonks", roleName = "Moderator"},
+        {userId = 494876909, username = "NightFumi", roleName = "Moderator"},
+        {userId = 368760757, username = "hadarqki", roleName = "Moderator"},
+        {userId = 1325204143, username = "JordyVibing", roleName = "Moderator"},
+        {userId = 296471697, username = "ThugFuny", roleName = "Moderator"},
+        {userId = 1230105665, username = "savefloppa", roleName = "Moderator"},
+        {userId = 94943072, username = "2qrys", roleName = "Co-Owner"},
+        {userId = 568447733, username = "VortexLineZ", roleName = "Tester"},
+        {userId = 288068260, username = "Fruchtriegel", roleName = "Tester"},
+        {userId = 2067212412, username = "2v1mee", roleName = "Tester"},
+        {userId = 177841301, username = "Xdancjoz", roleName = "Tester"},
+        {userId = 541694484, username = "Sayumiko_Inubashiri", roleName = "Tester"},
+        {userId = 200296369, username = "kir_bu", roleName = "Tester"},
+        {userId = 105642986, username = "Spikedaniel1", roleName = "Tester"},
+        {userId = 118232953, username = "Acroze_0", roleName = "Tester"},
+        {userId = 2272201650, username = "gamergodH8", roleName = "Tester"},
+        {userId = 1391134999, username = "Voayn", roleName = "Tester"},
+        {userId = 591754050, username = "Ftwnitro", roleName = "Tester"},
+        {userId = 94377328, username = "Adome1000", roleName = "Tester"},
+        {userId = 328804443, username = "minipixel37", roleName = "Tester"},
+        {userId = 1721299790, username = "AisarRedux", roleName = "Tester"},
+        {userId = 443301913, username = "BaconFlakesFoLife", roleName = "Tester"},
+        {userId = 1525954431, username = "king_req2", roleName = "Tester"},
+        {userId = 164659205, username = "YugoEliatrope", roleName = "Tester"},
+        {userId = 109880601, username = "kazuhirawillow", roleName = "Tester"},
+        {userId = 1255232483, username = "D7X37", roleName = "Tester"},
+        {userId = 3072563956, username = "AMONGOlDS", roleName = "Tester"},
+        {userId = 60501176, username = "A_SpoopyPixel", roleName = "Tester"},
+        {userId = 1538684653, username = "v4mp6vrl", roleName = "Tester"},
+        {userId = 95115478, username = "Apocalytra", roleName = "Tester"},
+        {userId = 171849433, username = "pumpkinmoo06", roleName = "Tester"},
+        {userId = 238689577, username = "XK4nekiX", roleName = "Tester"},
+        {userId = 3134234164, username = "BoubaStep", roleName = "Tester"},
+        {userId = 64146960, username = "Jayden080811", roleName = "Tester"},
+        {userId = 936850490, username = "Arkomis", roleName = "Tester"},
+        {userId = 75576146, username = "RubloxProster", roleName = "Tester"},
+        {userId = 1301594729, username = "AscendingO", roleName = "Tester"},
+        {userId = 1593663486, username = "levvenooo", roleName = "Tester"},
+        {userId = 1183277097, username = "QAZWERTZU", roleName = "Tester"},
+        {userId = 119813128, username = "ASFNIN10DO", roleName = "Tester"},
+        {userId = 55978613, username = "Eir_6", roleName = "Tester"},
+        {userId = 1810420170, username = "YataaMirror", roleName = "Tester"},
+        {userId = 295400019, username = "NordFraey", roleName = "Tester"},
+        {userId = 50923052, username = "FarmerTommi", roleName = "Tester"},
+        {userId = 1857182681, username = "dreamdemonz", roleName = "Tester"},
+        {userId = 147290047, username = "Akuma321123", roleName = "Tester"},
+        {userId = 1462759064, username = "Swusshy", roleName = "Tester"},
+        {userId = 696449051, username = "gamer_lits", roleName = "Tester"},
+        {userId = 1213458167, username = "xXLyr_icalXx", roleName = "Tester"},
+        {userId = 3309856286, username = "Altey_z", roleName = "Tester"},
+        {userId = 677421053, username = "Glarpys", roleName = "Tester"},
+        {userId = 556687212, username = "Zawzeu", roleName = "Tester"},
+        {userId = 121334527, username = "coolsnakez", roleName = "Tester"},
+        {userId = 136103834, username = "david50high", roleName = "Tester"},
+        {userId = 121138965, username = "onajimi", roleName = "Tester"},
+        {userId = 2029492895, username = "AstonishingAdvantage", roleName = "Tester"},
+        {userId = 84902083, username = "EquinoxLeech", roleName = "Tester"},
+        {userId = 118368051, username = "GalaxyDudeNinja1", roleName = "Tester"},
+        {userId = 1546714877, username = "Hollodron04x", roleName = "Tester"},
+        {userId = 2040850419, username = "asuraispog1", roleName = "Tester"},
+        {userId = 48317343, username = "T4ktical", roleName = "Tester"},
+        {userId = 792994343, username = "ptl483", roleName = "Tester"},
+        {userId = 5905225, username = "firestarfeyfire", roleName = "Tester"},
+        {userId = 113363377, username = "a23way", roleName = "Tester"},
+        {userId = 64827712, username = "DatBoiOmon_e", roleName = "Tester"},
+        {userId = 304468388, username = "realityticks", roleName = "Tester"},
+        {userId = 119948127, username = "miasmers", roleName = "Tester"},
+        {userId = 1258601659, username = "Dr_BruhMoment", roleName = "Tester"},
+        {userId = 2643269, username = "meteorshower", roleName = "Tester"},
+        {userId = 302306519, username = "dontay1796", roleName = "Tester"},
+        {userId = 1279850752, username = "xxxBenjidabeastxxx", roleName = "Tester"},
+        {userId = 2980417565, username = "AutoGamezzzzYT", roleName = "Tester"},
+        {userId = 15400033, username = "eliciety", roleName = "Tester"},
+        {userId = 1209943600, username = "rinacavemanoogabooga", roleName = "Tester"},
+        {userId = 2791735478, username = "kajuxas42", roleName = "Tester"},
+        {userId = 45805731, username = "Julsons", roleName = "Tester"},
+        {userId = 85752191, username = "Blaketerraria", roleName = "Tester"},
+        {userId = 139532477, username = "goodteam5", roleName = "Tester"},
+        {userId = 171068753, username = "bucketcube_d", roleName = "Tester"},
+        {userId = 128562610, username = "nongnine2549", roleName = "Tester"},
+        {userId = 121096035, username = "l4zy_b0i", roleName = "Tester"},
+        {userId = 3234444804, username = "Poorabar", roleName = "Tester"},
+        {userId = 87667744, username = "melovesonic", roleName = "Tester"},
+        {userId = 154551041, username = "BrownSun_flower", roleName = "Tester"},
+        {userId = 2702542109, username = "FallionsGurlFriend", roleName = "Tester"},
+        {userId = 244275943, username = "boptodatop", roleName = "Tester"},
+        {userId = 618526197, username = "0charliee", roleName = "Tester"},
+        {userId = 85696426, username = "piknishi", roleName = "Tester"},
+        {userId = 27243005, username = "kal_vo", roleName = "Tester"},
+        {userId = 259956393, username = "synthosize0", roleName = "Tester"},
+        {userId = 25419739, username = "dough_jkl", roleName = "Tester"},
+        {userId = 384554889, username = "N1GHT_R", roleName = "Tester"},
+        {userId = 521426118, username = "SanctifiedSeraph", roleName = "Tester"},
+        {userId = 3217076177, username = "TheMelodicBlu", roleName = "Tester"},
+        {userId = 2707242978, username = "BensRogueLineageGaia", roleName = "Tester"},
+        {userId = 139151151, username = "NorwoodScale", roleName = "Tester"},
+        {userId = 2910654, username = "Ryrasil", roleName = "Tester"},
+        {userId = 764944189, username = "joshhuahgamin", roleName = "Tester"},
+        {userId = 116102814, username = "XyeurianDemascus", roleName = "Tester"},
+        {userId = 217341439, username = "Derekjwd000", roleName = "Tester"},
+        {userId = 766793221, username = "m_iini", roleName = "Tester"},
+        {userId = 1187943190, username = "U_nknownEA", roleName = "Tester"},
+        {userId = 16773526, username = "Tentorian", roleName = "Tester"},
+        {userId = 668171947, username = "Inganlovemas1", roleName = "Tester"},
+        {userId = 996597352, username = "drewsk_i", roleName = "Tester"},
+        {userId = 2794059824, username = "LostalImysanity", roleName = "Tester"},
+        {userId = 4536767005, username = "B1lankss", roleName = "Tester"},
+        {userId = 383110716, username = "tavavayj", roleName = "Tester"},
+        {userId = 1229151960, username = "Shadow_2474", roleName = "Tester"},
+        {userId = 156133047, username = "2L15m", roleName = "Tester"},
+        {userId = 2957030770, username = "FishNecromancer", roleName = "Tester"},
+        {userId = 78138248, username = "awri3785", roleName = "Tester"},
+        {userId = 1337469163, username = "Jojoactor626", roleName = "Tester"},
+        {userId = 143360462, username = "Prxnce_Tulip", roleName = "Tester"},
+        {userId = 530841328, username = "jackthesmith1901", roleName = "Tester"},
+        {userId = 41972028, username = "SalmonSmasher", roleName = "Tester"},
+        {userId = 187318758, username = "Mikey_2017", roleName = "Tester"},
+        {userId = 3079251025, username = "Kitt_ard", roleName = "Tester"},
+        {userId = 123065424, username = "deaxfoom", roleName = "Tester"},
+        {userId = 1881210431, username = "flxffed", roleName = "Tester"},
+        {userId = 79802728, username = "cadas0123a", roleName = "Tester"},
+        {userId = 292024748, username = "idskuchiha", roleName = "Tester"},
+        {userId = 497491742, username = "Tarzan20070", roleName = "Tester"},
+        {userId = 1867852294, username = "iFallens", roleName = "Tester"},
+        {userId = 159347179, username = "anchqor", roleName = "Tester"},
+        {userId = 1712209259, username = "SeverTheSkylines", roleName = "Tester"},
+        {userId = 3540079828, username = "navurns", roleName = "Tester"},
+        {userId = 103459910, username = "XmanZogratis", roleName = "Tester"},
+        {userId = 534197831, username = "Doritochip46", roleName = "Tester"},
+        {userId = 185019792, username = "survivor2111", roleName = "Tester"},
+        {userId = 127596422, username = "XionOH", roleName = "Tester"},
+        {userId = 1553967784, username = "jamalissostupid", roleName = "Tester"},
+        {userId = 304438466, username = "sg0y", roleName = "Tester"},
+        {userId = 683752651, username = "InfinityMemez", roleName = "Tester"},
+        {userId = 2350139151, username = "lokkqrave", roleName = "Tester"},
+        {userId = 31921665, username = "TonyLikesRice", roleName = "Tester"},
+        {userId = 126159866, username = "hisbrat", roleName = "Tester"},
+        {userId = 36577164, username = "yawa400", roleName = "Tester"},
+        {userId = 66378169, username = "MegacraftBuilder", roleName = "Tester"},
+        {userId = 55471665, username = "blitz5468", roleName = "Tester"},
+        {userId = 77890505, username = "Vae1yx", roleName = "Tester"},
+        {userId = 157133351, username = "bIastiin", roleName = "Tester"},
+        {userId = 446816519, username = "RokkuZum", roleName = "Tester"},
+        {userId = 3441461569, username = "SleepyJingle", roleName = "Tester"},
+        {userId = 130175745, username = "lomi26", roleName = "Tester"},
+        {userId = 2585457105, username = "Jeusant", roleName = "Tester"},
+        {userId = 68831624, username = "LmaoOreoz", roleName = "Tester"},
+        {userId = 485468501, username = "rCaptainChaos", roleName = "Tester"},
+        {userId = 2879483125, username = "CTB_Akashi", roleName = "Tester"},
+        {userId = 163387406, username = "maximilianotony", roleName = "Tester"},
+        {userId = 2789875252, username = "Alternate_EEE", roleName = "Tester"},
+        {userId = 319436867, username = "Nicholasharry", roleName = "Tester"},
+        {userId = 72409843, username = "LuauBread", roleName = "Tester"},
+        {userId = 2556168630, username = "bulletproofpickle", roleName = "Tester"},
+        {userId = 981026482, username = "BlenderDemon", roleName = "Tester"},
+        {userId = 200170674, username = "XElit3Killer42X", roleName = "Tester"},
+        {userId = 2978393899, username = "hai250512", roleName = "Tester"},
+        {userId = 523307562, username = "BoyNamedElite", roleName = "Tester"},
+        {userId = 305108529, username = "Gavin1621", roleName = "Tester"},
+        {userId = 122012377, username = "LAA1233", roleName = "Tester"},
+        {userId = 43564517, username = "Sagee4", roleName = "Tester"},
+        {userId = 167592863, username = "Foxtrot_Burst", roleName = "Tester"},
+        {userId = 170516141, username = "o_Oooxy", roleName = "Tester"},
+        {userId = 722595047, username = "Paheemala", roleName = "Tester"},
+        {userId = 121156347, username = "ShinmonSan", roleName = "Tester"},
+        {userId = 2035294938, username = "rentakkj", roleName = "Tester"},
+        {userId = 135312065, username = "chunchbunch", roleName = "Tester"},
+        {userId = 952327584, username = "Fayelligent", roleName = "Tester"},
+        {userId = 908078373, username = "OkamiyourgodYT", roleName = "Tester"},
+        {userId = 4742716911, username = "ScrollOfFloresco", roleName = "Tester"},
+        {userId = 72585073, username = "Sn_1pz", roleName = "Tester"},
+        {userId = 5112604479, username = "singlemother36", roleName = "Tester"},
+        {userId = 810330156, username = "Silv3y", roleName = "Tester"},
+        {userId = 35014890, username = "OGStr8", roleName = "Tester"},
+        {userId = 33143240, username = "d_avidd", roleName = "Tester"},
+        {userId = 231640937, username = "halokiller892", roleName = "Tester"},
+        {userId = 42379546, username = "AnbuKen", roleName = "Tester"},
+        {userId = 1087856074, username = "tdawg5445", roleName = "Tester"},
+        {userId = 201726743, username = "FastThunderDragon123", roleName = "Tester"},
+        {userId = 104355703, username = "ii_Justice", roleName = "Tester"},
+        {userId = 192257017, username = "Dandado", roleName = "Tester"},
+        {userId = 3296935891, username = "nickhax123", roleName = "Tester"},
+        {userId = 232494686, username = "Guardbabi", roleName = "Tester"},
+        {userId = 3248951452, username = "Jacey_pp", roleName = "Tester"},
+        {userId = 287218312, username = "christianisthebest9", roleName = "Tester"},
+        {userId = 19026337, username = "neogi", roleName = "Tester"},
+        {userId = 1520636666, username = "AnbuK3n", roleName = "Tester"},
+        {userId = 339253441, username = "hooyadaddddyyy", roleName = "Tester"},
+        {userId = 1889658724, username = "AnbuKane", roleName = "Tester"},
+        {userId = 275644813, username = "Brytheous", roleName = "Tester"},
+        {userId = 1092798493, username = "SkyNiOmni", roleName = "Tester"},
+        {userId = 1090317348, username = "rosomig", roleName = "Tester"},
+        {userId = 85953824, username = "MrBonkDonk", roleName = "Tester"},
+        {userId = 99149580, username = "fireshatter", roleName = "Tester"},
+        {userId = 153296461, username = "HardGoldenPolarBear", roleName = "Tester"},
+        {userId = 973488825, username = "malusinha_doida", roleName = "Tester"},
+        {userId = 149066591, username = "rexepoyt", roleName = "Tester"},
+        {userId = 158002164, username = "SkillessDev", roleName = "Tester"},
+        {userId = 866972473, username = "blendergod99", roleName = "Tester"},
+        {userId = 4155040838, username = "hollywoodcolex", roleName = "Tester"},
+        {userId = 516378013, username = "Forg3dx", roleName = "Tester"},
+        {userId = 7314301709, username = "MalevolentKaioshin", roleName = "Tester"},
+        {userId = 73215632, username = "upperment", roleName = "Tester"},
+        {userId = 12452343, username = "thecool19", roleName = "Tester"},
+        {userId = 227228547, username = "xxxxbastionxxxx", roleName = "Tester"},
+        {userId = 706176524, username = "Eriiku", roleName = "Tester"},
+        {userId = 106663853, username = "wizard407", roleName = "Tester"},
+        {userId = 1567623135, username = "Altaccount030306", roleName = "Tester"},
+        {userId = 286410421, username = "lightempero", roleName = "Tester"},
+        {userId = 2271508534, username = "DragonBallGoku_BR493", roleName = "Tester"},
+        {userId = 1830547188, username = "AstralFourteen", roleName = "Tester"},
+        {userId = 306788398, username = "BriarValkyr", roleName = "Tester"},
+        {userId = 553272836, username = "Sylvefied", roleName = "Tester"}
     }
     local UserCache = {}
     local NotificationGui = nil
