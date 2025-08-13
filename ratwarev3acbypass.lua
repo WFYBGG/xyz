@@ -62,6 +62,17 @@ MainGroup:AddSlider("FlightSpeed", {
     Rounding = 0,
     Compact = true
 })
+MainGroup:AddToggle("SwimStatusToggle", {
+    Text = "Anti-AA Bypass",
+    Default = false
+}):AddKeyPicker("SwimStatusBind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.SwimStatusToggle:SetValue(value)
+    end
+})
 MainGroup:AddToggle("NoclipToggle", {
     Text = "No Clip",
     Default = false
@@ -79,17 +90,9 @@ MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
--- Swim Status GUI
-MainGroup1:AddToggle("SwimStatusToggle", {
-    Text = "Anti-AA Bypass",
+MainGroup1:AddToggle("DisableTouchToggle", {
+    Text = "No Killbricks",
     Default = false
-}):AddKeyPicker("SwimStatusBind", {
-    Default = "",
-    Mode = "Toggle",
-    Text = "N/A",
-    Callback = function(value)
-        Toggles.SwimStatusToggle:SetValue(value)
-    end
 })
 
 -- Moderator Notifier GUI
@@ -893,8 +896,237 @@ pcall(function()
     end)
 end)
 
+-- No Killbricks/Disable Touch Module
+pcall(function()
+    local success, Workspace = pcall(function() return game:GetService("Workspace") end)
+    if not success then
+        warn("[Disable Touch] Failed to get Workspace: " .. tostring(Workspace))
+        return
+    end
+    local success, RunService = pcall(function() return game:GetService("RunService") end)
+    if not success then
+        warn("[Disable Touch] Failed to get RunService: " .. tostring(RunService))
+        return
+    end
+
+    local isEnabled = false
+    local affectedParts = {} -- Store parts and their original CanTouch state
+    local targetFolders = {"Burning", "Knocked", "HealthPackCD", "FallRagdoll"}
+    local targetColorTurquoise = Color3.fromRGB(120, 255, 181)
+    local targetColorPersimmon = Color3.fromRGB(255, 91, 62)
+    local scanInterval = 5 -- Seconds between scans
+    local scanConnection = nil
+    local lastScanTime = 0
+
+    local function safeGet(obj, ...)
+        local args = {...}
+        for i, v in ipairs(args) do
+            local ok, res = pcall(function() return obj[v] end)
+            if not ok then
+                warn("[Disable Touch] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                return nil
+            end
+            obj = res
+            if not obj then
+                warn("[Disable Touch] safeGet returned nil for " .. tostring(v))
+                return nil
+            end
+        end
+        return obj
+    end
+
+    local function isTargetPart(part)
+        local success, isBasePart = pcall(function() return part:IsA("BasePart") or part:IsA("MeshPart") end)
+        if not success or not isBasePart then return false end
+
+        -- Check moundkillbricks
+        local successMound, mound = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map", "moundkillbricks")) end)
+        if successMound and mound then
+            return true
+        end
+
+        -- Check BanditCampfire
+        local successCampfire, campfire = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Debris", "BanditCampfire")) end)
+        if successCampfire and campfire then
+            return true
+        end
+
+        -- Check Turquoise Neon
+        local successColor, color = pcall(function() return part.BrickColor end)
+        local successMaterial, material = pcall(function() return part.Material end)
+        if successColor and successMaterial and color == BrickColor.new("Turquoise") and material == Enum.Material.Neon then
+            return true
+        end
+
+        -- Check part named "void"
+        local successName, name = pcall(function() return part.Name end)
+        if successName and name == "void" then
+            return true
+        end
+
+        -- Check Persimmon Neon under Workspace.Map
+        local successMap, isMap = pcall(function() return part:IsDescendantOf(safeGet(Workspace, "Map")) end)
+        if successMap and isMap and successColor and successMaterial and color == BrickColor.new("Persimmon") and material == Enum.Material.Neon then
+            return true
+        end
+
+        return false
+    end
+
+    local function scanAndDisableTouch()
+        pcall(function()
+            -- Scan Workspace for folders
+            local success, workspaceChildren = pcall(function() return Workspace:GetChildren() end)
+            if not success then
+                warn("[Disable Touch] Failed to get Workspace children: " .. tostring(workspaceChildren))
+                return
+            end
+            for _, folder in ipairs(workspaceChildren) do
+                pcall(function()
+                    local successName, folderName = pcall(function() return folder.Name end)
+                    if successName and table.find(targetFolders, folderName) then
+                        local successDescendants, descendants = pcall(function() return folder:GetDescendants() end)
+                        if successDescendants then
+                            for _, part in ipairs(descendants) do
+                                pcall(function()
+                                    if part:IsA("BasePart") or part:IsA("MeshPart") then
+                                        local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                                        if successCanTouch and not affectedParts[part] then
+                                            affectedParts[part] = canTouch
+                                            pcall(function() part.CanTouch = false end)
+                                        end
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end)
+            end
+
+            -- Scan Workspace for specific parts
+            local successDescendants, allDescendants = pcall(function() return Workspace:GetDescendants() end)
+            if successDescendants then
+                for _, part in ipairs(allDescendants) do
+                    pcall(function()
+                        if isTargetPart(part) then
+                            local successCanTouch, canTouch = pcall(function() return part.CanTouch end)
+                            if successCanTouch and not affectedParts[part] then
+                                affectedParts[part] = canTouch
+                                pcall(function() part.CanTouch = false end)
+                            end
+                        end
+                    end)
+                end
+            end
+
+            print("[Disable Touch] Disabled touch for " .. tostring(table.getn(affectedParts)) .. " parts")
+        end)
+    end
+
+    local function restoreTouch()
+        pcall(function()
+            for part, originalCanTouch in pairs(affectedParts) do
+                pcall(function()
+                    if part and part.Parent then
+                        part.CanTouch = originalCanTouch
+                    end
+                end)
+            end
+            affectedParts = {}
+            print("[Disable Touch] Restored touch for parts")
+        end)
+    end
+
+    local function enableDisableTouch()
+        if isEnabled then
+            print("[Disable Touch] Already enabled")
+            return
+        end
+        isEnabled = true
+        pcall(scanAndDisableTouch)
+
+        -- Periodic scan for new parts
+        local success, conn = pcall(function()
+            return RunService.Heartbeat:Connect(function(deltaTime)
+                pcall(function()
+                    if isEnabled then
+                        local currentTime = tick()
+                        if currentTime - lastScanTime >= scanInterval then
+                            scanAndDisableTouch()
+                            lastScanTime = currentTime
+                        end
+                    end
+                end)
+            end)
+        end)
+        if success then
+            scanConnection = conn
+            print("[Disable Touch] Periodic scan enabled")
+        else
+            warn("[Disable Touch] Failed to connect Heartbeat: " .. tostring(conn))
+        end
+
+        -- Monitor for new parts
+        local successDescendant, descendantConn = pcall(function()
+            return Workspace.DescendantAdded:Connect(function(descendant)
+                pcall(function()
+                    if isEnabled and isTargetPart(descendant) then
+                        local successCanTouch, canTouch = pcall(function() return descendant.CanTouch end)
+                        if successCanTouch and not affectedParts[descendant] then
+                            affectedParts[descendant] = canTouch
+                            pcall(function() descendant.CanTouch = false end)
+                            print("[Disable Touch] Disabled touch for new part: " .. tostring(descendant.Name))
+                        end
+                    end
+                end)
+            end)
+        end)
+        if not successDescendant then
+            warn("[Disable Touch] Failed to connect DescendantAdded: " .. tostring(descendantConn))
+        end
+        print("[Disable Touch] Enabled")
+    end
+
+    local function disableDisableTouch()
+        if not isEnabled then
+            print("[Disable Touch] Already disabled")
+            return
+        end
+        isEnabled = false
+        pcall(function()
+            if scanConnection then
+                pcall(function() scanConnection:Disconnect() end)
+                scanConnection = nil
+            end
+            restoreTouch()
+            print("[Disable Touch] Disabled")
+        end)
+    end
+
+    local success, _ = pcall(function()
+        Toggles.DisableTouchToggle:OnChanged(function(value)
+            pcall(function()
+                print("[Disable Touch] Toggle changed to: " .. tostring(value))
+                if value then
+                    enableDisableTouch()
+                else
+                    disableDisableTouch()
+                end
+            end)
+        end)
+    end)
+    if not success then
+        warn("[Disable Touch] Failed to set toggle callback")
+    end
+
+    pcall(function()
+        game:BindToClose(function()
+            pcall(disableDisableTouch)
+        end)
+    end)
+end)
+
 -- Anti-AA Bypass/No Fire/Swim Status Module
--- Swim Status Module
 pcall(function()
     local success, ReplicatedStorage = pcall(function() return game:GetService("ReplicatedStorage") end)
     if not success then
