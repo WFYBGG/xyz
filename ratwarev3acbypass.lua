@@ -79,6 +79,20 @@ MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
+-- Water Duplicate GUI
+MainGroup1:AddToggle("WaterDuplicateToggle", {
+    Text = "Anti-AA",
+    Default = false,
+    Tooltip = "Duplicates the 'water' part below your humanoid"
+}):AddKeyPicker("WaterDuplicateBind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.WaterDuplicateToggle:SetValue(value)
+    end
+})
+
 -- Moderator Notifier GUI
 local NotificationsGroup = Tabs.Main:AddRightGroupbox("Notifications")
 NotificationsGroup:AddToggle("ModeratorNotifierToggle", {
@@ -876,6 +890,145 @@ pcall(function()
             if fallFolder then
                 fallFolder:Destroy()
             end
+        end)
+    end)
+end)
+
+-- Water Duplicate Module
+pcall(function()
+    local Workspace = game:GetService("Workspace")
+    local PhysicsService = game:GetService("PhysicsService")
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local LocalPlayer = Players.LocalPlayer
+
+    local duplicatePart = nil
+    local isEnabled = false
+    local collisionGroupCharacter = "Character"
+    local collisionGroupWater = "WaterPart"
+
+    local function safeGet(obj, ...)
+        local args = {...}
+        for i, v in ipairs(args) do
+            local ok, res = pcall(function() return obj[v] end)
+            if not ok then
+                print("[Water Duplicate] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                return nil
+            end
+            obj = res
+            if not obj then
+                print("[Water Duplicate] safeGet returned nil for " .. tostring(v))
+                return nil
+            end
+        end
+        return obj
+    end
+
+    local function createCollisionGroups()
+        pcall(function()
+            PhysicsService:CreateCollisionGroup(collisionGroupCharacter)
+            PhysicsService:CreateCollisionGroup(collisionGroupWater)
+            PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, collisionGroupCharacter, true)
+            PhysicsService:CollisionGroupSetCollidable(collisionGroupWater, "Default", false)
+            print("[Water Duplicate] Collision groups created")
+        end)
+    end
+
+    local function setCharacterCollisionGroup()
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        PhysicsService:SetPartCollisionGroup(part, collisionGroupCharacter)
+                    end
+                end
+                print("[Water Duplicate] Character parts set to collision group")
+            end
+        end)
+    end
+
+    local function enableDuplicate()
+        if isEnabled then
+            print("[Water Duplicate] Already enabled")
+            return
+        end
+        isEnabled = true
+        createCollisionGroups()
+        setCharacterCollisionGroup()
+
+        local success, result = pcall(function()
+            local waterPart = Workspace:FindFirstChild("water", true)
+            if not waterPart or not waterPart:IsA("Part") then
+                print("[Water Duplicate] No 'water' part found")
+                return
+            end
+            duplicatePart = waterPart:Clone()
+            duplicatePart.Name = "DuplicateWater"
+            duplicatePart.Size = Vector3.new(10, 1, 10)
+            duplicatePart.CanCollide = true
+            duplicatePart.Anchored = true
+            PhysicsService:SetPartCollisionGroup(duplicatePart, collisionGroupWater)
+            duplicatePart.Parent = Workspace
+
+            LocalPlayer.CharacterAdded:Connect(function(char)
+                pcall(function()
+                    task.wait(1)
+                    setCharacterCollisionGroup()
+                    updatePosition()
+                end)
+            end)
+
+            RunService.RenderStepped:Connect(function()
+                if isEnabled then
+                    updatePosition()
+                end
+            end)
+
+            print("[Water Duplicate] Enabled and duplicate created")
+        end)
+        if not success then
+            warn("[Water Duplicate] Failed to enable: " .. tostring(result))
+        end
+    end
+
+    local function updatePosition()
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hrp = char and safeGet(char, "HumanoidRootPart")
+            if hrp and duplicatePart then
+                duplicatePart.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - (hrp.Size.Y / 2 + duplicatePart.Size.Y / 2), hrp.Position.Z)
+            end
+        end)
+    end
+
+    local function disableDuplicate()
+        if not isEnabled then
+            print("[Water Duplicate] Already disabled")
+            return
+        end
+        isEnabled = false
+        if duplicatePart then
+            duplicatePart:Destroy()
+            duplicatePart = nil
+        end
+        print("[Water Duplicate] Disabled and duplicate destroyed")
+    end
+
+    Toggles.WaterDuplicateToggle:OnChanged(function(value)
+        pcall(function()
+            print("[Water Duplicate] Toggle changed to: " .. tostring(value))
+            if value then
+                enableDuplicate()
+            else
+                disableDuplicate()
+            end
+        end)
+    end)
+
+    game:BindToClose(function()
+        pcall(function()
+            disableDuplicate()
         end)
     end)
 end)
