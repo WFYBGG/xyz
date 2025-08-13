@@ -1,10 +1,16 @@
+{"groupId":5161694,"roles":[{"id":34381143,"name":"Guest","rank":0,"memberCount":0},{"id":34381142,"name":"Fan","rank":1,"memberCount":40012},{"id":102498095,"name":"Inactive","rank":2,"memberCount":2637},{"id":34381156,"name":"Tester","rank":3,"memberCount":1308},{"id":102498097,"name":"Secret Tester","rank":4,"memberCount":35},{"id":102498104,"name":"Junior Moderator","rank":6,"memberCount":7},{"id":102498108,"name":"Moderator","rank":7,"memberCount":18},{"id":102498110,"name":"Senior Moderator","rank":8,"memberCount":3},{"id":107386024,"name":"Head Moderator","rank":9,"memberCount":0},{"id":102498122,"name":"Community Manager","rank":10,"memberCount":2},{"id":34435102,"name":"Developers","rank":11,"memberCount":4},{"id":102927239,"name":"Co-Owner","rank":12,"memberCount":1},{"id":111452300,"name":"Owner","rank":254,"memberCount":0},{"id":34381140,"name":"The Hydra","rank":255,"memberCount":1}]}
+
+{"id":34381156,"name":"Tester","rank":3,"memberCount":1308},{"id":102498097,"name":"Secret Tester","rank":4,"memberCount":35},{"id":102498104,"name":"Junior Moderator","rank":6,"memberCount":7},{"id":102498108,"name":"Moderator","rank":7,"memberCount":18},{"id":102498110,"name":"Senior Moderator","rank":8,"memberCount":3},{"id":107386024,"name":"Head Moderator","rank":9,"memberCount":0},{"id":102498122,"name":"Community Manager","rank":10,"memberCount":2},{"id":34435102,"name":"Developers","rank":11,"memberCount":4},{"id":102927239,"name":"Co-Owner","rank":12,"memberCount":1},{"id":111452300,"name":"Owner","rank":254,"memberCount":0},{"id":34381140,"name":"The Hydra","rank":255,"memberCount":1}]}
+
+
 --KILL BRICKS UNDER HERE
 Workspace/Map/moundkillbricks
 Workspace/Debris/BanditCampfire
 Disable touch events 
 Any part Turquoise, [120, 255, 181], Neon
 
-Part named "void"  [Persimmon and [255, 91, 62] material Neon] under Workspace/Map
+Any Part named "void"  
+Any part [Persimmon and [255, 91, 62] material Neon] under Workspace/Map
 
 Burning folder
 Knocked folder
