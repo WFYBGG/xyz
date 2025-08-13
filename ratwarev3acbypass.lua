@@ -9,7 +9,7 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Ratware.exe - 100% By ChatGPT [Press 'Insert' to hide GUI]",
+    Title = "Ratware.exe - 100% Made By ChatGPT [Press 'Insert' to hide GUI]",
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -63,7 +63,7 @@ MainGroup:AddSlider("FlightSpeed", {
     Compact = true
 })
 MainGroup:AddToggle("NoclipToggle", {
-    Text = "Noclip",
+    Text = "No Clip",
     Default = false
 }):AddKeyPicker("NoclipKeybind", {
     Default = "",
@@ -73,7 +73,9 @@ MainGroup:AddToggle("NoclipToggle", {
         Toggles.NoclipToggle:SetValue(value)
     end
 })
-MainGroup:AddToggle("NoFallDamage", {
+
+local MainGroup1 = Tabs.Main:AddLeftGroupbox("Removal")
+MainGroup1:AddToggle("NoFallDamage", {
     Text = "No Fall Damage",
     Default = false
 })
