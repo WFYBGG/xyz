@@ -532,7 +532,7 @@ local function resetCharacterState()
             humanoid.WalkSpeed = 16
             humanoid.JumpPower = 50
         end
-        -- Cleanup any lingering instances
+        -- Cleanup all movement instances
         if char then
             for _, obj in pairs(char:GetChildren()) do
                 if obj.Name == "SpeedhackVelocity" or obj.Name == "OldDebris" then
@@ -552,6 +552,11 @@ local function cleanupAllStates()
         MovementStates.TweenActive = false
         MovementStates.AttachActive = false
         resetCharacterState()
+        -- Additional cleanup for modules
+        _G.StopTween()
+        if _G.BodyVelocity then _G.BodyVelocity:Destroy() end
+        if _G.Platform then _G.Platform:Destroy() end
+        if _G.FallDamageCD then _G.FallDamageCD:Destroy() end
     end)
 end
 
@@ -562,13 +567,15 @@ LocalPlayer.CharacterAdded:Connect(cleanupAllStates)
 -- Standalone Toggle System for Speedhack and Fly
 local ToggleManager = {}
 ToggleManager.State = { Speedhack = false, Fly = false }
+local isUpdating = false -- Prevent recursion
 
 local function updateToggleState(feature, state)
+    if isUpdating then return end
+    isUpdating = true
     ToggleManager.State[feature] = state
     if feature == "Speedhack" then Toggles.SpeedhackToggle:SetValue(state)
     elseif feature == "Fly" then Toggles.FlightToggle:SetValue(state) end
 
-    -- Toggle-off-and-back-on logic
     if feature == "Speedhack" and not state and ToggleManager.State.Fly then
         Toggles.FlightToggle:SetValue(false)
         task.wait(0.1)
@@ -578,43 +585,49 @@ local function updateToggleState(feature, state)
         task.wait(0.1)
         Toggles.SpeedhackToggle:SetValue(true)
     end
+    isUpdating = false
 end
 
 Toggles.SpeedhackToggle:OnChanged(function(state)
     updateToggleState("Speedhack", state)
     MovementStates.Speedhack = state
-    if not state then resetCharacterState() end
+    if not state then cleanupAllStates() end
 end)
 
 Toggles.FlightToggle:OnChanged(function(state)
     updateToggleState("Fly", state)
     MovementStates.Fly = state
-    if not state then resetCharacterState() end
+    if not state then cleanupAllStates() end
 end)
 
 Toggles.NoclipToggle:OnChanged(function(state)
     MovementStates.Noclip = state
-    if not state then resetCharacterState() end
+    if not state then cleanupAllStates() end
 end)
 
 Toggles.NoFallDamage:OnChanged(function(state)
     MovementStates.NoFall = state
-    if not state then resetCharacterState() end
+    if not state then cleanupAllStates() end
 end)
 
 Toggles.AttachtobackToggle:OnChanged(function(state)
     MovementStates.AttachActive = state
-    if not state then resetCharacterState() end
+    if not state then cleanupAllStates() end
 end)
 
 -- Sync with Universal Tween
 _G.tweenActive = false
 _G.CustomTween = function(target)
     MovementStates.TweenActive = true
+    cleanupAllStates()
+    MovementStates.Fly = true
+    MovementStates.Noclip = true
+    Toggles.FlightToggle:SetValue(true)
+    Toggles.NoclipToggle:SetValue(true)
 end
 _G.StopTween = function()
     MovementStates.TweenActive = false
-    resetCharacterState()
+    cleanupAllStates()
 end
 
 -- Prevent Interference and Restore State
@@ -623,14 +636,13 @@ RunService.RenderStepped:Connect(function()
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then return end
 
-        -- Enforce mutual exclusivity or cleanup
         if MovementStates.TweenActive or MovementStates.AttachActive then
             if MovementStates.Speedhack then updateToggleState("Speedhack", false) end
             if MovementStates.Fly then updateToggleState("Fly", false) end
         end
 
         if MovementStates.Speedhack and MovementStates.Fly then
-            updateToggleState("Speedhack", false) -- Prioritize Fly
+            updateToggleState("Speedhack", false)
         end
 
         if MovementStates.TweenActive and not (MovementStates.Fly or MovementStates.Noclip) then
@@ -651,7 +663,6 @@ RunService.RenderStepped:Connect(function()
             end
         end
 
-        -- Ensure state restoration after deactivation
         if not MovementStates.Speedhack and not MovementStates.Fly and not MovementStates.Noclip and
            not MovementStates.NoFall and not MovementStates.TweenActive and not MovementStates.AttachActive then
             resetCharacterState()
@@ -659,39 +670,12 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
-
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-
-
---BEGIN MODULES
---BEGIN MODULES
---BEGIN MODULES
---BEGIN MODULES
-
-
---Speedhack Module
+-- Speedhack Module
 pcall(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
     local player = Players.LocalPlayer
-
-    -- Wait for GUI initialization with timeout
-    local timeout = tick() + 10
-    while not (Toggles and Toggles.SpeedhackToggle and Options and Options.SpeedhackSpeed) and tick() < timeout do
-        print("[Speedhack] Waiting for GUI initialization...")
-        task.wait(0.1)
-    end
-    if not Toggles or not Toggles.SpeedhackToggle or not Options or not Options.SpeedhackSpeed then
-        print("[Speedhack] Error: GUI Toggles or Options not initialized after timeout")
-        return
-    end
 
     local BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
@@ -705,8 +689,6 @@ pcall(function()
                 char.Humanoid.JumpPower = 50
             end
             BodyVelocity.Parent = nil
-        end, function(err)
-            print("[Speedhack] resetSpeed error: " .. tostring(err))
         end)
     end
 
@@ -714,46 +696,19 @@ pcall(function()
         pcall(function()
             resetSpeed()
             BodyVelocity:Destroy()
-            print("[Speedhack] Cleaned up at " .. os.date("%H:%M:%S"))
-        end, function(err)
-            print("[Speedhack] cleanupSpeed error: " .. tostring(err))
         end)
     end
 
-    -- Initialize for existing character
-    pcall(function()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            if Toggles.SpeedhackToggle.Value then
-                local char = player.Character
-                BodyVelocity.Parent = char.HumanoidRootPart
-                char.Humanoid.JumpPower = 0
-                print("[Speedhack] Initialized for existing character")
-            end
-        else
-            print("[Speedhack] Warning: No character or components found on startup")
-        end
-    end, function(err)
-        print("[Speedhack] Initial character check error: " .. tostring(err))
-    end)
-
     player.CharacterAdded:Connect(function(character)
         pcall(function()
-            -- Wait for HumanoidRootPart and Humanoid
             local timeout = tick() + 5
             while not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) and tick() < timeout do
                 task.wait()
             end
-            if not (character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")) then
-                print("[Speedhack] Error: Character initialization failed")
-                return
-            end
             if Toggles.SpeedhackToggle.Value then
                 BodyVelocity.Parent = character.HumanoidRootPart
                 character.Humanoid.JumpPower = 0
-                print("[Speedhack] Enabled for new character")
             end
-        end, function(err)
-            print("[Speedhack] CharacterAdded error: " .. tostring(err))
         end)
     end)
 
@@ -776,39 +731,12 @@ pcall(function()
                 else
                     resetSpeed()
                 end
-            end, function(err)
-                print("[Speedhack] RenderStepped error: " .. tostring(err))
             end)
         end)
-    end, function(err)
-        print("[Speedhack] Error connecting RenderStepped: " .. tostring(err))
-    end)
-
-    -- Handle Flight toggle-off when both are active
-    pcall(function()
-        if Toggles.FlightToggle then
-            Toggles.FlightToggle:OnChanged(function(value)
-                pcall(function()
-                    if not value and Toggles.SpeedhackToggle.Value then
-                        Toggles.SpeedhackToggle:SetValue(false)
-                        task.wait(0.1)
-                        Toggles.SpeedhackToggle:SetValue(true)
-                        print("[Speedhack] Re-enabled after Flight toggle-off")
-                    end
-                end, function(err)
-                    print("[Speedhack] FlightToggle OnChanged error: " .. tostring(err))
-                end)
-            end)
-        else
-            print("[Speedhack] Warning: Toggles.FlightToggle not found")
-        end
-    end, function(err)
-        print("[Speedhack] Error setting up FlightToggle: " .. tostring(err))
     end)
 end)
 
-
---Fly/Flight Module
+-- Fly Module
 pcall(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
@@ -878,7 +806,6 @@ pcall(function()
 
                     FlyVelocity.Velocity = moveDir * math.min(Options.FlightSpeed.Value, 49 / dt) + Vector3.new(0, vert, 0)
                     FlyVelocity.Parent = char.HumanoidRootPart
-
                     Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
                     Platform.Parent = workspace
                 else
@@ -887,31 +814,13 @@ pcall(function()
             end)
         end)
     end)
-
-    -- Handle Speedhack toggle-off when both are active
-    Toggles.SpeedhackToggle:OnChanged(function(value)
-        pcall(function()
-            if not value and Toggles.FlightToggle.Value then
-                Toggles.FlightToggle:SetValue(false)
-                task.wait(0.1)
-                Toggles.FlightToggle:SetValue(true)
-            end
-        end)
-    end)
 end)
 
-
---Noclip Module
+-- Noclip Module
 pcall(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
     local player = Players.LocalPlayer
-
-    -- Check if GUI is initialized
-    if not Toggles or not Toggles.NoclipToggle then
-        print("[Noclip] Error: GUI toggles not initialized")
-        return
-    end
 
     local function setCollision(state)
         pcall(function()
@@ -922,36 +831,18 @@ pcall(function()
                         part.CanCollide = state
                     end
                 end
-            else
-                print("[Noclip] Warning: No character found for setCollision")
             end
-        end, function(err)
-            print("[Noclip] setCollision error: " .. tostring(err))
         end)
     end
 
-    -- Check if character exists on script start
-    pcall(function()
-        if player.Character and Toggles.NoclipToggle.Value then
-            setCollision(false)
-            print("[Noclip] Enabled for existing character")
-        end
-    end)
-
     player.CharacterAdded:Connect(function(character)
         pcall(function()
-            -- Wait for character parts with timeout
             local timeout = tick() + 5
             while not character:FindFirstChild("HumanoidRootPart") and tick() < timeout do
                 task.wait()
             end
-            if not character:FindFirstChild("HumanoidRootPart") then
-                print("[Noclip] Error: Character initialization failed")
-                return
-            end
             if Toggles.NoclipToggle.Value then
                 setCollision(false)
-                print("[Noclip] Enabled for new character")
             end
         end)
     end)
@@ -961,17 +852,12 @@ pcall(function()
         renderConnection = RunService.RenderStepped:Connect(function()
             pcall(function()
                 setCollision(not Toggles.NoclipToggle.Value)
-            end, function(err)
-                print("[Noclip] RenderStepped error: " .. tostring(err))
             end)
         end)
-    end, function(err)
-        print("[Noclip] Error connecting RenderStepped: " .. tostring(err))
     end)
 end)
 
-
---No fall module
+-- No Fall Module
 pcall(function()
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
@@ -1013,16 +899,12 @@ pcall(function()
     end)
 end)
 
-
---Player ESP Module
+-- Player ESP Module
 pcall(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local Camera = workspace.CurrentCamera
-
-    local LocalPlayer
-    pcall(function() LocalPlayer = Players.LocalPlayer end)
-
+    local LocalPlayer = Players.LocalPlayer
     local ESPObjects = {}
 
     local function safeGet(parent, child)
@@ -1036,10 +918,7 @@ pcall(function()
     end
 
     local function getCharacterModel(player)
-        local living
-        pcall(function()
-            living = workspace:FindFirstChild("Living")
-        end)
+        local living = workspace:FindFirstChild("Living")
         if not living then return nil end
         return safeGet(living, player.Name)
     end
@@ -1057,19 +936,18 @@ pcall(function()
     end
 
     local function cleanupESP(player)
-        local tbl
-        pcall(function() tbl = ESPObjects[player] end)
+        local tbl = ESPObjects[player]
         if tbl then
             for _, obj in pairs(tbl) do
                 if typeof(obj) == "table" then
                     for _, v in pairs(obj) do
-                        pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
+                        pcall(function() if v and v.Remove then v:Remove() end end)
                     end
                 else
-                    pcall(function() if typeof(obj) == "userdata" and v.Remove then obj:Remove() end end)
+                    pcall(function() if obj and obj.Remove then obj:Remove() end end)
                 end
             end
-            pcall(function() ESPObjects[player] = nil end)
+            ESPObjects[player] = nil
         end
     end
 
@@ -1077,101 +955,57 @@ pcall(function()
         if player == LocalPlayer then return end
         pcall(function()
             if ESPObjects[player] then cleanupESP(player) end
-
-            local box, nameText, healthText, distText, chamBox
-
-            pcall(function()
-                box = Drawing.new("Line")
-                box.Visible = false
-                box.Thickness = 2
-                box.Color = Color3.fromRGB(255, 25, 25)
-            end)
-
-            pcall(function()
-                nameText = Drawing.new("Text")
-                nameText.Size = 14
-                nameText.Center = true
-                nameText.Outline = true
-                nameText.Color = Color3.fromRGB(255, 255, 255)
-                nameText.Visible = false
-            end)
-
-            pcall(function()
-                healthText = Drawing.new("Text")
-                healthText.Size = 13
-                healthText.Center = true
-                healthText.Outline = true
-                healthText.Color = Color3.fromRGB(0, 255, 0)
-                healthText.Visible = false
-            end)
-
-            pcall(function()
-                distText = Drawing.new("Text")
-                distText.Size = 13
-                distText.Center = true
-                distText.Outline = true
-                distText.Color = Color3.fromRGB(200, 200, 200)
-                distText.Visible = false
-            end)
-
-            pcall(function()
-                chamBox = Drawing.new("Square")
-                chamBox.Visible = false
-                chamBox.Color = Color3.fromRGB(255, 0, 0)
-                chamBox.Transparency = 0.2
-                chamBox.Filled = true
-            end)
-
-            ESPObjects[player] = {
-                Box = box,
-                Name = nameText,
-                Health = healthText,
-                Distance = distText,
-                ChamBox = chamBox,
-                Skeleton = {},
-            }
+            local box = Drawing.new("Line")
+            box.Visible = false
+            box.Thickness = 2
+            box.Color = Color3.fromRGB(255, 25, 25)
+            local nameText = Drawing.new("Text")
+            nameText.Size = 14
+            nameText.Center = true
+            nameText.Outline = true
+            nameText.Color = Color3.fromRGB(255, 255, 255)
+            nameText.Visible = false
+            local healthText = Drawing.new("Text")
+            healthText.Size = 13
+            healthText.Center = true
+            healthText.Outline = true
+            healthText.Color = Color3.fromRGB(0, 255, 0)
+            healthText.Visible = false
+            local distText = Drawing.new("Text")
+            distText.Size = 13
+            distText.Center = true
+            distText.Outline = true
+            distText.Color = Color3.fromRGB(200, 200, 200)
+            distText.Visible = false
+            local chamBox = Drawing.new("Square")
+            chamBox.Visible = false
+            chamBox.Color = Color3.fromRGB(255, 0, 0)
+            chamBox.Transparency = 0.2
+            chamBox.Filled = true
+            ESPObjects[player] = {Box = box, Name = nameText, Health = healthText, Distance = distText, ChamBox = chamBox, Skeleton = {}}
         end)
     end
 
     local function drawSkeleton(player, char, color, thickness)
         local bones = {
-            { "Head", "HumanoidRootPart" },
-            { "HumanoidRootPart", "LeftUpperLeg" },
-            { "LeftUpperLeg", "LeftLowerLeg" },
-            { "LeftLowerLeg", "LeftFoot" },
-            { "HumanoidRootPart", "RightUpperLeg" },
-            { "RightUpperLeg", "RightLowerLeg" },
-            { "RightLowerLeg", "RightFoot" },
-            { "HumanoidRootPart", "LeftUpperArm" },
-            { "LeftUpperArm", "LeftLowerArm" },
-            { "LeftLowerArm", "LeftHand" },
-            { "HumanoidRootPart", "RightUpperArm" },
-            { "RightUpperArm", "RightLowerArm" },
-            { "RightLowerArm", "RightHand" },
+            {"Head", "HumanoidRootPart"}, {"HumanoidRootPart", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"},
+            {"LeftLowerLeg", "LeftFoot"}, {"HumanoidRootPart", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"},
+            {"RightLowerLeg", "RightFoot"}, {"HumanoidRootPart", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"},
+            {"LeftLowerArm", "LeftHand"}, {"HumanoidRootPart", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"},
+            {"RightLowerArm", "RightHand"}
         }
-
-        if not ESPObjects[player] then ESPObjects[player] = {} end
         local skeleton = ESPObjects[player].Skeleton or {}
-
         for i, pair in ipairs(bones) do
             local part1, part2
-            pcall(function()
-                part1 = char:FindFirstChild(pair[1])
-                part2 = char:FindFirstChild(pair[2])
-            end)
-            local line = skeleton[i]
-            if not line then
-                line = Drawing.new("Line")
-                skeleton[i] = line
-            end
-
+            pcall(function() part1, part2 = char:FindFirstChild(pair[1]), char:FindFirstChild(pair[2]) end)
+            local line = skeleton[i] or Drawing.new("Line")
             if part1 and part2 then
                 local pos1, onScr1 = Camera:WorldToViewportPoint(part1.Position)
                 local pos2, onScr2 = Camera:WorldToViewportPoint(part2.Position)
                 if onScr1 and onScr2 then
                     line.From = Vector2.new(pos1.X, pos1.Y)
                     line.To = Vector2.new(pos2.X, pos2.Y)
-                    line.Color = color or Color3.fromRGB(255,255,255)
+                    line.Color = color or Color3.fromRGB(255, 255, 255)
                     line.Thickness = thickness or 2
                     line.Visible = Toggles.PlayerESP.Value
                 else
@@ -1180,26 +1014,14 @@ pcall(function()
             else
                 line.Visible = false
             end
+            skeleton[i] = line
         end
         ESPObjects[player].Skeleton = skeleton
     end
 
-    -- Player join/leave management
-    pcall(function()
-        Players.PlayerAdded:Connect(function(plr)
-            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
-        end)
-    end)
-    pcall(function()
-        Players.PlayerRemoving:Connect(function(plr)
-            pcall(function() cleanupESP(plr) end)
-        end)
-    end)
-    pcall(function()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
-        end
-    end)
+    Players.PlayerAdded:Connect(function(plr) if plr ~= LocalPlayer then createESP(plr) end end)
+    Players.PlayerRemoving:Connect(function(plr) cleanupESP(plr) end)
+    for _, plr in ipairs(Players:GetPlayers()) do if plr ~= LocalPlayer then createESP(plr) end end
 
     RunService.RenderStepped:Connect(function()
         pcall(function()
@@ -1208,161 +1030,73 @@ pcall(function()
                 streamedPlayers[player] = true
                 pcall(function()
                     local char = getCharacterModel(player)
-                    local box, nameText, healthText, distText, chamBox
-                    pcall(function()
-                        box = tbl.Box
-                        nameText = tbl.Name
-                        healthText = tbl.Health
-                        distText = tbl.Distance
-                        chamBox = tbl.ChamBox
-                    end)
-
+                    local box, nameText, healthText, distText, chamBox = tbl.Box, tbl.Name, tbl.Health, tbl.Distance, tbl.ChamBox
                     if char and safeGet(char, "HumanoidRootPart") then
-                        local hrp
-                        pcall(function() hrp = char.HumanoidRootPart end)
-                        local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
-
-                        pcall(function()
-                            pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        end)
-
-                        pcall(function()
-                            health, maxHealth = getHealthInfo(char)
-                        end)
-
-                        pcall(function()
-                            extents = char:GetExtentsSize()
-                        end)
-
-                        pcall(function()
-                            topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
-                        end)
-                        pcall(function()
-                            botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
-                        end)
-                        pcall(function()
-                            height = (botW.Y - topW.Y)
-                            width = height * 0.45
-                        end)
-
+                        local hrp = char.HumanoidRootPart
+                        local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        local health, maxHealth = getHealthInfo(char)
+                        local extents = char:GetExtentsSize()
+                        local topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
+                        local botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
+                        local height, width = (botW.Y - topW.Y), height * 0.45
                         if Toggles.PlayerESP.Value and onScreen and onScreen1 and onScreen2 and health > 0 then
-                            -- Chams box (drawn behind ESP box)
-                            pcall(function()
-                                chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
-                                chamBox.Size = Vector2.new(width, height)
-                                chamBox.Color = Color3.fromRGB(255, 0, 0)
-                                chamBox.Transparency = 0.15
-                                chamBox.Visible = true
-                            end)
-
-                            -- Draw box (top horizontal line)
-                            pcall(function()
-                                box.From = Vector2.new(topW.X - width/2, topW.Y)
-                                box.To = Vector2.new(topW.X + width/2, topW.Y)
-                                box.Visible = true
-                            end)
-
-                            -- Draw name
-                            pcall(function()
-                                nameText.Text = player.Name
-                                nameText.Position = Vector2.new(pos.X, topW.Y - 16)
-                                nameText.Visible = true
-                            end)
-
-                            -- Draw health/maxhealth
-                            pcall(function()
-                                healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
-                                healthText.Position = Vector2.new(pos.X, topW.Y - 2)
-                                local r = math.floor(255 - 255 * (health/maxHealth))
-                                local g = math.floor(255 * (health/maxHealth))
-                                healthText.Color = Color3.fromRGB(r, g, 0)
-                                healthText.Visible = true
-                            end)
-
-                            -- Draw distance
-                            pcall(function()
-                                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                                distText.Text = "[" .. math.floor(dist) .. "m]"
-                                distText.Position = Vector2.new(pos.X, botW.Y + 2)
-                                distText.Visible = true
-                            end)
-
-                            -- Draw skeleton
-                            drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
+                            chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
+                            chamBox.Size = Vector2.new(width, height)
+                            chamBox.Visible = true
+                            box.From = Vector2.new(topW.X - width/2, topW.Y)
+                            box.To = Vector2.new(topW.X + width/2, topW.Y)
+                            box.Visible = true
+                            nameText.Text = player.Name
+                            nameText.Position = Vector2.new(pos.X, topW.Y - 16)
+                            nameText.Visible = true
+                            healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
+                            healthText.Position = Vector2.new(pos.X, topW.Y - 2)
+                            healthText.Color = Color3.fromRGB(255 - 255 * (health/maxHealth), 255 * (health/maxHealth), 0)
+                            healthText.Visible = true
+                            local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
+                            distText.Text = "[" .. math.floor(dist) .. "m]"
+                            distText.Position = Vector2.new(pos.X, botW.Y + 2)
+                            distText.Visible = true
+                            drawSkeleton(player, char, Color3.fromRGB(255, 255, 255), 2)
                         else
-                            pcall(function() box.Visible = false end)
-                            pcall(function() nameText.Visible = false end)
-                            pcall(function() healthText.Visible = false end)
-                            pcall(function() distText.Visible = false end)
-                            pcall(function() chamBox.Visible = false end)
-                            -- Hide skeleton lines
-                            if tbl.Skeleton then
-                                for _, line in pairs(tbl.Skeleton) do
-                                    pcall(function() line.Visible = false end)
-                                end
-                            end
+                            box.Visible = false
+                            nameText.Visible = false
+                            healthText.Visible = false
+                            distText.Visible = false
+                            chamBox.Visible = false
+                            for _, line in pairs(tbl.Skeleton) do line.Visible = false end
                         end
                     else
-                        pcall(function() box.Visible = false end)
-                        pcall(function() nameText.Visible = false end)
-                        pcall(function() healthText.Visible = false end)
-                        pcall(function() distText.Visible = false end)
-                        pcall(function() chamBox.Visible = false end)
-                        -- Hide skeleton lines
-                        if tbl.Skeleton then
-                            for _, line in pairs(tbl.Skeleton) do
-                                pcall(function() line.Visible = false end)
-                            end
-                        end
+                        box.Visible = false
+                        nameText.Visible = false
+                        healthText.Visible = false
+                        distText.Visible = false
+                        chamBox.Visible = false
+                        for _, line in pairs(tbl.Skeleton) do line.Visible = false end
                     end
                 end)
             end
-            -- Robust cleanup: remove ESP for any player no longer in Players
             for playerRef in pairs(ESPObjects) do
-                local found = false
-                pcall(function()
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p == playerRef then
-                            found = true
-                            break
-                        end
-                    end
-                end)
-                if not found then
-                    cleanupESP(playerRef)
-                end
+                if not streamedPlayers[playerRef] then cleanupESP(playerRef) end
             end
         end)
     end)
-
-    -- Log script start
-    print("[ESP] Script initialized at " .. os.date("%H:%M:%S"))
-end, function(err)
-    print("[ESP] Initialization error: " .. tostring(err))
 end)
 
-
---Universal Tween & Location
+-- Universal Tween & Location Module
 pcall(function()
-    repeat
-        wait()
-    until game:IsLoaded()
-    repeat
-        wait()
-    until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    repeat wait() until game:IsLoaded()
+    repeat wait() until game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-    -- Combined script for fly, noclip, nofall with tween system
     local players = game:GetService("Players")
     local rs = game:GetService("RunService")
 
-    -- Fly variables
     _G.originalspeed = 125
     _G.Speed = _G.originalspeed
     local flyEnabled = false
     local flyActive = false
-    local lastPosition = nil -- Track position to detect teleportation
+    local lastPosition = nil
 
-    -- Table to store original CanCollide states of nearby parts
     local originalCollideStates = {}
 
     local function resetHumanoidState()
@@ -1375,37 +1109,32 @@ pcall(function()
         end)
     end
 
-    -- Create platform with increased size
     local platform = Instance.new("Part")
     platform.Name = "OldDebris"
     platform.Size = Vector3.new(10, 1, 10)
     platform.Anchored = true
-    platform.CanCollide = true -- Must be true to avoid anticheat
+    platform.CanCollide = true
     platform.Transparency = 0.75
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
 
-    -- Create BodyVelocity
     local bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
 
     players.LocalPlayer.CharacterAdded:Connect(function(character)
-        repeat
-            wait()
-        until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
+        repeat wait() until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
         pcall(function()
             if flyEnabled or _G.tweenActive then
                 character.Humanoid.JumpPower = 0
                 platform.Parent = workspace
                 platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
-                toggleNoclip(true) -- Reapply noclip on respawn
             else
                 platform.Parent = nil
                 bodyVelocity.Parent = nil
             end
-            lastPosition = character.HumanoidRootPart.Position -- Reset last position
+            lastPosition = character.HumanoidRootPart.Position
         end)
     end)
 
@@ -1431,7 +1160,6 @@ pcall(function()
         end)
     end
 
-    -- Noclip variables
     local noclipEnabled = false
     local noclipActive = false
 
@@ -1440,28 +1168,25 @@ pcall(function()
             if players.LocalPlayer.Character then
                 for _, part in pairs(players.LocalPlayer.Character:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = true end)
+                        part.CanCollide = true
                     end
                 end
             end
-            -- Restore original CanCollide states for nearby parts
             for part, canCollide in pairs(originalCollideStates) do
                 if part and part.Parent then
-                    pcall(function() part.CanCollide = canCollide end)
+                    part.CanCollide = canCollide
                 end
             end
-            originalCollideStates = {} -- Clear the table
+            originalCollideStates = {}
         end)
     end
 
     players.LocalPlayer.CharacterAdded:Connect(function(character)
-        repeat
-            wait()
-        until character:FindFirstChild("HumanoidRootPart")
+        repeat wait() until character:FindFirstChild("HumanoidRootPart")
         if noclipEnabled or _G.tweenActive then
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
-                    pcall(function() part.CanCollide = false end)
+                    part.CanCollide = false
                 end
             end
         end
@@ -1474,7 +1199,7 @@ pcall(function()
             if character then
                 for _, part in pairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = not enable end)
+                        part.CanCollide = not enable
                     end
                 end
             end
@@ -1484,7 +1209,6 @@ pcall(function()
         end)
     end
 
-    -- Nofall variables
     local nofallEnabled = false
     local fallDamageCD = nil
     local statusFolder = game.Workspace:WaitForChild("Living"):WaitForChild(players.LocalPlayer.Name):WaitForChild("Status")
@@ -1497,7 +1221,6 @@ pcall(function()
                 end
                 fallDamageCD = Instance.new("Folder")
                 fallDamageCD.Name = "FallDamageCD"
-                fallDamageCD.Archivable = true
                 fallDamageCD.Parent = statusFolder
             else
                 if fallDamageCD and fallDamageCD.Parent then
@@ -1509,81 +1232,43 @@ pcall(function()
         end)
     end
 
-    -- Tween variables
     _G.tweenActive = false
     _G.tweenPhase = 0
     _G.highAltitude = 0
     _G.tweenTarget = Vector3.new(0, 0, 0)
     local tweenNotification = nil
-    local teleportCooldown = 0 -- Cooldown to pause tween after teleport detection
-    local notificationCheck = 0 -- Timer to periodically check notification
+    local teleportCooldown = 0
+    local notificationCheck = 0
 
-    -- Main RenderStepped loop combining fly and noclip
     rs.RenderStepped:Connect(function(delta)
         pcall(function()
             local character = players.LocalPlayer.Character
             local hrp = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
 
-            -- Handle fly
             if flyEnabled and character and humanoid and hrp then
                 flyActive = true
-                local moveDirection = Vector3.new(0, 0, 0)
-                local verticalSpeed = 0
-
-                -- Detect teleportation (anti-cheat)
-                if lastPosition and _G.tweenActive then
-                    local currentPosition = hrp.Position
-                    local distanceMoved = (currentPosition - lastPosition).Magnitude
-                    if distanceMoved > 50 then -- Arbitrary threshold for teleport detection
-                        teleportCooldown = 0.5 -- Pause tween for 0.5 seconds
-                        Library:Notify("Teleport detected, pausing tween briefly", { Duration = 2 })
-                    end
-                    lastPosition = currentPosition
-                end
-
-                -- Periodically check and recreate notification if missing
-                if _G.tweenActive then
-                    notificationCheck = notificationCheck + delta
-                    if notificationCheck >= 1 and (not tweenNotification or not tweenNotification.Parent) then
-                        tweenNotification = Library:Notify("Tween in progress", {
-                            Duration = 9999 -- Fallback to long finite duration
-                        })
-                        if tweenNotification then
-                            print("Notification recreated: Tween in progress")
-                        else
-                            print("Failed to recreate notification")
-                        end
-                        notificationCheck = 0
-                    end
-                end
-
                 if _G.tweenActive and teleportCooldown <= 0 then
-                    -- Ensure noclip is active during tween
                     if not noclipEnabled then
                         toggleNoclip(true)
                     end
-                    -- Tween logic
                     local pos = hrp.Position
-                    if _G.tweenPhase == 1 then -- Ascend
+                    if _G.tweenPhase == 1 then
                         local targetY = _G.highAltitude
                         local distance = targetY - pos.Y
                         if distance > 1 then
-                            verticalSpeed = _G.Speed * delta
-                            hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
+                            hrp.CFrame = hrp.CFrame + Vector3.new(0, _G.Speed * delta, 0)
                         else
                             hrp.CFrame = CFrame.new(Vector3.new(pos.X, targetY, pos.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 2
                         end
-                    elseif _G.tweenPhase == 2 then -- Horizontal
+                    elseif _G.tweenPhase == 2 then
                         local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
                         local horizontalVec = (highTarget - pos) * Vector3.new(1, 0, 1)
                         if horizontalVec.Magnitude > 5 then
                             local stepDistance = _G.Speed * delta
-                            if stepDistance > 10 then -- Cap step size to avoid anti-cheat
-                                stepDistance = 10
-                            end
-                            moveDirection = horizontalVec.Unit * stepDistance
+                            if stepDistance > 10 then stepDistance = 10 end
+                            local moveDirection = horizontalVec.Unit * stepDistance
                             if horizontalVec.Magnitude < moveDirection.Magnitude then
                                 moveDirection = horizontalVec
                             end
@@ -1592,12 +1277,11 @@ pcall(function()
                             hrp.CFrame = CFrame.new(Vector3.new(highTarget.X, _G.highAltitude, highTarget.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenPhase = 3
                         end
-                    elseif _G.tweenPhase == 3 then -- Descend
+                    elseif _G.tweenPhase == 3 then
                         local targetY = _G.tweenTarget.Y
                         local distance = pos.Y - targetY
                         if distance > 5 then
-                            verticalSpeed = -_G.Speed * delta
-                            hrp.CFrame = hrp.CFrame + Vector3.new(0, verticalSpeed, 0)
+                            hrp.CFrame = hrp.CFrame + Vector3.new(0, -_G.Speed * delta, 0)
                         else
                             hrp.CFrame = CFrame.new(Vector3.new(pos.X, targetY, pos.Z)) * (hrp.CFrame - hrp.Position)
                             _G.tweenActive = false
@@ -1606,7 +1290,6 @@ pcall(function()
                             toggleNoclip(false)
                             toggleNofall(false)
                             if tweenNotification then
-                                print("Destroying notification")
                                 tweenNotification:Destroy()
                                 tweenNotification = nil
                             end
@@ -1615,17 +1298,8 @@ pcall(function()
                 elseif teleportCooldown > 0 then
                     teleportCooldown = teleportCooldown - delta
                 end
-
-                -- Apply BodyVelocity for horizontal movement
-                bodyVelocity.Velocity = Vector3.new(moveDirection.X, 0, moveDirection.Z)
-
-                -- Set JumpPower
                 humanoid.JumpPower = 0
-
-                -- Update platform to follow character precisely
                 platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
-
-                -- Monitor health to detect kill
                 if humanoid.Health <= 0 then
                     Library:Notify("Character Dead, Please Try Again", { Duration = 3 })
                     resetHumanoidState()
@@ -1638,7 +1312,6 @@ pcall(function()
                     toggleNoclip(false)
                     toggleNofall(false)
                     if tweenNotification then
-                        print("Destroying notification")
                         tweenNotification:Destroy()
                         tweenNotification = nil
                     end
@@ -1652,43 +1325,11 @@ pcall(function()
                 end
             end
 
-            -- Handle noclip
             if noclipEnabled and character and hrp then
                 noclipActive = true
                 for _, part in pairs(character:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        pcall(function() part.CanCollide = false end)
-                    end
-                end
-                local region = workspace:FindPartsInRegion3(Region3.new(hrp.Position - Vector3.new(20, 20, 20), hrp.Position + Vector3.new(20, 20, 20)))
-                for _, part in pairs(region) do
-                    if part:IsA("BasePart") and part ~= hrp and part ~= platform then
-                        if not originalCollideStates[part] then
-                            originalCollideStates[part] = part.CanCollide
-                        end
-                        pcall(function() part.CanCollide = false end)
-                    end
-                end
-                -- Additional noclip pass for ascent and horizontal phases
-                if _G.tweenActive and (_G.tweenPhase == 1 or _G.tweenPhase == 2) then
-                    for _, part in pairs(region) do
-                        if part:IsA("BasePart") and part ~= hrp and part ~= platform then
-                            if not originalCollideStates[part] then
-                                originalCollideStates[part] = part.CanCollide
-                            end
-                            pcall(function() part.CanCollide = false end)
-                        end
-                    end
-                end
-                -- Additional noclip pass for descent
-                if _G.tweenActive and _G.tweenPhase == 3 then
-                    for _, part in pairs(region) do
-                        if part:IsA("BasePart") and part ~= hrp and part ~= platform then
-                            if not originalCollideStates[part] then
-                                originalCollideStates[part] = part.CanCollide
-                            end
-                            pcall(function() part.CanCollide = false end)
-                        end
+                        part.CanCollide = false
                     end
                 end
             else
@@ -1700,36 +1341,21 @@ pcall(function()
         end)
     end)
 
-    -- Custom Tween function
     _G.CustomTween = function(target)
         pcall(function()
             local character = players.LocalPlayer.Character
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
-
             toggleNoclip(true)
             toggleNofall(true)
             toggleFly(true)
-
             _G.tweenTarget = target
             _G.highAltitude = hrp.Position.Y + 500
             _G.tweenPhase = 1
             _G.tweenActive = true
-            lastPosition = hrp.Position -- Initialize last position
-
-            -- Create persistent notification
+            lastPosition = hrp.Position
             if not tweenNotification then
-                tweenNotification = Library:Notify("Tween in progress", {
-                    Duration = 9999 -- Fallback to long finite duration
-                })
-                if tweenNotification then
-                    print("Notification created: Tween in progress")
-                else
-                    print("Failed to create notification")
-                end
-                notificationCheck = 0
-            else
-                print("Notification already exists, skipping creation")
+                tweenNotification = Library:Notify("Tween in progress", { Duration = 9999 })
             end
         end)
     end
@@ -1742,16 +1368,14 @@ pcall(function()
             toggleNoclip(false)
             toggleNofall(false)
             if tweenNotification then
-                print("Destroying notification")
                 tweenNotification:Destroy()
                 tweenNotification = nil
             end
             teleportCooldown = 0
-            resetNoClip() -- Ensure nearby parts are restored
+            resetNoClip()
         end)
     end
 
-    -- Cleanup
     game:BindToClose(function()
         pcall(function()
             _G.StopTween()
@@ -1761,16 +1385,13 @@ pcall(function()
     end)
 end)
 
-
-
---Attach to back Module [TESTING STILL]
+-- Attach to Back Module [TESTING STILL]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- Internal state
 local targetPlayer = nil
 local isAttached = false
 local attachConn = nil
@@ -1783,17 +1404,16 @@ local flyConn = nil
 local noclipEnabled = false
 local nofallEnabled = false
 local nofallFolder = nil
-local heightOffset = 0 -- Matches ATBHeight default
-local zDistance = -4 -- Updated default
+local heightOffset = 0
+local zDistance = -4
 local originalSpeed = 150
 local messageDebounce = false
 local currentTween = nil
 local updateCoroutine = nil
 
--- Utility: Safe get
 local function safeGet(obj, ...)
     local args = {...}
-    for i, v in ipairs(args) do
+    for _, v in ipairs(args) do
         local ok, res = pcall(function() return obj[v] end)
         if not ok then return nil end
         obj = res
@@ -1802,7 +1422,6 @@ local function safeGet(obj, ...)
     return obj
 end
 
--- Fly logic
 local function enableFly()
     local success, result = pcall(function()
         if flyEnabled then return true end
@@ -1835,9 +1454,6 @@ local function enableFly()
         end)
         return true
     end)
-    if not success then
-        warn("Failed to enable fly: " .. tostring(result))
-    end
     return success and result
 end
 
@@ -1845,18 +1461,9 @@ local function disableFly()
     local success, result = pcall(function()
         if not flyEnabled then return true end
         flyEnabled = false
-        if flyConn then
-            flyConn:Disconnect()
-            flyConn = nil
-        end
-        if flyPlatform then
-            flyPlatform:Destroy()
-            flyPlatform = nil
-        end
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-            bodyVelocity = nil
-        end
+        if flyConn then flyConn:Disconnect() flyConn = nil end
+        if flyPlatform then flyPlatform:Destroy() flyPlatform = nil end
+        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
         local char = Workspace.Living:FindFirstChild(LocalPlayer.Name)
         if char then
             local humanoid = safeGet(char, "Humanoid")
@@ -1867,13 +1474,9 @@ local function disableFly()
         end
         return true
     end)
-    if not success then
-        warn("Failed to disable fly: " .. tostring(result))
-    end
     return success and result
 end
 
--- Nofall logic
 local function enableNofall()
     local success, result = pcall(function()
         if nofallEnabled then return true end
@@ -1895,9 +1498,6 @@ local function enableNofall()
         nofallEnabled = true
         return true
     end)
-    if not success then
-        warn("Failed to enable nofall: " .. tostring(result))
-    end
     return success and result
 end
 
@@ -1915,13 +1515,9 @@ local function disableNofall()
         nofallFolder = nil
         return true
     end)
-    if not success then
-        warn("Failed to disable nofall: " .. tostring(result))
-    end
     return success and result
 end
 
--- Noclip logic
 local function enableNoclip()
     local success, result = pcall(function()
         if noclipEnabled then return true end
@@ -1930,14 +1526,11 @@ local function enableNoclip()
         noclipEnabled = true
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
-                pcall(function() part.CanCollide = false end)
+                part.CanCollide = false
             end
         end
         return true
     end)
-    if not success then
-        warn("Failed to enable noclip: " .. tostring(result))
-    end
     return success and result
 end
 
@@ -1949,18 +1542,14 @@ local function disableNoclip()
         noclipEnabled = false
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
-                pcall(function() part.CanCollide = true end)
+                part.CanCollide = true
             end
         end
         return true
     end)
-    if not success then
-        warn("Failed to disable noclip: " .. tostring(result))
-    end
     return success and result
 end
 
--- Tween logic
 local function tweenToBack()
     if isTweening or isLocked then return false end
     isTweening = true
@@ -1975,27 +1564,10 @@ local function tweenToBack()
         enableFly()
         enableNofall()
         enableNoclip()
-        local function createTween()
-            local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
-            local tweenTime = distance / originalSpeed
-            currentTween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
-            currentTween:Play()
-        end
-        createTween()
-        updateCoroutine = coroutine.create(function()
-            while isTweening do
-                task.wait(1)
-                if not isTweening then break end
-                if currentTween then
-                    currentTween:Cancel()
-                end
-                targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
-                if not targetHrp then break end
-                distance = (hrp.Position - targetHrp.Position).Magnitude
-                createTween()
-            end
-        end)
-        coroutine.resume(updateCoroutine)
+        local backGoal = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
+        local tweenTime = distance / originalSpeed
+        currentTween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
+        currentTween:Play()
         currentTween.Completed:Wait()
         isLocked = true
         isTweening = false
@@ -2012,32 +1584,19 @@ local function tweenToBack()
     return success and result
 end
 
--- Attach/Detach logic
 local function stopAttach()
     local success, result = pcall(function()
         isAttached = false
         isLocked = false
         isTweening = false
-        if attachConn then
-            attachConn:Disconnect()
-            attachConn = nil
-        end
-        if updateCoroutine then
-            coroutine.close(updateCoroutine)
-            updateCoroutine = nil
-        end
-        if currentTween then
-            currentTween:Cancel()
-            currentTween = nil
-        end
+        if attachConn then attachConn:Disconnect() attachConn = nil end
+        if updateCoroutine then coroutine.close(updateCoroutine) updateCoroutine = nil end
+        if currentTween then currentTween:Cancel() currentTween = nil end
         disableNofall()
         disableNoclip()
         disableFly()
         return true
     end)
-    if not success then
-        warn("Failed to stop attach: " .. tostring(result))
-    end
     return success and result
 end
 
@@ -2047,9 +1606,7 @@ local function startAttach()
             if not messageDebounce then
                 messageDebounce = true
                 messagebox("Please select a player first!", "Error", 0)
-                task.delay(2, function()
-                    messageDebounce = false
-                end)
+                task.delay(2, function() messageDebounce = false end)
             end
             return false
         end
@@ -2074,7 +1631,7 @@ local function startAttach()
                 return
             end
             if isLocked then
-                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, -zDistance) -- Reversed direction
+                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, heightOffset, zDistance)
             elseif not isTweening then
                 tweenToBack()
             end
@@ -2088,20 +1645,15 @@ local function startAttach()
     return success and result
 end
 
--- Linoria GUI integration
 local success, result = pcall(function()
-    -- Ensure clean initial state
     local success, _ = pcall(function()
         disableNofall()
         disableNoclip()
         disableFly()
         return true
     end)
-    if not success then
-        warn("Failed to ensure clean initial state")
-    end
+    if not success then warn("Failed to ensure clean initial state") end
 
-    -- Player dropdown
     Options.PlayerDropdown:OnChanged(function(value)
         local success, _ = pcall(function()
             targetPlayer = value and Players:FindFirstChild(value) or nil
@@ -2110,49 +1662,33 @@ local success, result = pcall(function()
             end
             return true
         end)
-        if not success then
-            warn("Failed to update target player")
-        end
+        if not success then warn("Failed to update target player") end
     end)
 
-    -- Toggle
     Toggles.AttachtobackToggle:OnChanged(function(value)
         local success, _ = pcall(function()
-            if value then
-                startAttach()
-            else
-                stopAttach()
-            end
+            if value then startAttach() else stopAttach() end
             return true
         end)
-        if not success then
-            warn("Failed to toggle attach")
-        end
+        if not success then warn("Failed to toggle attach") end
     end)
 
-    -- Height slider
     Options.ATBHeight:OnChanged(function(value)
         local success, _ = pcall(function()
             heightOffset = value
             return true
         end)
-        if not success then
-            warn("Failed to update height offset")
-        end
+        if not success then warn("Failed to update height offset") end
     end)
 
-    -- Distance slider
     Options["ATBDistance)"]:OnChanged(function(value)
         local success, _ = pcall(function()
             zDistance = value
             return true
         end)
-        if not success then
-            warn("Failed to update distance")
-        end
+        if not success then warn("Failed to update distance") end
     end)
 
-    -- Re-apply on respawn
     LocalPlayer.CharacterAdded:Connect(function(char)
         local success, _ = pcall(function()
             if isAttached then
@@ -2168,25 +1704,19 @@ local success, result = pcall(function()
             end
             return true
         end)
-        if not success then
-            warn("Failed to handle character respawn")
-        end
+        if not success then warn("Failed to handle character respawn") end
     end)
 
-    -- Cleanup when local player leaves
     LocalPlayer.AncestryChanged:Connect(function(_, parent)
         if not parent then
             local success, _ = pcall(function()
                 stopAttach()
                 return true
             end)
-            if not success then
-                warn("Failed to clean up on leave")
-            end
+            if not success then warn("Failed to clean up on leave") end
         end
     end)
 
-    -- Handle player leave
     Players.PlayerRemoving:Connect(function(player)
         local success, _ = pcall(function()
             if player == targetPlayer then
@@ -2196,22 +1726,13 @@ local success, result = pcall(function()
             end
             return true
         end)
-        if not success then
-            warn("Failed to handle player removing")
-        end
+        if not success then warn("Failed to handle player removing") end
     end)
 
     return true
 end)
 
-if not success then
-    warn("Setup failed: " .. tostring(result))
-end
---END MODULES
---END MODULES
---END MODULES
---END MODULES
-
+if not success then warn("Setup failed: " .. tostring(result)) end
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
