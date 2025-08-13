@@ -80,6 +80,27 @@ MainGroup1:AddToggle("NoFallDamage", {
     Default = false
 })
 
+-- Moderator Notifier GUI
+local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Moderators")
+ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
+    Text = "Moderator Notifier",
+    Default = false,
+    Tooltip = "Notifies when moderators are in the server",
+    Callback = function(value)
+        pcall(function()
+            _G.toggleModeratorNotifier(value)
+            print("[Moderator Notifier GUI] Toggle set to: " .. tostring(value))
+        end)
+    end
+}):AddKeyPicker("ModeratorNotifierBind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.ModeratorNotifierToggle:SetValue(value)
+    end
+})
+
 local MainGroup3 = Tabs.Main:AddRightGroupbox("Universal Tween")
 
 -- Initialize lists for Areas and NPCs
@@ -1935,6 +1956,180 @@ end)
 if not success then
     warn("Setup failed: " .. tostring(result))
 end
+
+-- Moderator Notifier Module
+pcall(function()
+    local HttpService = game:GetService("HttpService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local GroupId = 5161694
+    local MonitoredRoles = {
+        {id = 34381156, name = "Tester"},
+        {id = 102498097, name = "Secret Tester"},
+        {id = 102498104, name = "Junior Moderator"},
+        {id = 102498108, name = "Moderator"},
+        {id = 102498110, name = "Senior Moderator"},
+        {id = 107386024, name = "Head Moderator"},
+        {id = 102498122, name = "Community Manager"},
+        {id = 34435102, name = "Developers"},
+        {id = 102927239, name = "Co-Owner"},
+        {id = 111452300, name = "Owner"},
+        {id = 34381140, name = "The Hydra"}
+    }
+    local RoleCache = {} -- Cache: {PlayerId = {roleId, roleName}}
+    local ActiveNotifications = {} -- Tracks active notifications: {NotificationId = true}
+    local IsMonitoring = false
+    local MonitorConn = nil
+
+    local function safeGet(obj, ...)
+        local args = {...}
+        for i, v in ipairs(args) do
+            local ok, res = pcall(function() return obj[v] end)
+            if not ok then
+                print("[Moderator Notifier] safeGet failed for " .. tostring(v) .. ": " .. tostring(res))
+                return nil
+            end
+            obj = res
+            if not obj then
+                print("[Moderator Notifier] safeGet returned nil for " .. tostring(v))
+                return nil
+            end
+        end
+        return obj
+    end
+
+    local function getPlayerRole(player)
+        if not player then return nil end
+        if RoleCache[player.UserId] then
+            print("[Moderator Notifier] Using cached role for " .. player.Name .. ": " .. tostring(RoleCache[player.UserId].roleName))
+            return RoleCache[player.UserId]
+        end
+        local success, result = pcall(function()
+            local url = "https://groups.roblox.com/v2/users/" .. player.UserId .. "/groups/roles"
+            local response = HttpService:GetAsync(url)
+            local data = HttpService:JSONDecode(response)
+            for _, group in ipairs(data.data) do
+                if group.group.id == GroupId then
+                    return {roleId = group.role.id, roleName = group.role.name}
+                end
+            end
+            return nil
+        end)
+        if success and result then
+            for _, role in ipairs(MonitoredRoles) do
+                if result.roleId == role.id then
+                    RoleCache[player.UserId] = result
+                    print("[Moderator Notifier] Found role for " .. player.Name .. ": " .. result.roleName .. " (ID " .. result.roleId .. ")")
+                    return result
+                end
+            end
+        elseif not success then
+            warn("[Moderator Notifier] Failed to fetch role for " .. player.Name .. ": " .. tostring(result))
+        end
+        RoleCache[player.UserId] = {roleId = 0, roleName = "None"}
+        return nil
+    end
+
+    local function updateNotification()
+        local rolePlayers = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local role = getPlayerRole(player)
+                if role then
+                    table.insert(rolePlayers, player.Name .. " (" .. role.roleName .. ")")
+                end
+            end
+        end
+        local message = #rolePlayers > 0 and "Moderators in server: " .. table.concat(rolePlayers, ", ") or nil
+        local existingNotif = next(ActiveNotifications)
+        if message and not existingNotif then
+            local notifId = HttpService:GenerateGUID(false)
+            ActiveNotifications[notifId] = true
+            Library:Notify(message, {Duration = 9999})
+            print("[Moderator Notifier] Notification shown: " .. message)
+        elseif not message and existingNotif then
+            for notifId in pairs(ActiveNotifications) do
+                ActiveNotifications[notifId] = nil
+            end
+            Library:Notify("No moderators in server.", {Duration = 3})
+            print("[Moderator Notifier] All moderators left, notification cleared")
+        elseif message and existingNotif then
+            for notifId in pairs(ActiveNotifications) do
+                ActiveNotifications[notifId] = nil
+            end
+            local notifId = HttpService:GenerateGUID(false)
+            ActiveNotifications[notifId] = true
+            Library:Notify(message, {Duration = 9999})
+            print("[Moderator Notifier] Notification updated: " .. message)
+        end
+    end
+
+    local function startMonitoring()
+        if IsMonitoring then
+            print("[Moderator Notifier] Monitoring already active")
+            return
+        end
+        IsMonitoring = true
+        print("[Moderator Notifier] Starting monitoring")
+        updateNotification()
+        MonitorConn = Players.PlayerAdded:Connect(function(player)
+            pcall(function()
+                if player == LocalPlayer then return end
+                local role = getPlayerRole(player)
+                if role then
+                    updateNotification()
+                end
+                print("[Moderator Notifier] Player added: " .. player.Name)
+            end)
+        end)
+        Players.PlayerRemoving:Connect(function(player)
+            pcall(function()
+                if player == LocalPlayer then return end
+                RoleCache[player.UserId] = nil
+                if getPlayerRole(player) then
+                    updateNotification()
+                end
+                print("[Moderator Notifier] Player removed: " .. player.Name)
+            end)
+        end)
+        Library:Notify("Moderator Notifier enabled.", {Duration = 3})
+    end
+
+    local function stopMonitoring()
+        if not IsMonitoring then
+            print("[Moderator Notifier] Monitoring not active")
+            return
+        end
+        IsMonitoring = false
+        if MonitorConn then
+            MonitorConn:Disconnect()
+            MonitorConn = nil
+        end
+        for notifId in pairs(ActiveNotifications) do
+            ActiveNotifications[notifId] = nil
+        end
+        RoleCache = {}
+        Library:Notify("Moderator Notifier disabled.", {Duration = 3})
+        print("[Moderator Notifier] Stopped monitoring")
+    end
+
+    _G.toggleModeratorNotifier = function(value)
+        pcall(function()
+            print("[Moderator Notifier] Toggle changed to: " .. tostring(value))
+            if value then
+                startMonitoring()
+            else
+                stopMonitoring()
+            end
+        end)
+    end
+
+    game:BindToClose(function()
+        pcall(function()
+            stopMonitoring()
+        end)
+    end)
+end)
 
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
