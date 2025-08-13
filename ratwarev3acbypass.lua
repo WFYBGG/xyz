@@ -84,7 +84,7 @@ MainGroup1:AddToggle("NoFallDamage", {
 local ModeratorsGroup = Tabs.Main:AddRightGroupbox("Moderators")
 ModeratorsGroup:AddToggle("ModeratorNotifierToggle", {
     Text = "Moderator Notifier",
-    Default = false,
+    Default = true,
     Tooltip = "Shows a popup when moderators are in the server",
     Callback = function(value)
         pcall(function()
@@ -1955,7 +1955,7 @@ pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local MonitoredUsers = {
-        {userId = 9188634092, username = "fwqfqfqwgqghqwehqw", roleName = "RATWARE.EXE-SCRIPT-TEST-USER"},
+        {userId = , username = "", roleName = "Ratware.exe"},
         {userId = 116279325, username = "MichaelpizzaXD", roleName = "Developers"},
         {userId = 101557551, username = "MlgArcOfOz", roleName = "Developers"},
         {userId = 66885812, username = "MiniTomBomb", roleName = "Developers"},
@@ -2269,8 +2269,8 @@ pcall(function()
         NotificationGui.Enabled = false
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 100)
-        frame.Position = UDim2.new(0.5, -150, 0.1, 0)
+        frame.Size = UDim2.new(0, 200, 0, 60) -- Smaller popup size
+        frame.Position = UDim2.new(0.5, -100, 0.1, 0)
         frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         frame.BackgroundTransparency = 0.3
         frame.BorderSizePixel = 0
@@ -2281,10 +2281,10 @@ pcall(function()
         uiCorner.Parent = frame
 
         NotificationLabel = Instance.new("TextLabel")
-        NotificationLabel.Size = UDim2.new(1, -20, 1, -20)
-        NotificationLabel.Position = UDim2.new(0, 10, 0, 10)
+        NotificationLabel.Size = UDim2.new(1, -10, 1, -10)
+        NotificationLabel.Position = UDim2.new(0, 5, 0, 5)
         NotificationLabel.BackgroundTransparency = 1
-        NotificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NotificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Default, will be overridden
         NotificationLabel.TextScaled = true
         NotificationLabel.TextWrapped = true
         NotificationLabel.Font = Enum.Font.SourceSans
@@ -2317,7 +2317,7 @@ pcall(function()
             if player ~= LocalPlayer then
                 local role = getPlayerRole(player)
                 if role then
-                    table.insert(rolePlayers, role.roleName .. " is in server: " .. player.Name)
+                    table.insert(rolePlayers, "Warning, " .. role.roleName .. " Detected: " .. player.Name)
                 end
             end
         end
@@ -2326,12 +2326,17 @@ pcall(function()
                 createNotificationGui()
             end
             NotificationGui.Enabled = true
-            NotificationLabel.Text = table.concat(rolePlayers, ", ")
+            NotificationLabel.TextColor3 = Color3.fromRGB(255, 20, 20) -- Neon red
+            NotificationLabel.Text = table.concat(rolePlayers, "\n")
             print("[Moderator Notifier] Notification shown: " .. NotificationLabel.Text)
-        elseif NotificationGui then
-            NotificationGui.Enabled = false
-            NotificationLabel.Text = ""
-            print("[Moderator Notifier] No moderators, notification hidden")
+        else
+            if not NotificationGui then
+                createNotificationGui()
+            end
+            NotificationGui.Enabled = true
+            NotificationLabel.TextColor3 = Color3.fromRGB(0, 255, 127) -- Neon green
+            NotificationLabel.Text = "Safe, No Detected Users"
+            print("[Moderator Notifier] No moderators, notification set to safe")
         end
     end
 
