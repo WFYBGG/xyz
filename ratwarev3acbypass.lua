@@ -1536,6 +1536,7 @@ pcall(function()
             if not status:FindFirstChild("FallDamageCD") then
                 nofallFolder = Instance.new("Folder")
                 nofallFolder.Name = "FallDamageCD"
+                nofallFolder.Archivable = true
                 nofallFolder.Parent = status
             else
                 nofallFolder = status:FindFirstChild("FallDamageCD")
@@ -1668,6 +1669,68 @@ pcall(function()
         end)
     end
 
+    -- Define the Rage groupbox GUI (using AddLeftGroupbox as per your snippet)
+    local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
+    MainGroup6:AddDropdown('PlayerDropdown', {
+        SpecialType = 'Player',
+        Text = 'Select Player',
+        Tooltip = 'Attach to [Selected Username]',
+        Callback = function(Value)
+            pcall(function()
+                targetPlayer = Players:FindFirstChild(Value)
+                print('[cb] Player dropdown got changed:', Value)
+            end)
+        end
+    })
+    MainGroup6:AddToggle("AttachtobackToggle", {
+        Text = "Attach To Back",
+        Default = false,
+        Callback = function(Value)
+            pcall(function()
+                if Value then
+                    startAttach()
+                else
+                    stopAttach()
+                end
+            end)
+        end
+    }):AddKeyPicker("Attachtobackbind", {
+        Default = "",
+        Mode = "Toggle",
+        Text = "N/A",
+        Callback = function(value)
+            pcall(function()
+                Toggles.AttachtobackToggle:SetValue(value)
+            end)
+        end
+    })
+    MainGroup6:AddSlider("ATBHeight", {
+        Text = "Height",
+        Default = 0,
+        Min = -100,
+        Max = 100,
+        Rounding = 0,
+        Compact = true
+    })
+    MainGroup6:AddSlider("ATBDistance", {
+        Text = "Distance",
+        Default = -3,
+        Min = -100,
+        Max = 100,
+        Rounding = 0,
+        Compact = true
+    })
+
+    -- Initialize dropdown with current players
+    pcall(function()
+        local playerList = {}
+        for _, plr in ipairs(Players:GetPlayers()) do
+            table.insert(playerList, plr.Name)
+        end
+        table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
+        Options.PlayerDropdown:SetValues(playerList)
+    end)
+
     Players.PlayerAdded:Connect(function()
         pcall(function()
             local playerList = {}
@@ -1677,7 +1740,7 @@ pcall(function()
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
         end)
-    end)
+    })
     Players.PlayerRemoving:Connect(function(player)
         pcall(function()
             if player == targetPlayer then
@@ -1692,7 +1755,7 @@ pcall(function()
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
         end)
-    end)
+    })
 
     LocalPlayer.CharacterAdded:Connect(function(char)
         pcall(function()
@@ -1708,6 +1771,9 @@ pcall(function()
     game:BindToClose(function()
         pcall(function()
             stopAttach()
+            if nofallFolder then
+                nofallFolder:Destroy()
+            end
         end)
     end)
 end)
