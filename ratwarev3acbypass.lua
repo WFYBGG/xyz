@@ -80,44 +80,17 @@ MainGroup1:AddToggle("NoFallDamage", {
     Default = false
 })
 -- Swim Status GUI
-pcall(function()
-    local success, Group = pcall(function()
-        return Tabs.Main:AddLeftGroupbox("Swim Status")
-    end)
-    if not success or not Group then
-        warn("[Swim Status GUI] Failed to create groupbox: " .. tostring(Group))
-        return
+MainGroup1:AddToggle("SwimStatusToggle", {
+    Text = "Anti-AA Bypass",
+    Default = false
+}):AddKeyPicker("SwimStatusBind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.SwimStatusToggle:SetValue(value)
     end
-
-    local success, toggle = pcall(function()
-        return Group:AddToggle("SwimStatusToggle", {
-            Text = "Swim Status",
-            Default = false,
-            Tooltip = "Toggles swim status via remote event"
-        })
-    end)
-    if not success or not toggle then
-        warn("[Swim Status GUI] Failed to create toggle: " .. tostring(toggle))
-        return
-    end
-
-    local success, keybind = pcall(function()
-        return toggle:AddKeyPicker("SwimStatusBind", {
-            Default = "",
-            Mode = "Toggle",
-            Text = "N/A",
-            Callback = function(value)
-                pcall(function()
-                    Toggles.SwimStatusToggle:SetValue(value)
-                    print("[Swim Status GUI] Keybind toggled to: " .. tostring(value))
-                end)
-            end
-        })
-    end)
-    if not success then
-        warn("[Swim Status GUI] Failed to create keybind: " .. tostring(keybind))
-    end)
-end)
+})
 
 -- Moderator Notifier GUI
 local NotificationsGroup = Tabs.Main:AddRightGroupbox("Notifications")
