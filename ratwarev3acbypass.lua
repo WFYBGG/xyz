@@ -468,36 +468,36 @@ end)
 
 local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
 MainGroup6:AddDropdown('PlayerDropdown', {
-        SpecialType = 'Player',
-        Text = 'Select Player',
-        Tooltip = 'Attach to [Selected Username]',
-        Callback = function(Value)
-            pcall(function()
-                targetPlayer = Players:FindFirstChild(Value)
-                print('[cb] Player dropdown got changed:', Value)
-            end)
-        end
-    })
-    MainGroup6:AddToggle("AttachtobackToggle", {
-        Text = "Attach To Back",
-        Default = false,
-        Callback = function(Value)
-            pcall(function()
-                if Value then
-                    startAttach()
-                else
-                    stopAttach()
-                end
-            end)
-        end
-    }):AddKeyPicker("Attachtobackbind", {
-        Default = "",
-        Mode = "Toggle",
-        Text = "N/A",
-        Callback = function(value)
-            Toggles.AttachtobackToggle:SetValue(value)
-        end
-    })
+    SpecialType = 'Player',
+    Text = 'Select Player',
+    Tooltip = 'Attach to [Selected Username]',
+    Callback = function(Value)
+        pcall(function()
+            targetPlayer = Players:FindFirstChild(Value)
+            print('[cb] Player dropdown got changed:', Value)
+        end)
+    end
+})
+MainGroup6:AddToggle("AttachtobackToggle", {
+    Text = "Attach To Back",
+    Default = false,
+    Callback = function(Value)
+        pcall(function()
+            if Value then
+                startAttach()
+            else
+                stopAttach()
+            end
+        end)
+    end
+}):AddKeyPicker("Attachtobackbind", {
+    Default = "",
+    Mode = "Toggle",
+    Text = "N/A",
+    Callback = function(value)
+        Toggles.AttachtobackToggle:SetValue(value)
+    end
+})
 MainGroup6:AddSlider("ATBHeight", {
     Text = "Height",
     Default = 0,
@@ -1507,9 +1507,7 @@ pcall(function()
     local attachConn = nil
     local isTweening = false
     local isLocked = false
-    local noclipEnabled = false
-    local nofallEnabled = false
-    local nofallFolder = nil
+    local originalSpeed = 150
 
     local function safeGet(obj, ...)
         local args = {...}
@@ -1522,105 +1520,48 @@ pcall(function()
         return obj
     end
 
-    local function enableNofall()
-        pcall(function()
-            if nofallEnabled then return end
-            local char = LocalPlayer.Character
-            if not char then return end
-            local status = safeGet(char, "Status")
-            if not status then
-                status = Instance.new("Folder")
-                status.Name = "Status"
-                status.Parent = char
-            end
-            if not status:FindFirstChild("FallDamageCD") then
-                nofallFolder = Instance.new("Folder")
-                nofallFolder.Name = "FallDamageCD"
-                nofallFolder.Archivable = true
-                nofallFolder.Parent = status
-            else
-                nofallFolder = status:FindFirstChild("FallDamageCD")
-            end
-            nofallEnabled = true
-        end)
-    end
-
-    local function disableNofall()
-        pcall(function()
-            if not nofallEnabled then return end
-            local char = LocalPlayer.Character
-            if not char then return end
-            local status = safeGet(char, "Status")
-            if status then
-                local fd = status:FindFirstChild("FallDamageCD")
-                if fd then fd:Destroy() end
-            end
-            nofallEnabled = false
-            nofallFolder = nil
-        end)
-    end
-
-    local function enableNoclip()
-        pcall(function()
-            if noclipEnabled then return end
-            local char = LocalPlayer.Character
-            if not char then return end
-            noclipEnabled = true
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    pcall(function() part.CanCollide = false end)
-                end
-            end
-        end)
-    end
-
-    local function disableNoclip()
-        pcall(function()
-            if not noclipEnabled then return end
-            local char = LocalPlayer.Character
-            if not char then return end
-            noclipEnabled = false
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    pcall(function() part.CanCollide = true end)
-                end
-            end
-        end)
-    end
-
     local function tweenToBack()
-        if isTweening or isLocked then return end
+        if isTweening or isLocked then return false end
         isTweening = true
-        pcall(function()
+        local success, result = pcall(function()
             local char = LocalPlayer.Character
             local targetChar = _G.targetPlayer and _G.targetPlayer.Character
             local hrp = char and safeGet(char, "HumanoidRootPart")
             local targetHrp = targetChar and safeGet(targetChar, "HumanoidRootPart")
             if not (hrp and targetHrp) then
-                isTweening = false
                 Library:Notify("Failed to find player or target character!", { Duration = 3 })
-                return
+                print("[Attach to Back] Tween failed: Missing HRP or target HRP")
+                return false
             end
             local distance = (hrp.Position - targetHrp.Position).Magnitude
             if distance > 20000 then
                 Library:Notify("Target too far away!", { Duration = 3 })
-                isTweening = false
-                return
+                print("[Attach to Back] Tween failed: Target too far (" .. distance .. ")")
+                return false
             end
-            enableNoclip()
-            enableNofall()
+            _G.toggleNoclip(true)
+            _G.toggleNofall(true)
             local backGoal = targetHrp.CFrame * CFrame.new(0, Options.ATBHeight.Value, Options.ATBDistance.Value)
-            local tweenTime = distance / _G.originalspeed
+            local tweenTime = distance / originalSpeed
             local tween = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backGoal})
             tween:Play()
             tween.Completed:Wait()
             isLocked = true
             isTweening = false
+            _G.toggleNoclip(false)
+            print("[Attach to Back] Tween completed, locked to target")
+            return true
         end)
+        if not success then
+            warn("[Attach to Back] Tween failed: " .. tostring(result))
+            isTweening = false
+            _G.toggleNoclip(false)
+        end
+        return success and result
     end
 
     _G.stopAttach = function()
-        pcall(function()
+        local success, result = pcall(function()
             _G.isAttached = false
             isLocked = false
             isTweening = false
@@ -1628,22 +1569,36 @@ pcall(function()
                 attachConn:Disconnect()
                 attachConn = nil
             end
-            disableNofall()
-            disableNoclip()
+            _G.toggleNofall(false)
+            _G.toggleNoclip(false)
             Library:Notify("Attach to Back stopped.", { Duration = 3 })
+            print("[Attach to Back] Stopped attach")
+            return true
         end)
+        if not success then
+            warn("[Attach to Back] Failed to stop attach: " .. tostring(result))
+        end
+        return success and result
     end
 
     _G.startAttach = function()
-        pcall(function()
+        local success, result = pcall(function()
             if not _G.targetPlayer then
                 Library:Notify("Please select a player first!", { Duration = 3 })
                 Toggles.AttachtobackToggle:SetValue(false)
-                return
+                print("[Attach to Back] Failed: No target player selected")
+                return false
+            end
+            local targetChar = _G.targetPlayer.Character
+            if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
+                Library:Notify("Target player has no character!", { Duration = 3 })
+                Toggles.AttachtobackToggle:SetValue(false)
+                print("[Attach to Back] Failed: Target has no character or HRP")
+                return false
             end
             _G.stopAttach()
             _G.isAttached = true
-            enableNofall()
+            _G.toggleNofall(true)
             tweenToBack()
             attachConn = RunService.RenderStepped:Connect(function()
                 if not _G.isAttached then return end
@@ -1655,12 +1610,14 @@ pcall(function()
                     _G.stopAttach()
                     Toggles.AttachtobackToggle:SetValue(false)
                     Library:Notify("Target player lost or character missing!", { Duration = 3 })
+                    print("[Attach to Back] Stopped: Missing HRP or target HRP")
                     return
                 end
                 local distance = (hrp.Position - targetHrp.Position).Magnitude
                 if distance > 100 then
                     isLocked = false
                     isTweening = false
+                    print("[Attach to Back] Distance too large (" .. distance .. "), unlocking")
                     return
                 end
                 if isLocked then
@@ -1670,29 +1627,71 @@ pcall(function()
                 end
             end)
             Library:Notify("Attach to Back started for " .. _G.targetPlayer.Name, { Duration = 3 })
+            print("[Attach to Back] Started for " .. _G.targetPlayer.Name)
+            return true
         end)
+        if not success then
+            warn("[Attach to Back] Failed to start attach: " .. tostring(result))
+            _G.stopAttach()
+        end
+        return success and result
     end
 
     -- Initialize PlayerDropdown with current players
     pcall(function()
         local playerList = {}
         for _, plr in ipairs(Players:GetPlayers()) do
-            table.insert(playerList, plr.Name)
+            if plr ~= LocalPlayer then
+                table.insert(playerList, plr.Name)
+            end
         end
         table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
         Options.PlayerDropdown:SetValues(playerList)
         print("[Attach to Back] PlayerDropdown initialized with:", table.concat(playerList, ", "))
     end)
 
-    Players.PlayerAdded:Connect(function()
+    -- GUI Integration
+    Options.PlayerDropdown:OnChanged(function(value)
+        local success, _ = pcall(function()
+            _G.targetPlayer = value and Players:FindFirstChild(value) or nil
+            if _G.isAttached and not _G.targetPlayer then
+                _G.stopAttach()
+                Toggles.AttachtobackToggle:SetValue(false)
+            end
+            print("[Attach to Back] PlayerDropdown changed to:", value or "nil")
+            return true
+        end)
+        if not success then
+            warn("[Attach to Back] Failed to update target player")
+        end
+    end)
+
+    Toggles.AttachtobackToggle:OnChanged(function(value)
+        local success, _ = pcall(function()
+            if value then
+                _G.startAttach()
+            else
+                _G.stopAttach()
+            end
+            return true
+        end)
+        if not success then
+            warn("[Attach to Back] Failed to toggle attach")
+        end
+    end)
+
+    Players.PlayerAdded:Connect(function(plr)
         pcall(function()
+            if plr == LocalPlayer then return end
             local playerList = {}
-            for _, plr in ipairs(Players:GetPlayers()) do
-                table.insert(playerList, plr.Name)
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    table.insert(playerList, p.Name)
+                end
             end
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player added, updated dropdown:", table.concat(playerList, ", "))
+            print("[Attach to Back] Player added (" .. plr.Name .. "), updated dropdown:", table.concat(playerList, ", "))
         end)
     end)
 
@@ -1703,25 +1702,32 @@ pcall(function()
                 _G.stopAttach()
                 Options.PlayerDropdown:SetValue("")
                 Library:Notify("Target player left the game!", { Duration = 3 })
+                print("[Attach to Back] Target (" .. player.Name .. ") left, stopped attach")
             end
             local playerList = {}
             for _, plr in ipairs(Players:GetPlayers()) do
-                table.insert(playerList, plr.Name)
+                if plr ~= LocalPlayer then
+                    table.insert(playerList, plr.Name)
+                end
             end
             table.sort(playerList, function(a, b) return string.lower(a) < string.lower(b) end)
             Options.PlayerDropdown:SetValues(playerList)
-            print("[Attach to Back] Player removed, updated dropdown:", table.concat(playerList, ", "))
+            print("[Attach to Back] Player removed (" .. player.Name .. "), updated dropdown:", table.concat(playerList, ", "))
         end)
     end)
 
     LocalPlayer.CharacterAdded:Connect(function(char)
         pcall(function()
+            repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
             if _G.isAttached then
-                enableNofall()
+                _G.toggleNofall(true)
                 if not isLocked then
-                    enableNoclip()
+                    _G.toggleNoclip(true)
                 end
                 print("[Attach to Back] Character respawned, maintaining attach state")
+            else
+                _G.toggleNofall(false)
+                _G.toggleNoclip(false)
             end
         end)
     end)
@@ -1729,9 +1735,6 @@ pcall(function()
     game:BindToClose(function()
         pcall(function()
             _G.stopAttach()
-            if nofallFolder then
-                nofallFolder:Destroy()
-            end
         end)
     end)
 end)
