@@ -1228,7 +1228,7 @@ pcall(function()
 
     local platform = Instance.new("Part")
     platform.Name = "OldDebris"
-    platform.Size = Vector3.new(10, 1, 10)
+    platform.Size = Vector3.new(50, 2, 50)
     platform.Anchored = true
     platform.CanCollide = true
     platform.Transparency = 0.75
@@ -1247,7 +1247,7 @@ pcall(function()
             if flyEnabled or _G.tweenActive then
                 character.Humanoid.JumpPower = 0
                 platform.Parent = workspace
-                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
+                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3, 0)
                 bodyVelocity.Parent = character.HumanoidRootPart
                 toggleNoclip(true)
                 if Toggles.NoFallDamage.Value then
