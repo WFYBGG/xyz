@@ -1365,7 +1365,7 @@ pcall(function()
     platform.Size = Vector3.new(30, 1, 30)
     platform.Anchored = true
     platform.CanCollide = true
-    platform.Transparency = 0.75
+    platform.Transparency = 1.00
     platform.Material = Enum.Material.SmoothPlastic
     platform.BrickColor = BrickColor.new("Bright blue")
 
