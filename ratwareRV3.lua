@@ -51,7 +51,8 @@ MainGroup:AddToggle("FlightToggle", {
 }):AddKeyPicker("FlightKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "N/A",
+    Text = "Fly",
+    NoUI = false,
     Callback = function(value)
         Toggles.FlightToggle:SetValue(value)
     end
@@ -70,7 +71,8 @@ MainGroup:AddToggle("SwimStatusToggle", {
 }):AddKeyPicker("SwimStatusBind", {
     Default = "",
     Mode = "Toggle",
-    Text = "N/A",
+    Text = "Anti-AA Bypass",
+    NoUI = false,
     Callback = function(value)
         Toggles.SwimStatusToggle:SetValue(value)
     end
@@ -81,7 +83,8 @@ MainGroup:AddToggle("NoclipToggle", {
 }):AddKeyPicker("NoclipKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "N/A",
+    Text = "No Clip",
+    NoUI = false,
     Callback = function(value)
         Toggles.NoclipToggle:SetValue(value)
     end
@@ -511,7 +514,8 @@ MainGroup6:AddToggle("AttachtobackToggle", {
 }):AddKeyPicker("Attachtobackbind", {
     Default = "",
     Mode = "Toggle",
-    Text = "N/A",
+    Text = "Attach To Back",
+    NoUI = false,
     Callback = function(value)
         Toggles.AttachtobackToggle:SetValue(value)
     end
