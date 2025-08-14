@@ -31,7 +31,8 @@ MainGroup:AddToggle("SpeedhackToggle", {
 }):AddKeyPicker("SpeedhackKeybind", {
     Default = "",
     Mode = "Toggle",
-    Text = "N/A",
+    Text = "Speedhack",
+    NoUI = false,
     Callback = function(value)
         Toggles.SpeedhackToggle:SetValue(value)
     end
