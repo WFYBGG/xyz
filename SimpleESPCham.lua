@@ -36,9 +36,9 @@ pcall(function()
         pcall(function()
             local highlight = Instance.new("Highlight")
             highlight.Name = "Player_ESP"
-            highlight.FillTransparency = 0.7
+            highlight.FillTransparency = 0.5
             highlight.OutlineTransparency = 0
-            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.FillColor = Color3.fromRGB(255, 130, 0)
             highlight.Parent = player.Character
         end)
     end
