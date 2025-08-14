@@ -5,12 +5,12 @@ if _G.RatwareLoaded then
 end
 _G.RatwareLoaded = true
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Ratware.exe - 100% Made By ChatGPT [Press 'Insert' to hide GUI]",
+    Title = "Ratware.exe - 100% Made By ChatGPT [Press 'Insert' To Hide]",
     Center = true,
     AutoShow = true,
     TabPadding = 8,
