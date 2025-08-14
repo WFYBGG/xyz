@@ -9,7 +9,7 @@ local Window = Library:CreateWindow({
     AutoShow = true,
     TabPadding = 8,
     MenuFadeTime = 0.2
-
+})
 local Tabs = {
     Visuals = Window:AddTab("Visual"),
     UI = Window:AddTab("UI Settings")
