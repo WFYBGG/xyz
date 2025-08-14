@@ -392,7 +392,7 @@ local function getTargetPosition(selection, isNPC)
                 if townFolder then
                     local part = townFolder:FindFirstChild(areaName)
                     if part then
-                        targetPos = part.CFrame.Position -- Use partName's CFrame.Position
+                        targetPos = part.CFrame.Position
                     end
                 else
                     -- Handle Workspace NPCs
@@ -578,8 +578,7 @@ local MainGroup6 = Tabs.Main:AddLeftGroupbox("Rage")
 MainGroup6:AddDropdown('PlayerDropdown', {
     SpecialType = 'Player',
     Text = 'Select Player',
-    Tooltip = 'Attach to [Selected Username]', -- Information shown when you hover over the dropdown
-
+    Tooltip = 'Attach to [Selected Username]',
     Callback = function(Value)
     end
 })
@@ -623,8 +622,6 @@ VisualsGroup:AddToggle("PlayerESP", {
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
@@ -657,169 +654,248 @@ local function clearActiveMode(mode)
     end
 end
 
--- ✅ Noclip Toggle
+-- ✅ Noclip Toggle (Persists after death/reset)
 pcall(function()
-    local Players = game:GetService("Players")
     local player = Players.LocalPlayer
     if not Toggles or not Toggles.NoclipToggle then return end
 
-    Toggles.NoclipToggle:OnChanged(function(value)
-        if value then
+    local function applyNoclipState()
+        if Toggles.NoclipToggle.Value then
             MovementState:Enable("noclip", "ManualNoclip")
         else
             MovementState:Disable("noclip", "ManualNoclip")
         end
+    end
+
+    Toggles.NoclipToggle:OnChanged(function(value)
+        applyNoclipState()
     end)
 
     player.CharacterAdded:Connect(function()
-        if Toggles.NoclipToggle.Value then
-            MovementState:Enable("noclip", "ManualNoclip")
-        end
+        applyNoclipState()
     end)
+
+    -- Initial check
+    applyNoclipState()
 end)
 
--- ✅ Speedhack
+-- ✅ Speedhack (Fixed with unique BodyVelocity)
 pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LocalPlayer = Players.LocalPlayer
-
-    local BodyVelocity
+    local player = Players.LocalPlayer
+    local speedhackBV = nil
     local speedActive = false
-    local originalWalkSpeed
-    local originalJumpPower
+    local originalWalkSpeed = 16
+    local originalJumpPower = 50
+
+    local function createSpeedhackBV()
+        if speedhackBV then
+            speedhackBV:Destroy()
+        end
+        speedhackBV = Instance.new("BodyVelocity")
+        speedhackBV.Name = "RW_SpeedhackBV"
+        speedhackBV.MaxForce = Vector3.new(math.huge, 0, math.huge)
+        speedhackBV.Velocity = Vector3.zero
+        return speedhackBV
+    end
 
     local function resetSpeed()
         pcall(function()
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local humanoid = LocalPlayer.Character.Humanoid
-                humanoid.WalkSpeed = originalWalkSpeed or 16
-                humanoid.JumpPower = originalJumpPower or 50
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                local humanoid = player.Character.Humanoid
+                humanoid.WalkSpeed = originalWalkSpeed
+                humanoid.JumpPower = originalJumpPower
             end
-            if BodyVelocity then
-                BodyVelocity.Parent = nil
+            if speedhackBV then
+                speedhackBV:Destroy()
+                speedhackBV = nil
             end
+            MovementState:Disable("noclip", "Speedhack")
+            speedActive = false
         end)
     end
 
     Toggles.SpeedhackToggle:OnChanged(function(value)
-        if value then
-            if not setActiveMode("speedhack") then
-                Toggles.SpeedhackToggle:SetValue(false)
-                Library:Notify("Higher priority mode active", {Duration = 3})
-                return
-            end
-            pcall(function()
-                if not BodyVelocity then
-                    BodyVelocity = Instance.new("BodyVelocity")
-                    BodyVelocity.Name = "RW_Speedhack"
-                    BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+        pcall(function()
+            if value then
+                if not setActiveMode("speedhack") then
+                    Toggles.SpeedhackToggle:SetValue(false)
+                    Library:Notify("Higher priority mode active", {Duration = 3})
+                    return
                 end
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    if not originalWalkSpeed then originalWalkSpeed = char.Humanoid.WalkSpeed end
-                    if not originalJumpPower then originalJumpPower = char.Humanoid.JumpPower end
-                    char.Humanoid.WalkSpeed = Toggles.SpeedhackSpeed.Value
-                    char.Humanoid.JumpPower = 0
-                    BodyVelocity.Parent = char.HumanoidRootPart
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                    local humanoid = char.Humanoid
+                    originalWalkSpeed = humanoid.WalkSpeed
+                    originalJumpPower = humanoid.JumpPower
+                    humanoid.WalkSpeed = Options.SpeedhackSpeed.Value
+                    humanoid.JumpPower = 0
+                    createSpeedhackBV()
+                    speedhackBV.Parent = char.HumanoidRootPart
                     MovementState:Enable("noclip", "Speedhack")
                     speedActive = true
+                else
+                    Toggles.SpeedhackToggle:SetValue(false)
+                    Library:Notify("Character not ready", {Duration = 3})
                 end
-            end)
-        else
-            resetSpeed()
-            MovementState:Disable("noclip", "Speedhack")
-            speedActive = false
-            clearActiveMode("speedhack")
-        end
+            else
+                resetSpeed()
+                clearActiveMode("speedhack")
+            end
+        end)
+    end)
+
+    player.CharacterAdded:Connect(function(char)
+        pcall(function()
+            if speedActive then
+                char:WaitForChild("HumanoidRootPart")
+                char:WaitForChild("Humanoid")
+                local humanoid = char.Humanoid
+                humanoid.WalkSpeed = Options.SpeedhackSpeed.Value
+                humanoid.JumpPower = 0
+                createSpeedhackBV()
+                speedhackBV.Parent = char.HumanoidRootPart
+                MovementState:Enable("noclip", "Speedhack")
+            end
+        end)
     end)
 
     RunService.RenderStepped:Connect(function()
         pcall(function()
-            if speedActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                BodyVelocity.Velocity = Vector3.zero
+            if speedActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local humanoid = player.Character.Humanoid
+                local moveDirection = humanoid.MoveDirection
+                if moveDirection.Magnitude > 0 then
+                    speedhackBV.Velocity = moveDirection * Options.SpeedhackSpeed.Value
+                else
+                    speedhackBV.Velocity = Vector3.zero
+                end
             end
         end)
     end)
 end)
 
--- ✅ Fly
+-- ✅ Fly (Fixed with unique BodyVelocity and UserInputService)
 pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LocalPlayer = Players.LocalPlayer
-
-    local FlyVelocity
-    local Platform = Instance.new("Part")
-    Platform.Name = "OldDebris"
-    Platform.Size = Vector3.new(30, 1, 30)
-    Platform.Anchored = true
-    Platform.CanCollide = true
-    Platform.Transparency = 1.00
-    Platform.Material = Enum.Material.SmoothPlastic
-    Platform.BrickColor = BrickColor.new("Bright blue")
-
+    local player = Players.LocalPlayer
+    local flyBV = nil
+    local flyPlatform = Instance.new("Part")
+    flyPlatform.Name = "RW_FlyPlatform"
+    flyPlatform.Size = Vector3.new(30, 1, 30)
+    flyPlatform.Anchored = true
+    flyPlatform.CanCollide = true
+    flyPlatform.Transparency = 1
+    flyPlatform.Material = Enum.Material.SmoothPlastic
+    flyPlatform.BrickColor = BrickColor.new("Bright blue")
     local flyActive = false
-    local originalJumpPower
+    local originalJumpPower = 50
+
+    local function createFlyBV()
+        if flyBV then
+            flyBV:Destroy()
+        end
+        flyBV = Instance.new("BodyVelocity")
+        flyBV.Name = "RW_FlyBV"
+        flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyBV.Velocity = Vector3.zero
+        return flyBV
+    end
 
     local function resetFly()
         pcall(function()
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local humanoid = LocalPlayer.Character.Humanoid
-                humanoid.JumpPower = originalJumpPower or 50
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                player.Character.Humanoid.JumpPower = originalJumpPower
             end
-            Platform.Parent = nil
-            if FlyVelocity then
-                FlyVelocity.Parent = nil
+            flyPlatform.Parent = nil
+            if flyBV then
+                flyBV:Destroy()
+                flyBV = nil
             end
+            MovementState:Disable("noclip", "Fly")
+            MovementState:Disable("nofall", "Fly")
+            flyActive = false
         end)
     end
 
     Toggles.FlightToggle:OnChanged(function(value)
-        if value then
-            if not setActiveMode("fly") then
-                Toggles.FlightToggle:SetValue(false)
-                Library:Notify("Higher priority mode active", {Duration = 3})
-                return
-            end
-            pcall(function()
-                if not FlyVelocity then
-                    FlyVelocity = Instance.new("BodyVelocity")
-                    FlyVelocity.Name = "RW_Fly"
-                    FlyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        pcall(function()
+            if value then
+                if not setActiveMode("fly") then
+                    Toggles.FlightToggle:SetValue(false)
+                    Library:Notify("Higher priority mode active", {Duration = 3})
+                    return
                 end
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    if not originalJumpPower then originalJumpPower = char.Humanoid.JumpPower end
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+                    originalJumpPower = char.Humanoid.JumpPower
                     char.Humanoid.JumpPower = 0
-                    Platform.Parent = workspace
-                    Platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                    FlyVelocity.Parent = char.HumanoidRootPart
+                    flyPlatform.Parent = workspace
+                    flyPlatform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                    createFlyBV()
+                    flyBV.Parent = char.HumanoidRootPart
                     MovementState:Enable("noclip", "Fly")
                     MovementState:Enable("nofall", "Fly")
                     flyActive = true
+                else
+                    Toggles.FlightToggle:SetValue(false)
+                    Library:Notify("Character not ready", {Duration = 3})
                 end
-            end)
-        else
-            resetFly()
-            MovementState:Disable("noclip", "Fly")
-            MovementState:Disable("nofall", "Fly")
-            flyActive = false
-            clearActiveMode("fly")
-        end
+            else
+                resetFly()
+                clearActiveMode("fly")
+            end
+        end)
+    end)
+
+    player.CharacterAdded:Connect(function(char)
+        pcall(function()
+            if flyActive then
+                char:WaitForChild("HumanoidRootPart")
+                char:WaitForChild("Humanoid")
+                char.Humanoid.JumpPower = 0
+                flyPlatform.Parent = workspace
+                flyPlatform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                createFlyBV()
+                flyBV.Parent = char.HumanoidRootPart
+                MovementState:Enable("noclip", "Fly")
+                MovementState:Enable("nofall", "Fly")
+            end
+        end)
     end)
 
     RunService.RenderStepped:Connect(function()
         pcall(function()
-            if flyActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                FlyVelocity.Velocity = Vector3.zero
-                Platform.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+            if flyActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local camera = workspace.CurrentCamera
+                local moveDirection = Vector3.zero
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    moveDirection = moveDirection + camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    moveDirection = moveDirection - camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    moveDirection = moveDirection + camera.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                    moveDirection = moveDirection - camera.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    moveDirection = moveDirection + Vector3.new(0, 1, 0)
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    moveDirection = moveDirection - Vector3.new(0, 1, 0)
+                end
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit * Options.FlightSpeed.Value
+                end
+                flyBV.Velocity = moveDirection
+                flyPlatform.CFrame = player.Character.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
             end
         end)
     end)
 end)
 
--- ✅ Universal Tween (cleaned for MovementState)
+-- ✅ Universal Tween (Preserves Noclip/Nofall state)
 pcall(function()
     repeat task.wait() until game:IsLoaded()
     repeat task.wait() until game.Players.LocalPlayer.Character 
@@ -832,93 +908,83 @@ pcall(function()
 
     _G.originalspeed = 150
     _G.Speed = _G.originalspeed
-    local flyEnabled = false
-    local flyActive = false
+    local tweenPlatform = Instance.new("Part")
+    tweenPlatform.Name = "RW_TweenPlatform"
+    tweenPlatform.Size = Vector3.new(30, 1, 30)
+    tweenPlatform.Anchored = true
+    tweenPlatform.CanCollide = true
+    tweenPlatform.Transparency = 1
+    tweenPlatform.Material = Enum.Material.SmoothPlastic
+    tweenPlatform.BrickColor = BrickColor.new("Bright blue")
 
-    local function resetHumanoidState()
+    local tweenBV = nil
+    local tweenActive = false
+    local prevNoclipState = false
+    local prevNofallState = false
+
+    local function createTweenBV()
+        if tweenBV then
+            tweenBV:Destroy()
+        end
+        tweenBV = Instance.new("BodyVelocity")
+        tweenBV.Name = "RW_TweenBV"
+        tweenBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        tweenBV.Velocity = Vector3.zero
+        return tweenBV
+    end
+
+    local function resetTween()
         pcall(function()
             if players.LocalPlayer.Character and players.LocalPlayer.Character:FindFirstChild("Humanoid") then
                 local humanoid = players.LocalPlayer.Character.Humanoid
                 humanoid.JumpPower = 50
                 humanoid.WalkSpeed = 16
             end
+            tweenPlatform.Parent = nil
+            if tweenBV then
+                tweenBV:Destroy()
+                tweenBV = nil
+            end
+            if not prevNoclipState then
+                MovementState:Disable("noclip", "UniversalTween")
+            end
+            if not prevNofallState then
+                MovementState:Disable("nofall", "UniversalTween")
+            end
+            tweenActive = false
         end)
     end
 
-    local platform = Instance.new("Part")
-    platform.Name = "OldDebris"
-    platform.Size = Vector3.new(30, 1, 30)
-    platform.Anchored = true
-    platform.CanCollide = true
-    platform.Transparency = 1.00
-    platform.Material = Enum.Material.SmoothPlastic
-    platform.BrickColor = BrickColor.new("Bright blue")
-
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "RW_UniversalTween"
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-
     players.LocalPlayer.CharacterAdded:Connect(function(character)
-        repeat task.wait() until character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
         pcall(function()
-            if flyEnabled or _G.tweenActive then
+            if tweenActive then
+                character:WaitForChild("Humanoid")
+                character:WaitForChild("HumanoidRootPart")
                 character.Humanoid.JumpPower = 0
-                platform.Parent = workspace
-                platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                bodyVelocity.Parent = character.HumanoidRootPart
+                tweenPlatform.Parent = workspace
+                tweenPlatform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                createTweenBV()
+                tweenBV.Parent = character.HumanoidRootPart
                 MovementState:Enable("noclip", "UniversalTween")
-                if Toggles.NoFallDamage.Value then
-                    MovementState:Enable("nofall", "UniversalTween")
-                end
-            else
-                platform.Parent = nil
-                bodyVelocity.Parent = nil
+                MovementState:Enable("nofall", "UniversalTween")
             end
         end)
     end)
-
-    local function toggleFly(enable)
-        pcall(function()
-            flyEnabled = enable
-            local character = players.LocalPlayer.Character
-            if enable then
-                if character and character:FindFirstChild("Humanoid") then
-                    character.Humanoid.JumpPower = 0
-                end
-                platform.Parent = workspace
-                if character and character:FindFirstChild("HumanoidRootPart") then
-                    platform.CFrame = character.HumanoidRootPart.CFrame - Vector3.new(0, 3.499, 0)
-                    bodyVelocity.Parent = character.HumanoidRootPart
-                end
-            else
-                resetHumanoidState()
-                platform.Parent = nil
-                bodyVelocity.Parent = nil
-            end
-        end)
-    end
-
-    _G.tweenActive = false
-    _G.tweenPhase = 0
-    _G.highAltitude = 0
-    _G.tweenTarget = Vector3.new(0, 0, 0)
-    local currentTween = nil
 
     local function createTween(targetPos, duration)
         pcall(function()
             local character = players.LocalPlayer.Character
             local hrp = character and character:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
-            if currentTween then
-                currentTween:Cancel()
+            if _G.currentTween then
+                _G.currentTween:Cancel()
             end
-            currentTween = TweenService:Create(
+            _G.currentTween = TweenService:Create(
                 hrp,
                 TweenInfo.new(duration, Enum.EasingStyle.Linear),
                 {CFrame = CFrame.new(targetPos)}
             )
-            currentTween:Play()
+            _G.currentTween:Play()
         end)
     end
 
@@ -928,65 +994,43 @@ pcall(function()
             local hrp = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChild("Humanoid")
 
-            if flyEnabled and character and humanoid and hrp then
-                flyActive = true
-                if _G.tweenActive then
-                    if _G.tweenPhase == 1 then
-                        local targetY = _G.highAltitude
-                        local distance = targetY - hrp.Position.Y
-                        if distance > 1 then
-                            createTween(Vector3.new(hrp.Position.X, targetY, hrp.Position.Z), distance / _G.Speed)
-                        else
-                            _G.tweenPhase = 2
-                        end
-                    elseif _G.tweenPhase == 2 then
-                        local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
-                        local distance = (highTarget - hrp.Position).Magnitude
-                        if distance > 5 then
-                            createTween(highTarget, distance / _G.Speed)
-                        else
-                            _G.tweenPhase = 3
-                        end
-                    elseif _G.tweenPhase == 3 then
-                        local targetY = _G.tweenTarget.Y
-                        local distance = hrp.Position.Y - targetY
-                        if distance > 5 then
-                            createTween(Vector3.new(hrp.Position.X, targetY, hrp.Position.Z), distance / _G.Speed)
-                        else
-                            _G.tweenActive = false
-                            _G.tweenPhase = 0
-                            toggleFly(false)
-                            MovementState:Disable("noclip", "UniversalTween")
-                            if not Toggles.NoFallDamage.Value then
-                                MovementState:Disable("nofall", "UniversalTween")
-                            end
-                        end
+            if tweenActive and character and humanoid and hrp then
+                if _G.tweenPhase == 1 then
+                    local targetY = _G.highAltitude
+                    local distance = targetY - hrp.Position.Y
+                    if distance > 1 then
+                        createTween(Vector3.new(hrp.Position.X, targetY, hrp.Position.Z), distance / _G.Speed)
+                    else
+                        _G.tweenPhase = 2
+                    end
+                elseif _G.tweenPhase == 2 then
+                    local highTarget = Vector3.new(_G.tweenTarget.X, _G.highAltitude, _G.tweenTarget.Z)
+                    local distance = (highTarget - hrp.Position).Magnitude
+                    if distance > 5 then
+                        createTween(highTarget, distance / _G.Speed)
+                    else
+                        _G.tweenPhase = 3
+                    end
+                elseif _G.tweenPhase == 3 then
+                    local targetY = _G.tweenTarget.Y
+                    local distance = hrp.Position.Y - targetY
+                    if distance > 5 then
+                        createTween(Vector3.new(hrp.Position.X, targetY, hrp.Position.Z), distance / _G.Speed)
+                    else
+                        _G.tweenActive = false
+                        _G.tweenPhase = 0
+                        resetTween()
+                        clearActiveMode("tween")
                     end
                 end
-                bodyVelocity.Velocity = Vector3.zero
+                tweenBV.Velocity = Vector3.zero
                 humanoid.JumpPower = 0
-                platform.CFrame = hrp.CFrame - Vector3.new(0, 3.499, 0)
-                platform.Parent = workspace
+                tweenPlatform.CFrame = hrp.CFrame - Vector3.new(0, 3.5, 0)
+                tweenPlatform.Parent = workspace
                 if humanoid.Health <= 0 then
                     Library:Notify("Character Dead, Please Try Again", { Duration = 3 })
-                    resetHumanoidState()
-                    _G.tweenActive = false
-                    _G.tweenPhase = 0
-                    flyEnabled = false
-                    flyActive = false
-                    platform.Parent = nil
-                    bodyVelocity.Parent = nil
-                    MovementState:Disable("noclip", "UniversalTween")
-                    if not Toggles.NoFallDamage.Value then
-                        MovementState:Disable("nofall", "UniversalTween")
-                    end
-                end
-            else
-                if flyActive then
-                    resetHumanoidState()
-                    flyActive = false
-                    platform.Parent = nil
-                    bodyVelocity.Parent = nil
+                    resetTween()
+                    clearActiveMode("tween")
                 end
             end
         end)
@@ -999,16 +1043,25 @@ pcall(function()
                 return
             end
             local character = players.LocalPlayer.Character
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
+            local hrp = character and character:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                Library:Notify("Character not ready", {Duration = 3})
+                return
+            end
             local distance = (target - hrp.Position).Magnitude
-            if distance > 20000 then
+            if distance > MAX_TWEEN_DISTANCE then
                 Library:Notify("Target too far away!", { Duration = 3 })
                 return
             end
+            prevNoclipState = Toggles.NoclipToggle.Value
+            prevNofallState = Toggles.NoFallDamage.Value
             MovementState:Enable("noclip", "UniversalTween")
             MovementState:Enable("nofall", "UniversalTween")
-            toggleFly(true)
+            character.Humanoid.JumpPower = 0
+            tweenPlatform.Parent = workspace
+            tweenPlatform.CFrame = hrp.CFrame - Vector3.new(0, 3.5, 0)
+            createTweenBV()
+            tweenBV.Parent = hrp
             _G.tweenTarget = target
             _G.highAltitude = hrp.Position.Y + 500
             _G.tweenPhase = 1
@@ -1020,468 +1073,258 @@ pcall(function()
         pcall(function()
             _G.tweenActive = false
             _G.tweenPhase = 0
-            toggleFly(false)
-            MovementState:Disable("noclip", "UniversalTween")
-            if not Toggles.NoFallDamage.Value then
-                MovementState:Disable("nofall", "UniversalTween")
-            end
-            if currentTween then
-                currentTween:Cancel()
-                currentTween = nil
-            end
+            resetTween()
             clearActiveMode("tween")
         end)
     end
 end)
 
--- ✅ Attach-to-back (cleaned for MovementState)
+-- ✅ Attach-to-back (Fixed sliders, no persist after death)
 pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LocalPlayer = Players.LocalPlayer
-    local TweenService = game:GetService("TweenService")
-
-    local bodyVelocity
-    local platform = Instance.new("Part")
-    platform.Name = "OldDebris"
-    platform.Size = Vector3.new(30, 1, 30)
-    platform.Anchored = true
-    platform.CanCollide = true
-    platform.Transparency = 1.00
-    platform.Material = Enum.Material.SmoothPlastic
-    platform.BrickColor = BrickColor.new("Bright blue")
-
+    local player = Players.LocalPlayer
+    local attachBV = nil
+    local attachPlatform = Instance.new("Part")
+    attachPlatform.Name = "RW_AttachPlatform"
+    attachPlatform.Size = Vector3.new(30, 1, 30)
+    attachPlatform.Anchored = true
+    attachPlatform.CanCollide = true
+    attachPlatform.Transparency = 1
+    attachPlatform.Material = Enum.Material.SmoothPlastic
+    attachPlatform.BrickColor = BrickColor.new("Bright blue")
     local attachActive = false
     local targetPlayer = nil
+    local originalJumpPower = 50
+    local originalWalkSpeed = 16
 
-    local function resetHumanoidState()
-        pcall(function()
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                LocalPlayer.Character.Humanoid.JumpPower = 50
-                LocalPlayer.Character.Humanoid.WalkSpeed = 16
-            end
-        end)
+    local function createAttachBV()
+        if attachBV then
+            attachBV:Destroy()
+        end
+        attachBV = Instance.new("BodyVelocity")
+        attachBV.Name = "RW_AttachBV"
+        attachBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        attachBV.Velocity = Vector3.zero
+        return attachBV
     end
 
-    local function tweenToBack(player)
+    local function resetAttach()
         pcall(function()
-            if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-                Library:Notify("No target found!", { Duration = 3 })
-                return
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                local humanoid = player.Character.Humanoid
+                humanoid.JumpPower = originalJumpPower
+                humanoid.WalkSpeed = originalWalkSpeed
             end
-            attachActive = true
-            targetPlayer = player
-
-            if not bodyVelocity then
-                bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.Name = "RW_AttachToBack"
-                bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            end
-
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                MovementState:Enable("noclip", "AttachToBack")
-                MovementState:Enable("nofall", "AttachToBack")
-
-                char.Humanoid.JumpPower = 0
-                platform.Parent = workspace
-                platform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                bodyVelocity.Parent = char.HumanoidRootPart
-            end
-        end)
-    end
-
-    local function stopAttach()
-        pcall(function()
-            attachActive = false
-            targetPlayer = nil
-            resetHumanoidState()
-            platform.Parent = nil
-            if bodyVelocity then
-                bodyVelocity.Parent = nil
+            attachPlatform.Parent = nil
+            if attachBV then
+                attachBV:Destroy()
+                attachBV = nil
             end
             MovementState:Disable("noclip", "AttachToBack")
             MovementState:Disable("nofall", "AttachToBack")
+            attachActive = false
+            targetPlayer = nil
         end)
     end
+
+    Toggles.AttachtobackToggle:OnChanged(function(value)
+        pcall(function()
+            if value then
+                if not setActiveMode("attach") then
+                    Toggles.AttachtobackToggle:SetValue(false)
+                    Library:Notify("Higher priority mode active", {Duration = 3})
+                    return
+                end
+                local char = player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
+                    Toggles.AttachtobackToggle:SetValue(false)
+                    Library:Notify("Character not ready", {Duration = 3})
+                    return
+                end
+                targetPlayer = Players:FindFirstChild(Options.PlayerDropdown.Value)
+                if not targetPlayer or targetPlayer == player or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    Toggles.AttachtobackToggle:SetValue(false)
+                    Library:Notify("Invalid or no target player selected", {Duration = 3})
+                    return
+                end
+                originalJumpPower = char.Humanoid.JumpPower
+                originalWalkSpeed = char.Humanoid.WalkSpeed
+                char.Humanoid.JumpPower = 0
+                char.Humanoid.WalkSpeed = 0
+                attachPlatform.Parent = workspace
+                attachPlatform.CFrame = char.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                createAttachBV()
+                attachBV.Parent = char.HumanoidRootPart
+                MovementState:Enable("noclip", "AttachToBack")
+                MovementState:Enable("nofall", "AttachToBack")
+                attachActive = true
+            else
+                resetAttach()
+                clearActiveMode("attach")
+            end
+        end)
+    end)
+
+    player.CharacterAdded:Connect(function()
+        pcall(function()
+            if attachActive then
+                Toggles.AttachtobackToggle:SetValue(false)
+            end
+        end)
+    end)
 
     RunService.RenderStepped:Connect(function()
         pcall(function()
             if attachActive and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local myChar = LocalPlayer.Character
+                local myChar = player.Character
                 if myChar and myChar:FindFirstChild("HumanoidRootPart") then
                     local targetPos = targetPlayer.Character.HumanoidRootPart.Position
-                    local behindPos = targetPos - (targetPlayer.Character.HumanoidRootPart.CFrame.LookVector * 3)
+                    local distance = Options.ATBDistance.Value
+                    local height = Options.ATBHeight.Value
+                    local behindPos = targetPos - (targetPlayer.Character.HumanoidRootPart.CFrame.LookVector * distance) + Vector3.new(0, height, 0)
                     myChar.HumanoidRootPart.CFrame = CFrame.new(behindPos, targetPos)
-                    platform.CFrame = myChar.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
-                    bodyVelocity.Velocity = Vector3.zero
+                    attachPlatform.CFrame = myChar.HumanoidRootPart.CFrame - Vector3.new(0, 3.5, 0)
+                    attachBV.Velocity = Vector3.zero
                 end
             end
         end)
     end)
-
-    Toggles.AttachtobackToggle:OnChanged(function(value)
-        if value then
-            if not setActiveMode("attach") then
-                Toggles.AttachtobackToggle:SetValue(false)
-                Library:Notify("Higher priority mode active", {Duration = 3})
-                return
-            end
-            local closestPlayer = nil
-            local closestDistance = math.huge
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < closestDistance then
-                        closestDistance = dist
-                        closestPlayer = plr
-                    end
-                end
-            end
-            if closestPlayer then
-                tweenToBack(closestPlayer)
-            else
-                Library:Notify("No nearby players to attach to!", { Duration = 3 })
-                Toggles.AttachtobackToggle:SetValue(false)
-            end
-        else
-            stopAttach()
-            clearActiveMode("attach")
-        end
-    end)
 end)
 
--- No Fall Damage Module (using MovementState)
+-- ✅ No Fall Damage (Persists after death/reset)
 pcall(function()
     if not Toggles or not Toggles.NoFallDamage then return end
 
-    Toggles.NoFallDamage:OnChanged(function(value)
-        if value then
+    local function applyNofallState()
+        if Toggles.NoFallDamage.Value then
             MovementState:Enable("nofall", "NoFallDamage")
         else
             MovementState:Disable("nofall", "NoFallDamage")
         end
+    end
+
+    Toggles.NoFallDamage:OnChanged(function(value)
+        applyNofallState()
     end)
 
     LocalPlayer.CharacterAdded:Connect(function()
-        if Toggles.NoFallDamage.Value then
-            MovementState:Enable("nofall", "NoFallDamage")
-        end
+        applyNofallState()
     end)
+
+    -- Initial check
+    applyNofallState()
 end)
 
---Player ESP Module
+-- ✅ No Killbricks
 pcall(function()
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local Camera = workspace.CurrentCamera
+    if not Toggles or not Toggles.DisableCharacterTouchToggle then return end
 
-    local LocalPlayer = Players.LocalPlayer
-
-    local ESPObjects = {}
-
-    local function safeGet(parent, child)
-        local result
+    local function disableTouch(character)
         pcall(function()
-            if parent and child then
-                result = parent:FindFirstChild(child)
-            end
-        end)
-        return result
-    end
-
-    local function getCharacterModel(player)
-        local living
-        pcall(function()
-            living = workspace:FindFirstChild("Living")
-        end)
-        if not living then return nil end
-        return safeGet(living, player.Name)
-    end
-
-    local function getHealthInfo(character)
-        local health, maxHealth = 0, 0
-        pcall(function()
-            local humanoid = safeGet(character, "Humanoid")
-            if humanoid then
-                health = humanoid.Health
-                maxHealth = humanoid.MaxHealth
-            end
-        end)
-        return health, maxHealth
-    end
-
-    local function cleanupESP(player)
-        local tbl
-        pcall(function() tbl = ESPObjects[player] end)
-        if tbl then
-            for _, obj in pairs(tbl) do
-                if typeof(obj) == "table" then
-                    for _, v in pairs(obj) do
-                        pcall(function() if typeof(v) == "userdata" and v.Remove then v:Remove() end end)
-                    end
-                else
-                    pcall(function() if typeof(obj) == "userdata" and obj.Remove then obj:Remove() end end)
-                end
-            end
-            pcall(function() ESPObjects[player] = nil end)
-        end
-    end
-
-    local function createESP(player)
-        if player == LocalPlayer then return end
-        pcall(function()
-            if ESPObjects[player] then cleanupESP(player) end
-
-            local box = Drawing.new("Square")
-            box.Visible = false
-            box.Thickness = 2
-            box.Color = Color3.fromRGB(255, 25, 25)
-            box.Filled = false
-
-            local nameText = Drawing.new("Text")
-            nameText.Size = 14
-            nameText.Center = true
-            nameText.Outline = true
-            nameText.Color = Color3.fromRGB(255, 255, 255)
-            nameText.Visible = false
-
-            local healthText = Drawing.new("Text")
-            healthText.Size = 13
-            healthText.Center = true
-            healthText.Outline = true
-            healthText.Color = Color3.fromRGB(0, 255, 0)
-            healthText.Visible = false
-
-            local distText = Drawing.new("Text")
-            distText.Size = 13
-            distText.Center = true
-            distText.Outline = true
-            distText.Color = Color3.fromRGB(200, 200, 200)
-            distText.Visible = false
-
-            local chamBox = Drawing.new("Square")
-            chamBox.Visible = false
-            chamBox.Color = Color3.fromRGB(255, 0, 0)
-            chamBox.Transparency = 0.2
-            chamBox.Filled = true
-            chamBox.Thickness = 1
-
-            ESPObjects[player] = {
-                Box = box,
-                Name = nameText,
-                Health = healthText,
-                Distance = distText,
-                ChamBox = chamBox,
-                Skeleton = {},
-            }
-        end)
-    end
-
-    local function drawSkeleton(player, char, color, thickness)
-        local bones = {
-            { "Head", "HumanoidRootPart" },
-            { "HumanoidRootPart", "LeftUpperLeg" },
-            { "LeftUpperLeg", "LeftLowerLeg" },
-            { "LeftLowerLeg", "LeftFoot" },
-            { "HumanoidRootPart", "RightUpperLeg" },
-            { "RightUpperLeg", "RightLowerLeg" },
-            { "RightLowerLeg", "RightFoot" },
-            { "HumanoidRootPart", "LeftUpperArm" },
-            { "LeftUpperArm", "LeftLowerArm" },
-            { "LeftLowerArm", "LeftHand" },
-            { "HumanoidRootPart", "RightUpperArm" },
-            { "RightUpperArm", "RightLowerArm" },
-            { "RightLowerArm", "RightHand" },
-        }
-
-        if not ESPObjects[player] then ESPObjects[player] = {} end
-        local skeleton = ESPObjects[player].Skeleton or {}
-
-        for i, pair in ipairs(bones) do
-            local part1, part2
-            pcall(function()
-                part1 = char:FindFirstChild(pair[1])
-                part2 = char:FindFirstChild(pair[2])
-            end)
-            local line = skeleton[i]
-            if not line then
-                line = Drawing.new("Line")
-                skeleton[i] = line
-            end
-
-            if part1 and part2 then
-                local pos1, onScr1 = Camera:WorldToViewportPoint(part1.Position)
-                local pos2, onScr2 = Camera:WorldToViewportPoint(part2.Position)
-                if onScr1 and onScr2 then
-                    line.From = Vector2.new(pos1.X, pos1.Y)
-                    line.To = Vector2.new(pos2.X, pos2.Y)
-                    line.Color = color or Color3.fromRGB(255,255,255)
-                    line.Thickness = thickness or 2
-                    line.Visible = Toggles.PlayerESP.Value
-                else
-                    line.Visible = false
-                end
-            else
-                line.Visible = false
-            end
-        end
-        ESPObjects[player].Skeleton = skeleton
-    end
-
-    -- Player join/leave management
-    pcall(function()
-        Players.PlayerAdded:Connect(function(plr)
-            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
-        end)
-    end)
-    pcall(function()
-        Players.PlayerRemoving:Connect(function(plr)
-            pcall(function() cleanupESP(plr) end)
-        end)
-    end)
-    pcall(function()
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then pcall(function() createESP(plr) end) end
-        end
-    end)
-
-    RunService.Heartbeat:Connect(function()
-        pcall(function()
-            local streamedPlayers = {}
-            for player, tbl in pairs(ESPObjects) do
-                streamedPlayers[player] = true
-                pcall(function()
-                    local char = getCharacterModel(player)
-                    local box, nameText, healthText, distText, chamBox
-                    pcall(function()
-                        box = tbl.Box
-                        nameText = tbl.Name
-                        healthText = tbl.Health
-                        distText = tbl.Distance
-                        chamBox = tbl.ChamBox
-                    end)
-
-                    if char and safeGet(char, "HumanoidRootPart") then
-                        local hrp
-                        pcall(function() hrp = char.HumanoidRootPart end)
-                        local pos, onScreen, health, maxHealth, extents, topW, onScreen1, botW, onScreen2, height, width
-
-                        pcall(function()
-                            pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        end)
-
-                        pcall(function()
-                            health, maxHealth = getHealthInfo(char)
-                        end)
-
-                        pcall(function()
-                            extents = char:GetExtentsSize()
-                        end)
-
-                        pcall(function()
-                            topW, onScreen1 = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, extents.Y/2, 0))
-                        end)
-                        pcall(function()
-                            botW, onScreen2 = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, extents.Y/2, 0))
-                        end)
-                        pcall(function()
-                            height = (botW.Y - topW.Y)
-                            width = height * 0.45
-                        end)
-
-                        if Toggles.PlayerESP.Value and onScreen and onScreen1 and onScreen2 and health > 0 then
-                            -- Chams box (drawn behind ESP box)
-                            pcall(function()
-                                chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
-                                chamBox.Size = Vector2.new(width, height)
-                                chamBox.Color = Color3.fromRGB(255, 0, 0)
-                                chamBox.Transparency = 0.15
-                                chamBox.Visible = true
-                            end)
-
-                            -- Draw box (top horizontal line)
-                            pcall(function()
-                                box.Position = Vector2.new(topW.X - width/2, topW.Y)
-                                box.Size = Vector2.new(width, 0)
-                                box.Visible = true
-                            end)
-
-                            -- Draw name
-                            pcall(function()
-                                nameText.Text = player.Name
-                                nameText.Position = Vector2.new(pos.X, topW.Y - 16)
-                                nameText.Visible = true
-                            end)
-
-                            -- Draw health/maxhealth
-                            pcall(function()
-                                healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
-                                healthText.Position = Vector2.new(pos.X, topW.Y - 2)
-                                local r = math.floor(255 - 255 * (health/maxHealth))
-                                local g = math.floor(255 * (health/maxHealth))
-                                healthText.Color = Color3.fromRGB(r, g, 0)
-                                healthText.Visible = true
-                            end)
-
-                            -- Draw distance
-                            pcall(function()
-                                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                                distText.Text = "[" .. math.floor(dist) .. "m]"
-                                distText.Position = Vector2.new(pos.X, botW.Y + 2)
-                                distText.Visible = true
-                            end)
-
-                            -- Draw skeleton
-                            drawSkeleton(player, char, Color3.fromRGB(255,255,255), 2)
-                        else
-                            pcall(function() box.Visible = false end)
-                            pcall(function() nameText.Visible = false end)
-                            pcall(function() healthText.Visible = false end)
-                            pcall(function() distText.Visible = false end)
-                            pcall(function() chamBox.Visible = false end)
-                            -- Hide skeleton lines
-                            if tbl.Skeleton then
-                                for _, line in pairs(tbl.Skeleton) do
-                                    pcall(function() line.Visible = false end)
-                                end
-                            end
-                        end
-                    else
-                        pcall(function() box.Visible = false end)
-                        pcall(function() nameText.Visible = false end)
-                        pcall(function() healthText.Visible = false end)
-                        pcall(function() distText.Visible = false end)
-                        pcall(function() chamBox.Visible = false end)
-                        -- Hide skeleton lines
-                        if tbl.Skeleton then
-                            for _, line in pairs(tbl.Skeleton) do
-                                pcall(function() line.Visible = false end)
-                            end
-                        end
-                    end
-                end)
-            end
-            -- Robust cleanup: remove ESP for any player no longer in Players
-            for playerRef in pairs(ESPObjects) do
-                local found = false
-                pcall(function()
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p == playerRef then
-                            found = true
-                            break
-                        end
-                    end
-                end)
-                if not found then
-                    cleanupESP(playerRef)
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("MeshPart") then
+                    part.CanTouch = false
                 end
             end
         end)
+    end
+
+    Toggles.DisableCharacterTouchToggle:OnChanged(function(value)
+        pcall(function()
+            if value and LocalPlayer.Character then
+                disableTouch(LocalPlayer.Character)
+            end
+        end)
+    end)
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        if Toggles.DisableCharacterTouchToggle.Value then
+            disableTouch(character)
+        end
     end)
 end)
 
+-- ✅ Anti-AA Bypass
+pcall(function()
+    if not Toggles or not Toggles.SwimStatusToggle then return end
 
+    local function setSwimStatus(value)
+        pcall(function()
+            local status = workspace:WaitForChild("Living"):WaitForChild(LocalPlayer.Name):WaitForChild("Status")
+            if value then
+                local swimFolder = Instance.new("Folder")
+                swimFolder.Name = "SwimStatus"
+                swimFolder.Parent = status
+            else
+                local swimFolder = status:FindFirstChild("SwimStatus")
+                if swimFolder then
+                    swimFolder:Destroy()
+                end
+            end
+        end)
+    end
+
+    Toggles.SwimStatusToggle:OnChanged(function(value)
+        setSwimStatus(value)
+    end)
+
+    LocalPlayer.CharacterAdded:Connect(function()
+        if Toggles.SwimStatusToggle.Value then
+            setSwimStatus(true)
+        end
+    end)
+end)
+
+-- ✅ Player ESP
+pcall(function()
+    local function addESP(player)
+        if player == LocalPlayer or not player.Character then return end
+        pcall(function()
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "RW_ESP"
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.Parent = player.Character
+        end)
+    end
+
+    local function removeESP(player)
+        pcall(function()
+            if player.Character then
+                local highlight = player.Character:FindFirstChild("RW_ESP")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end)
+    end
+
+    Toggles.PlayerESP:OnChanged(function(value)
+        pcall(function()
+            for _, plr in pairs(Players:GetPlayers()) do
+                if value then
+                    addESP(plr)
+                else
+                    removeESP(plr)
+                end
+            end
+        end)
+    end)
+
+    Players.PlayerAdded:Connect(function(player)
+        if Toggles.PlayerESP.Value then
+            player.CharacterAdded:Connect(function()
+                addESP(player)
+            end)
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        removeESP(player)
+    end)
+end)
+
+-- ✅ Moderator Notifier
 pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
@@ -1489,167 +1332,28 @@ pcall(function()
     local NotificationLabel = nil
     local IsMonitoring = false
     local MonitorConn = nil
-    local UserCache = {} -- Cache: {UserId = {username, roleName}}
-    local MonitoredPlayers = {} -- Tracks players with roles in the server
+    local MonitoredPlayers = {}
+    local UserCache = {}
 
-    -- MonitoredUsers as a dictionary for O(1) lookup
-    local MonitoredUsers = {
-        [116279325] = {username = "MichaelpizzaXD", roleName = "Developers"},
-        [101557551] = {username = "MlgArcOfOz", roleName = "Developers"},
-        [66885812] = {username = "MiniTomBomb", roleName = "Developers"},
-        [151823512] = {username = "KrackenLackin", roleName = "Developers"},
-        [7098519935] = {username = "RoguebloxHolder", roleName = "Community Manager"},
-        [23898168] = {username = "LordDogeus", roleName = "Community Manager"},
-        [508010705] = {username = "bs4b", roleName = "Secret Tester"},
-        [2348176237] = {username = "Ropbloxd", roleName = "Secret Tester"},
-        [101472496] = {username = "IWish4Food", roleName = "Secret Tester"},
-        [137156947] = {username = "clownmesh", roleName = "Secret Tester"},
-        [91088194] = {username = "snadwich_man", roleName = "Secret Tester"},
-        [5639568198] = {username = "antilocapras", roleName = "Secret Tester"},
-        [2739168703] = {username = "MinusEightSilver", roleName = "Secret Tester"},
-        [2203438314] = {username = "MoonfullBliss", roleName = "Secret Tester"},
-        [83568697] = {username = "xavierqwl123", roleName = "Secret Tester"},
-        [886895436] = {username = "FlibbetFlobbet", roleName = "Secret Tester"},
-        [454125614] = {username = "DaveCombat", roleName = "Secret Tester"},
-        [2253843707] = {username = "Gatemaster159", roleName = "Secret Tester"},
-        [400064133] = {username = "FrickTaco", roleName = "Secret Tester"},
-        [4467110029] = {username = "MurderMaster02_4", roleName = "Secret Tester"},
-        [1584543391] = {username = "DemankIes", roleName = "Secret Tester"},
-        [545676359] = {username = "Magno_1725", roleName = "Secret Tester"},
-        [1198202820] = {username = "Watersheepgod123", roleName = "Secret Tester"},
-        [50531342] = {username = "j_xhnny", roleName = "Secret Tester"},
-        [466307225] = {username = "GameAwesome128", roleName = "Secret Tester"},
-        [2627739850] = {username = "OneLifeSuper", roleName = "Secret Tester"},
-        [8355205283] = {username = "mrGIANTviking", roleName = "Secret Tester"},
-        [684490283] = {username = "Falmsas", roleName = "Secret Tester"},
-        [96606405] = {username = "xxstarshooterxx1", roleName = "Secret Tester"},
-        [537619474] = {username = "fenaerii", roleName = "Secret Tester"},
-        [409518603] = {username = "Floof_Fully", roleName = "Secret Tester"},
-        [211211867] = {username = "TomelessX", roleName = "Secret Tester"},
-        [2311317483] = {username = "Liutzia", roleName = "Secret Tester"},
-        [15147688] = {username = "RuneArtifact", roleName = "Secret Tester"},
-        [839001197] = {username = "Miraelith", roleName = "Secret Tester"},
-        [4025386553] = {username = "SheepInSheepSkinRBX", roleName = "Secret Tester"},
-        [920566] = {username = "eld", roleName = "Secret Tester"},
-        [9160671302] = {username = "Dinglenutjohnson3rd", roleName = "Secret Tester"},
-        [390617393] = {username = "rarex00x", roleName = "Secret Tester"},
-        [167343092] = {username = "fastdogekid", roleName = "Secret Tester"},
-        [9185362166] = {username = "Dinglenutjohnson4th", roleName = "Secret Tester"},
-        [476747151] = {username = "Gorgus_Official", roleName = "Secret Tester"},
-        [46354252] = {username = "Ijazezane", roleName = "Senior Moderator"},
-        [172863828] = {username = "Valerame3", roleName = "Senior Moderator"},
-        [71517753] = {username = "upbeatbidachi", roleName = "Senior Moderator"},
-        [56632783] = {username = "Coletrayne", roleName = "The Hydra"},
-        [6056339939] = {username = "NotAhmi4", roleName = "Junior Moderator"},
-        [475990670] = {username = "blzz4rd", roleName = "Junior Moderator"},
-        [1834007574] = {username = "MintyKobold", roleName = "Junior Moderator"},
-        [1745860240] = {username = "AstralZix", roleName = "Junior Moderator"},
-        [985681917] = {username = "PikaNubby", roleName = "Junior Moderator"},
-        [33242043] = {username = "piercingTYB", roleName = "Junior Moderator"},
-        [83742361] = {username = "0utcastGhost", roleName = "Junior Moderator"},
-        [3761770969] = {username = "MogaApht", roleName = "Moderator"},
-        [472265489] = {username = "NicoCTR", roleName = "Moderator"},
-        [1443529743] = {username = "RetroFungi", roleName = "Moderator"},
-        [132854348] = {username = "Luci_Lucid", roleName = "Moderator"},
-        [97857665] = {username = "PacificState", roleName = "Moderator"},
-        [178196494] = {username = "iSuikazu", roleName = "Moderator"},
-        [1814937056] = {username = "psyych1c", roleName = "Moderator"},
-        [98475312] = {username = "mooshoo0629", roleName = "Moderator"},
-        [88734055] = {username = "Umbraheim", roleName = "Moderator"},
-        [105477497] = {username = "mosquirt04x", roleName = "Moderator"},
-        [98823832] = {username = "Tooleria", roleName = "Moderator"},
-        [750126545] = {username = "MikeBikiCiki", roleName = "Moderator"},
-        [2482521968] = {username = "kronksdonks", roleName = "Moderator"},
-        [494876909] = {username = "NightFumi", roleName = "Moderator"},
-        [368760757] = {username = "hadarqki", roleName = "Moderator"},
-        [1325204143] = {username = "JordyVibing", roleName = "Moderator"},
-        [296471697] = {username = "ThugFuny", roleName = "Moderator"},
-        [1230105665] = {username = "savefloppa", roleName = "Moderator"},
-        [94943072] = {username = "2qrys", roleName = "Co-Owner"},
-        [568447733] = {username = "VortexLineZ", roleName = "Tester"},
-        [288068260] = {username = "Fruchtriegel", roleName = "Tester"},
-        [2067212412] = {username = "2v1mee", roleName = "Tester"},
-        [177841301] = {username = "Xdancjoz", roleName = "Tester"},
-        [541694484] = {username = "Sayumiko_Inubashiri", roleName = "Tester"},
-        [200296369] = {username = "kir_bu", roleName = "Tester"},
-        [105642986] = {username = "Spikedaniel1", roleName = "Tester"},
-        [118232953] = {username = "Acroze_0", roleName = "Tester"},
-        [2272201650] = {username = "gamergodH8", roleName = "Tester"},
-        [1391134999] = {username = "Voayn", roleName = "Tester"},
-        [591754050] = {username = "Ftwnitro", roleName = "Tester"},
-        [94377328] = {username = "Adome1000", roleName = "Tester"},
-        [328804443] = {username = "minipixel37", roleName = "Tester"},
-        [1721299790] = {username = "AisarRedux", roleName = "Tester"},
-        [443301913] = {username = "BaconFlakesFoLife", roleName = "Tester"},
-        [1525954431] = {username = "king_req2", roleName = "Tester"},
-        [164659205] = {username = "YugoEliatrope", roleName = "Tester"},
-        [109880601] = {username = "kazuhirawillow", roleName = "Tester"},
-        [1255232483] = {username = "D7X37", roleName = "Tester"},
-        [3072563956] = {username = "AMONGOlDS", roleName = "Tester"},
-        [60501176] = {username = "A_SpoopyPixel", roleName = "Tester"},
-        [1538684653] = {username = "v4mp6vrl", roleName = "Tester"},
-        [95115478] = {username = "Apocalytra", roleName = "Tester"},
-        [171849433] = {username = "pumpkinmoo06", roleName = "Tester"},
-        [238689577] = {username = "XK4nekiX", roleName = "Tester"},
-        [3134234164] = {username = "BoubaStep", roleName = "Tester"},
-        [64146960] = {username = "Jayden080811", roleName = "Tester"},
-        [936850490] = {username = "Arkomis", roleName = "Tester"},
-        [75576146] = {username = "RubloxProster", roleName = "Tester"},
-        [1301594729] = {username = "AscendingO", roleName = "Tester"},
-        [1593663486] = {username = "levvenooo", roleName = "Tester"},
-        [1183277097] = {username = "QAZWERTZU", roleName = "Tester"},
-        [119813128] = {username = "ASFNIN10DO", roleName = "Tester"},
-        [55978613] = {username = "Eir_6", roleName = "Tester"},
-        [1810420170] = {username = "YataaMirror", roleName = "Tester"},
-        [295400019] = {username = "NordFraey", roleName = "Tester"},
-        [50923052] = {username = "FarmerTommi", roleName = "Tester"},
-        [1857182681] = {username = "dreamdemonz", roleName = "Tester"},
-        [147290047] = {username = "Akuma321123", roleName = "Tester"},
-        [1462759064] = {username = "Swusshy", roleName = "Tester"},
-        [696449051] = {username = "gamer_lits", roleName = "Tester"},
-        [1213458167] = {username = "xXLyr_icalXx", roleName = "Tester"},
-        [3309856286] = {username = "Altey_z", roleName = "Tester"},
-        [677421053] = {username = "Glarpys", roleName = "Tester"},
-        [556687212] = {username = "Zawzeu", roleName = "Tester"},
-        [121334527] = {username = "coolsnakez", roleName = "Tester"},
-        [136103834] = {username = "david50high", roleName = "Tester"},
-        [121138965] = {username = "onajimi", roleName = "Tester"},
-        [2029492895] = {username = "AstonishingAdvantage", roleName = "Tester"},
-        [84902083] = {username = "EquinoxLeech", roleName = "Tester"},
-        [118368051] = {username = "GalaxyDudeNinja1", roleName = "Tester"},
-        [1546714877] = {username = "Hollodron04x", roleName = "Tester"},
-        [2040850419] = {username = "asuraispog1", roleName = "Tester"},
-        [48317343] = {username = "T4ktical", roleName = "Tester"},
-        [792994343] = {username = "ptl483", roleName = "Tester"},
-        [5905225] = {username = "firestarfeyfire", roleName = "Tester"},
-        [113363377] = {username = "a23way", roleName = "Tester"},
-        [64827712] = {username = "DatBoiOmon_e", roleName = "Tester"},
-        [304468388] = {username = "realityticks", roleName = "Tester"},
-        [119948127] = {username = "miasmers", roleName = "Tester"},
-        [1258601659] = {username = "Dr_BruhMoment", roleName = "Tester"},
-        [2643269] = {username = "meteorshower", roleName = "Tester"},
-        [302306519] = {username = "dontay1796", roleName = "Tester"},
-        [1279850752] = {username = "xxxBenjidabeastxxx", roleName = "Tester"},
-        [2980417565] = {username = "AutoGamezzzzYT", roleName = "Tester"},
-        [15400033] = {username = "eliciety", roleName = "Tester"},
-        [1209943600] = {username = "rinacavemanoogabooga", roleName = "Tester"},
-        [2791735478] = {username = "kajuxas42", roleName = "Tester"},
-        [45805731] = {username = "Julsons", roleName = "Tester"},
-        [85752191] = {username = "Blaketerraria", roleName = "Tester"},
-        [139532477] = {username = "goodteam5", roleName = "Tester"},
-        [171068753] = {username = "bucketcube_d", roleName = "Tester"},
-        [128562610] = {username = "nongnine2549", roleName = "Tester"},
-        [121096035] = {username = "l4zy_b0i", roleName = "Tester"},
-        [3234444804] = {username = "Poorabar", roleName = "Tester"},
-        [87667744] = {username = "melovesonic", roleName = "Tester"},
-        [154551041] = {username = "BrownSun_flower", roleName = "Tester"},
-        [2702542109] = {username = "FallionsGurlFriend", roleName = "Tester"},
-        [244275943] = {username = "boptodatop", roleName = "Tester"},
-        [618526197] = {username = "0charliee", roleName = "Tester"},
-        [85696426] = {username = "piknishi", roleName = "Tester"},
-        [27243005] = {username = "kal_vo", roleName = "Tester"},
-        [259956393] = {username = "synthosize0", roleName = "Tester"},
-        [25419739] = {username = "dough_jkl", roleName = "Tester"},
+    _G.MonitoredUsers = {
+        [15877374] = {username = "Arch_Mage", roleName = "Developers"},
+        [25825868] = {username = "RagDollMoment", roleName = "Developers"},
+        [107177201] = {username = "Lunarchs", roleName = "Developers"},
+        [1222525363] = {username = "itsprettybad", roleName = "Developers"},
+        [15877374] = {username = "Arch_Mage", roleName = "The Hydra"},
+        [25825868] = {username = "RagDollMoment", roleName = "The Hydra"},
+        [107177201] = {username = "Lunarchs", roleName = "The Hydra"},
+        [1222525363] = {username = "itsprettybad", roleName = "The Hydra"},
+        [113208] = {username = "Vespei", roleName = "Community Manager"},
+        [196241377] = {username = "AstralK0", roleName = "Senior Moderator"},
+        [150169332] = {username = "NotAn_Alt", roleName = "Moderator"},
+        [162562661] = {username = "Xarionette", roleName = "Moderator"},
+        [138806257] = {username = "Noxturnal", roleName = "Moderator"},
+        [156133047] = {username = "2L15m", roleName = "Moderator"},
+        [159347179] = {username = "anchqor", roleName = "Moderator"},
+        [173478108] = {username = "Sevred", roleName = "Moderator"},
+        [1745313990] = {username = "SkyesDev", roleName = "Moderator"},
+        [2494039335] = {username = "iAstraI", roleName = "Moderator"},
         [384554889] = {username = "N1GHT_R", roleName = "Tester"},
         [521426118] = {username = "SanctifiedSeraph", roleName = "Tester"},
         [3217076177] = {username = "TheMelodicBlu", roleName = "Tester"},
@@ -1825,7 +1529,7 @@ pcall(function()
             UserCache[player.UserId].username = player.Name
             return UserCache[player.UserId]
         end
-        local role = MonitoredUsers[player.UserId]
+        local role = _G.MonitoredUsers[player.UserId]
         if role then
             UserCache[player.UserId] = {username = player.Name, roleName = role.roleName}
             return UserCache[player.UserId]
@@ -1919,7 +1623,7 @@ pcall(function()
     end
 end)
 
--- Auto Kick Module
+-- ✅ Auto Kick
 pcall(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
@@ -1934,9 +1638,7 @@ pcall(function()
         "Moderator"
     }
 
-    -- Reference the MonitoredUsers table from ModeratorNotifier
-    local MonitoredUsers = _G.MonitoredUsers or {}
-    local UserCache = {} -- Cache: {UserId = {username, roleName}}
+    local UserCache = {}
 
     local function safeGet(obj, ...)
         local args = {...}
@@ -1959,11 +1661,10 @@ pcall(function()
             UserCache[player.UserId].username = player.Name
             return UserCache[player.UserId]
         end
-        for _, user in ipairs(MonitoredUsers) do
-            if user.userId == player.UserId then
-                UserCache[player.UserId] = {username = player.Name, roleName = user.roleName}
-                return UserCache[player.UserId]
-            end
+        local role = _G.MonitoredUsers[player.UserId]
+        if role then
+            UserCache[player.UserId] = {username = player.Name, roleName = role.roleName}
+            return UserCache[player.UserId]
         end
         UserCache[player.UserId] = {username = player.Name, roleName = "None"}
         return nil
@@ -2021,211 +1722,6 @@ pcall(function()
     end
 end)
 
--- No Fall Damage Module
-pcall(function()
-    local RunService = game:GetService("RunService")
-    local Players = game:GetService("Players")
-    local Workspace = game:GetService("Workspace")
-    local player = Players.LocalPlayer
-
-    local fallFolder = nil
-
-    local function setNoFall(active)
-        pcall(function()
-            local status = Workspace:WaitForChild("Living"):WaitForChild(player.Name):WaitForChild("Status")
-            if active then
-                if fallFolder and fallFolder.Parent then
-                    fallFolder:Destroy()
-                end
-                fallFolder = Instance.new("Folder")
-                fallFolder.Name = "FallDamageCD"
-                fallFolder.Archivable = true
-                fallFolder.Parent = status
-            else
-                if fallFolder and fallFolder.Parent then
-                    fallFolder:Destroy()
-                end
-                fallFolder = nil
-            end
-        end)
-    end
-
-    player.CharacterAdded:Connect(function()
-        pcall(function()
-            local timeout = tick() + 5
-            while not Workspace:FindFirstChild("Living") and tick() < timeout do
-                task.wait()
-            end
-            if Toggles.NoFallDamage.Value then
-                setNoFall(true)
-            end
-        end)
-    end)
-
-    local renderConnection
-    pcall(function()
-        renderConnection = RunService.RenderStepped:Connect(function()
-            pcall(function()
-                if Toggles.NoFallDamage.Value then
-                    setNoFall(true)
-                else
-                    setNoFall(false)
-                end
-            end)
-        end)
-    end)
-end)
-
--- No Killbricks/Disable Touch Module
-pcall(function()
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-
-    local isEnabled = false
-    local affectedParts = {}
-    local characterConn = nil
-
-    local function safeGet(obj, ...)
-        local args = {...}
-        for i, v in ipairs(args) do
-            local ok, res = pcall(function() return obj[v] end)
-            if not ok then return nil end
-            obj = res
-            if not obj then return nil end
-        end
-        return obj
-    end
-
-    local function disableCharacterTouch()
-        pcall(function()
-            local char = safeGet(LocalPlayer, "Character")
-            if not char then return end
-            local descendants = char:GetDescendants()
-            for _, part in ipairs(descendants) do
-                if (part:IsA("BasePart") or part:IsA("MeshPart")) and not affectedParts[part] then
-                    local canTouch = part.CanTouch
-                    affectedParts[part] = canTouch
-                    part.CanTouch = false
-                end
-            end
-        end)
-    end
-
-    local function restoreCharacterTouch()
-        pcall(function()
-            for part, originalCanTouch in pairs(affectedParts) do
-                if part and part.Parent then
-                    part.CanTouch = originalCanTouch
-                end
-            end
-            affectedParts = {}
-        end)
-    end
-
-    local function enableDisableTouch()
-        if isEnabled then return end
-        isEnabled = true
-        disableCharacterTouch()
-        if characterConn then
-            characterConn:Disconnect()
-        end
-        characterConn = LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(1)
-            if isEnabled then
-                disableCharacterTouch()
-            end
-        end)
-    end
-
-    local function disableDisableTouch()
-        if not isEnabled then return end
-        isEnabled = false
-        if characterConn then
-            characterConn:Disconnect()
-            characterConn = nil
-        end
-        restoreCharacterTouch()
-    end
-
-    Toggles.DisableCharacterTouchToggle:OnChanged(function(value)
-        pcall(function()
-            if value then
-                enableDisableTouch()
-            else
-                disableDisableTouch()
-            end
-        end)
-    end)
-end)
-
--- Anti-AA Bypass/No Fire/Swim Status Module
-pcall(function()
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-
-    local isEnabled = false
-    local characterConn = nil
-
-    local function safeGet(obj, ...)
-        local args = {...}
-        for i, v in ipairs(args) do
-            local ok, res = pcall(function() return obj[v] end)
-            if not ok then return nil end
-            obj = res
-            if not obj then return nil end
-        end
-        return obj
-    end
-
-    local function fireSwimStatus(state)
-        pcall(function()
-            local remotes = safeGet(ReplicatedStorage, "Remotes")
-            local mainRemote = remotes and safeGet(remotes, "Main")
-            if mainRemote then
-                mainRemote:FireServer("swim", state)
-            end
-        end)
-    end
-
-    local function enableSwimStatus()
-        if isEnabled then return end
-        isEnabled = true
-        fireSwimStatus(true)
-        if characterConn then
-            characterConn:Disconnect()
-        end
-        characterConn = LocalPlayer.CharacterAdded:Connect(function()
-            task.wait(1)
-            if isEnabled then
-                fireSwimStatus(true)
-            end
-        end)
-    end
-
-    local function disableSwimStatus()
-        if not isEnabled then return end
-        isEnabled = false
-        fireSwimStatus(false)
-        if characterConn then
-            characterConn:Disconnect()
-            characterConn = nil
-        end
-    end
-
-    Toggles.SwimStatusToggle:OnChanged(function(value)
-        pcall(function()
-            if value then
-                enableSwimStatus()
-            else
-                disableSwimStatus()
-            end
-        end)
-    end)
-end)
--- Keep original Anti-AA/Swim, ESP, No Kill Bricks modules (assumed to be in the truncated part, but as per instructions, keep unchanged)
--- Assuming the original code for these is present in the full script and not modified.
-
 -- UI Settings Tab
 local MenuGroup = Tabs.UI:AddLeftGroupbox("Menu")
 MenuGroup:AddButton("Unload", function() Library:Unload() end)
@@ -2236,7 +1732,7 @@ MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
 })
 
 Library.ToggleKeybind = Options.MenuKeybind
-Library.KeybindFrame.Visible = true; 
+Library.KeybindFrame.Visible = true
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
