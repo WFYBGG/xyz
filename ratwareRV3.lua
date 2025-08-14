@@ -2602,37 +2602,7 @@ MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
 })
 
 Library.ToggleKeybind = Options.MenuKeybind
-
--- Show and position the Keybind List in Linoria
-pcall(function()
-    if Library and Library.KeybindFrame then
-        Library.KeybindFrame.Visible = true -- force show
-        Library.KeybindFrame.Position = UDim2.new(0, 10, 0.5, -Library.KeybindFrame.AbsoluteSize.Y / 2) -- left side, vertically centered
-    end
-end)
-
--- Grab services
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
--- Remove existing cursor if needed
-if cursor then
-    pcall(function() cursor:Remove() end)
-end
-
--- Create new solid cursor
-local cursor = Drawing.new("Circle")
-cursor.Radius = 4               -- size of the cursor
-cursor.Filled = true            -- make it solid
-cursor.Color = Color3.fromRGB(255, 0, 0)  -- choose your color
-cursor.Visible = true
-cursor.ZIndex = 10              -- make sure it's on top
-
--- Update cursor every frame
-RunService.RenderStepped:Connect(function()
-    local mousePos = UserInputService:GetMouseLocation()
-    cursor.Position = Vector2.new(mousePos.X, mousePos.Y)
-end)
+Library.KeybindFrame.Visible = true; 
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
