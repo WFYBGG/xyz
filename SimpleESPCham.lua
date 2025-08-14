@@ -35,8 +35,8 @@ pcall(function()
         if player == LocalPlayer or not player.Character then return end
         pcall(function()
             local highlight = Instance.new("Highlight")
-            highlight.Name = "Rogueblox Player ESP"
-            highlight.FillTransparency = 0.5
+            highlight.Name = "Player_ESP"
+            highlight.FillTransparency = 0.1
             highlight.OutlineTransparency = 0
             highlight.FillColor = Color3.fromRGB(255, 0, 0)
             highlight.Parent = player.Character
@@ -46,7 +46,7 @@ pcall(function()
     local function removeESP(player)
         pcall(function()
             if player.Character then
-                local highlight = player.Character:FindFirstChild("RW_ESP")
+                local highlight = player.Character:FindFirstChild("Player_ESP")
                 if highlight then
                     highlight:Destroy()
                 end
