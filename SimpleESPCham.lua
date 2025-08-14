@@ -4,7 +4,7 @@ local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/addons/SaveManager.lua"))()
 
 local Window = Library:CreateWindow({
-    Title = "Ratware.exe ESP TEST - 100% Made By ChatGPT [Press 'Insert' To Hide]",
+    Title = "Ratware.esp - 100% Made By ChatGPT [Press 'Insert' To Hide]",
     Center = true,
     AutoShow = true,
     TabPadding = 8,
