@@ -14,13 +14,13 @@ local Tabs = {
     Visuals = Window:AddTab("Visual"),
     UI = Window:AddTab("UI Settings")
 }
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Player ESP")
 VisualsGroup:AddToggle("PlayerESP", {
-    Text = "Player ESP",
+    Text = "Chams",
     Default = false
 })
 VisualsGroup:AddToggle("PlayerESPName", {
-    Text = "Username & Distance",
+    Text = "Show Username & Distance",
     Default = false
 })
 VisualsGroup:AddToggle("PlayerESPHealthbar", {
@@ -28,6 +28,40 @@ VisualsGroup:AddToggle("PlayerESPHealthbar", {
     Default = false
 })
 VisualsGroup:AddToggle("PlayerESPHealthText", {
+    Text = "Show Health Text",
+    Default = false
+})
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("NPC ESP")
+VisualsGroup:AddToggle("NPCESP", {
+    Text = "Chams",
+    Default = false
+})
+VisualsGroup:AddToggle("NPCESPName", {
+    Text = "Show Name & Distance",
+    Default = false
+})
+VisualsGroup:AddToggle("NPCESPHealthbar", {
+    Text = "Show Health Bar",
+    Default = false
+})
+VisualsGroup:AddToggle("NPCESPHealthText", {
+    Text = "Show Health Text",
+    Default = false
+})
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Mob ESP")
+VisualsGroup:AddToggle("MobESP", {
+    Text = "Chams",
+    Default = false
+})
+VisualsGroup:AddToggle("MobESPName", {
+    Text = "Show Name & Distance",
+    Default = false
+})
+VisualsGroup:AddToggle("MobESPHealthbar", {
+    Text = "Show Health Bar",
+    Default = false
+})
+VisualsGroup:AddToggle("MobESPHealthText", {
     Text = "Show Health Text",
     Default = false
 })
