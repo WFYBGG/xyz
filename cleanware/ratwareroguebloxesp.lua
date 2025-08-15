@@ -230,15 +230,24 @@ pcall(function()
     end)
     for _, toggleName in ipairs({"PlayerESPName", "PlayerESPHealthbar", "PlayerESPHealthText"}) do
         Toggles[toggleName]:OnChanged(function(val)
-            if val then
-                for _, p in ipairs(Players:GetPlayers()) do
-                    pcall(function()
-                        if not espData[p] then createESP(p) end
-                    end)
-                end
-            else
-                for _, p in ipairs(Players:GetPlayers()) do
-                    pcall(function() removeESP(p) end)
+            for _, p in ipairs(Players:GetPlayers()) do
+                local data = espData[p]
+                if val then
+                    if not data then
+                        createESP(p)
+                        data = espData[p]
+                    end
+                else
+                    if data then
+                        if toggleName == "PlayerESPName" then
+                            data.NameText.Visible = false
+                        elseif toggleName == "PlayerESPHealthbar" then
+                            data.HealthBarBG.Visible = false
+                            data.HealthBarFill.Visible = false
+                        elseif toggleName == "PlayerESPHealthText" then
+                            data.HealthText.Visible = false
+                        end
+                    end
                 end
             end
             checkAllToggles()
