@@ -14,54 +14,56 @@ local Tabs = {
     Visuals = Window:AddTab("Visual"),
     UI = Window:AddTab("UI Settings")
 }
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Player ESP")
+VisualsGroup:AddLabel('Name/Distance Color'):AddColorPicker('PlayerESPNameColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Name & Distance',
+    Callback = function(Value)
+        -- Apply text color immediately
+        for _, data in pairs(espData) do
+            if data.NameText then
+                data.NameText.Color = Value
+            end
+        end
+    end
+})
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 VisualsGroup:AddToggle("PlayerESP", {
-    Text = "Chams",
+    Text = "Player ESP",
     Default = false
 })
+VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
+    Default = Color3.fromRGB(255, 130, 0),
+    Title = 'Player Highlight',
+    Callback = function(Value)
+        -- Apply highlight color immediately
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Player_ESP") then
+                p.Character.Player_ESP.FillColor = Value
+            end
+        end
+    end
+})
 VisualsGroup:AddToggle("PlayerESPName", {
-    Text = "Show Username & Distance",
+    Text = "Username & Distance",
     Default = false
+})
+VisualsGroup:AddLabel('Name/Distance Color'):AddColorPicker('PlayerESPNameColor', {
+    Default = Color3.fromRGB(255, 255, 255),
+    Title = 'Name & Distance',
+    Callback = function(Value)
+        -- Apply text color immediately
+        for _, data in pairs(espData) do
+            if data.NameText then
+                data.NameText.Color = Value
+            end
+        end
+    end
 })
 VisualsGroup:AddToggle("PlayerESPHealthbar", {
     Text = "Show Health Bar",
     Default = false
 })
 VisualsGroup:AddToggle("PlayerESPHealthText", {
-    Text = "Show Health Text",
-    Default = false
-})
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("NPC ESP")
-VisualsGroup:AddToggle("NPCESP", {
-    Text = "Chams",
-    Default = false
-})
-VisualsGroup:AddToggle("NPCESPName", {
-    Text = "Show Name & Distance",
-    Default = false
-})
-VisualsGroup:AddToggle("NPCESPHealthbar", {
-    Text = "Show Health Bar",
-    Default = false
-})
-VisualsGroup:AddToggle("NPCESPHealthText", {
-    Text = "Show Health Text",
-    Default = false
-})
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Mob ESP")
-VisualsGroup:AddToggle("MobESP", {
-    Text = "Chams",
-    Default = false
-})
-VisualsGroup:AddToggle("MobESPName", {
-    Text = "Show Name & Distance",
-    Default = false
-})
-VisualsGroup:AddToggle("MobESPHealthbar", {
-    Text = "Show Health Bar",
-    Default = false
-})
-VisualsGroup:AddToggle("MobESPHealthText", {
     Text = "Show Health Text",
     Default = false
 })
@@ -101,7 +103,7 @@ pcall(function()
                 highlight.Name = "Player_ESP"
                 highlight.FillTransparency = 0.5
                 highlight.OutlineTransparency = 0
-                highlight.FillColor = Color3.fromRGB(255, 130, 0)
+                highlight.FillColor = Options.PlayerESPColor.Value
                 highlight.Parent = player.Character
             end
         end)
@@ -193,7 +195,7 @@ pcall(function()
             if Toggles.PlayerESPName.Value then
                 drawings.NameText.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
                 drawings.NameText.Position = Vector2.new(pos2D.X, pos2D.Y - totalHeight/2 - verticalOffset)
-                drawings.NameText.Color = Color3.fromRGB(255,255,255)
+                drawings.NameText.Color = Options.PlayerESPNameColor.Value
                 drawings.NameText.Visible = true
             else
                 drawings.NameText.Visible = false
