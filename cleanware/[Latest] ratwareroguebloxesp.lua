@@ -107,8 +107,8 @@ pcall(function()
     local function createESP(player)
         if player == LocalPlayer or espData[player] then return end
         espData[player] = {
-            NameText = createDrawing("Text",   {Size=14, Center=true, Outline=true, Visible=false}),
-            HealthText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            NameText = createDrawing("Text",   {Size=12, Center=true, Outline=true, Visible=false}),
+            HealthText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
             HealthBarBG = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,0,0), Visible=false}),
             HealthBarFill = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,255,0), Visible=false}),
             HealthBarWidth = 50,
@@ -166,7 +166,7 @@ pcall(function()
                     local usernameHeight = drawings.NameText.TextBounds.Y
                     local healthTextHeight = drawings.HealthText.TextBounds.Y
                     local totalHeight = usernameHeight + buffer + drawings.HealthBarHeight + buffer + healthTextHeight
-                    local verticalOffset = 20
+                    local verticalOffset = 30
 
                     -- Get health values safely
                     local health = tonumber(humanoid.Health) or 0
