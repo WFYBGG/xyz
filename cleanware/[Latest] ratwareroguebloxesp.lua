@@ -168,8 +168,17 @@ pcall(function()
                     local totalHeight = usernameHeight + buffer + drawings.HealthBarHeight + buffer + healthTextHeight
                     local verticalOffset = 20
 
-                    local health = humanoid.Health
-                    local maxHealth = humanoid.MaxHealth
+                    -- Get health values safely
+                    local health = tonumber(humanoid.Health) or 0
+                    local maxHealth = tonumber(humanoid.MaxHealth) or 100
+                    
+                    -- Prevent division errors or blank bars
+                    if maxHealth <= 0 then
+                        maxHealth = 100
+                    end
+                    local ratio = math.clamp(health / maxHealth, 0, 1)
+                    local dist = (head.Position - Camera.CFrame.Position).Magnitude
+
                     local ratio = math.clamp(maxHealth > 0 and (health / maxHealth) or 0, 0, 1)
                     local dist = (head.Position - Camera.CFrame.Position).Magnitude
 
