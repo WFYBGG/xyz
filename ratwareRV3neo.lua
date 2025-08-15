@@ -767,6 +767,55 @@ end)
 
 --Player ESP Module
 pcall(function()
+    local function addESP(player)
+        if player == LocalPlayer or not player.Character then return end
+        pcall(function()
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Player_ESP"
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.FillColor = Color3.fromRGB(255, 130, 0)
+            highlight.Parent = player.Character
+        end)
+    end
+
+    local function removeESP(player)
+        pcall(function()
+            if player.Character then
+                local highlight = player.Character:FindFirstChild("Player_ESP")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end)
+    end
+
+    Toggles.PlayerESP:OnChanged(function(value)
+        pcall(function()
+            for _, plr in pairs(Players:GetPlayers()) do
+                if value then
+                    addESP(plr)
+                else
+                    removeESP(plr)
+                end
+            end
+        end)
+    end)
+
+    Players.PlayerAdded:Connect(function(player)
+        if Toggles.PlayerESP.Value then
+            player.CharacterAdded:Connect(function()
+                addESP(player)
+            end)
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        removeESP(player)
+    end)
+end)
+
+pcall(function()
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local Camera = workspace.CurrentCamera
@@ -828,12 +877,6 @@ pcall(function()
         pcall(function()
             if ESPObjects[player] then cleanupESP(player) end
 
-            local box = Drawing.new("Square")
-            box.Visible = false
-            box.Thickness = 2
-            box.Color = Color3.fromRGB(255, 25, 25)
-            box.Filled = false
-
             local nameText = Drawing.new("Text")
             nameText.Size = 14
             nameText.Center = true
@@ -854,13 +897,6 @@ pcall(function()
             distText.Outline = true
             distText.Color = Color3.fromRGB(200, 200, 200)
             distText.Visible = false
-
-            local chamBox = Drawing.new("Square")
-            chamBox.Visible = false
-            chamBox.Color = Color3.fromRGB(255, 0, 0)
-            chamBox.Transparency = 0.2
-            chamBox.Filled = true
-            chamBox.Thickness = 1
 
             ESPObjects[player] = {
                 Box = box,
@@ -950,11 +986,9 @@ pcall(function()
                     local char = getCharacterModel(player)
                     local box, nameText, healthText, distText, chamBox
                     pcall(function()
-                        box = tbl.Box
                         nameText = tbl.Name
                         healthText = tbl.Health
                         distText = tbl.Distance
-                        chamBox = tbl.ChamBox
                     end)
 
                     if char and safeGet(char, "HumanoidRootPart") then
@@ -986,45 +1020,25 @@ pcall(function()
                         end)
 
                         if Toggles.PlayerESP.Value and onScreen and onScreen1 and onScreen2 and health > 0 then
-                            -- Chams box (drawn behind ESP box)
-                            pcall(function()
-                                chamBox.Position = Vector2.new(topW.X - width/2, topW.Y)
-                                chamBox.Size = Vector2.new(width, height)
-                                chamBox.Color = Color3.fromRGB(255, 0, 0)
-                                chamBox.Transparency = 0.15
-                                chamBox.Visible = true
-                            end)
 
-                            -- Draw box (top horizontal line)
-                            pcall(function()
-                                box.Position = Vector2.new(topW.X - width/2, topW.Y)
-                                box.Size = Vector2.new(width, 0)
-                                box.Visible = true
-                            end)
-
-                            -- Draw name
-                            pcall(function()
-                                nameText.Text = player.Name
-                                nameText.Position = Vector2.new(pos.X, topW.Y - 16)
-                                nameText.Visible = true
-                            end)
-
-                            -- Draw health/maxhealth
-                            pcall(function()
-                                healthText.Text = "[" .. math.floor(health) .. "/" .. math.floor(maxHealth) .. "]"
-                                healthText.Position = Vector2.new(pos.X, topW.Y - 2)
-                                local r = math.floor(255 - 255 * (health/maxHealth))
-                                local g = math.floor(255 * (health/maxHealth))
-                                healthText.Color = Color3.fromRGB(r, g, 0)
-                                healthText.Visible = true
-                            end)
-
-                            -- Draw distance
+                          -- Draw combined text "[Username] [Health] [Distance]"
                             pcall(function()
                                 local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-                                distText.Text = "[" .. math.floor(dist) .. "m]"
-                                distText.Position = Vector2.new(pos.X, botW.Y + 2)
-                                distText.Visible = true
+                                local r = math.floor(255 - 255 * (health / maxHealth))
+                                local g = math.floor(255 * (health / maxHealth))
+                            
+                                local combinedText = string.format(
+                                    "[%s] [%d/%d] [%dm]",
+                                    player.Name,
+                                    math.floor(health),
+                                    math.floor(maxHealth),
+                                    math.floor(dist)
+                                )
+                            
+                                nameText.Text = combinedText
+                                nameText.Position = Vector2.new(pos.X, topW.Y - 32) -- 2 studs above head (adjust as needed)
+                                nameText.Color = Color3.fromRGB(r, g, 0) -- color based on health
+                                nameText.Visible = true
                             end)
 
                             -- Draw skeleton
