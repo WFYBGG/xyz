@@ -543,6 +543,10 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "Player ESP",
     Default = false
 })
+VisualsGroup:AddToggle("PlayerESPLabels", {
+    Text = "Health & Distance",
+    Default = false
+})
 
 -- Services
 local Players = game:GetService("Players")
@@ -766,211 +770,179 @@ pcall(function()
 end)
 
 --Player ESP Module
---// Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+pcall(function()
+    local Players = game:GetService("Players")
+    local Camera = workspace.CurrentCamera
+    local LocalPlayer = Players.LocalPlayer
 
---// Storage
-local ESPObjects = {}
-
---// Create Drawing + Highlight ESP
-local function createESP(player)
-    if player == LocalPlayer then return end
-    if ESPObjects[player] then return end
-
-    -- Name/Distance text
-    local nameText = Drawing.new("Text")
-    nameText.Size = 14
-    nameText.Center = true
-    nameText.Outline = true
-    nameText.Color = Color3.fromRGB(255, 255, 255)
-    nameText.Visible = false
-
-    -- Health bar
-    local healthBarBG = Drawing.new("Line")
-    healthBarBG.Thickness = 3
-    healthBarBG.Color = Color3.fromRGB(0, 0, 0)
-    healthBarBG.Visible = false
-
-    local healthBarFG = Drawing.new("Line")
-    healthBarFG.Thickness = 3
-    healthBarFG.Color = Color3.fromRGB(0, 255, 0)
-    healthBarFG.Visible = false
-
-    -- Health text
-    local healthText = Drawing.new("Text")
-    healthText.Size = 14
-    healthText.Center = true
-    healthText.Outline = true
-    healthText.Visible = false
-
-    -- Highlight object
-    local function addHighlight()
-        if not player.Character then return end
-        if player.Character:FindFirstChild("Player_ESP") then return end
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "Player_ESP"
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 0
-        highlight.FillColor = Color3.fromRGB(255, 130, 0)
-        highlight.Parent = player.Character
+    -- Create Drawing utility
+    local function createDrawing(type, props)
+        local obj = Drawing.new(type)
+        for k, v in pairs(props) do
+            obj[k] = v
+        end
+        return obj
     end
 
-    ESPObjects[player] = {
-        Name = nameText,
-        HealthBarBG = healthBarBG,
-        HealthBarFG = healthBarFG,
-        HealthText = healthText,
-        AddHighlight = addHighlight
-    }
+    -- ESP storage
+    local espData = {}
 
-    if Toggles.PlayerESP.Value then
-        addHighlight()
+    -- Highlight
+    local function addHighlight(player)
+        if player == LocalPlayer or not player.Character then return end
+        pcall(function()
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Player_ESP"
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.FillColor = Color3.fromRGB(255, 130, 0)
+            highlight.Parent = player.Character
+        end)
     end
-end
 
---// Cleanup Drawing + Highlight
-local function removeESP(player)
-    if ESPObjects[player] then
-        for _, obj in pairs(ESPObjects[player]) do
-            if typeof(obj) == "table" and obj.Remove then
-                obj:Remove()
-            elseif typeof(obj) ~= "function" and obj then
-                pcall(function() obj:Remove() end)
+    local function removeHighlight(player)
+        pcall(function()
+            if player.Character then
+                local highlight = player.Character:FindFirstChild("Player_ESP")
+                if highlight then highlight:Destroy() end
             end
-        end
-        if player.Character then
-            local hl = player.Character:FindFirstChild("Player_ESP")
-            if hl then hl:Destroy() end
-        end
-        ESPObjects[player] = nil
-    end
-end
-
---// Update loop
-RunService.Heartbeat:Connect(function()
-    if not Toggles.PlayerESP.Value then
-        for _, obj in pairs(ESPObjects) do
-            obj.Name.Visible = false
-            obj.HealthBarBG.Visible = false
-            obj.HealthBarFG.Visible = false
-            obj.HealthText.Visible = false
-        end
-        return
+        end)
     end
 
-    for player, tbl in pairs(ESPObjects) do
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
-            local hrp = char.HumanoidRootPart
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            local head = char:FindFirstChild("Head")
+    -- Create ESP drawings
+    local function createESP(player)
+        if player == LocalPlayer then return end
+        if espData[player] then return end
 
-            if head then
+        espData[player] = {
+            NameText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            HealthText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            HealthBarBG = createDrawing("Square", {Filled=true, Visible=false, Color=Color3.fromRGB(0,0,0)}),
+            HealthBarFill = createDrawing("Square", {Filled=true, Visible=false})
+        }
+    end
+
+    local function removeESP(player)
+        if espData[player] then
+            for _, obj in pairs(espData[player]) do
+                obj:Remove()
+            end
+            espData[player] = nil
+        end
+    end
+
+    -- ESP update loop
+    game:GetService("RunService").RenderStepped:Connect(function()
+        for player, drawings in pairs(espData) do
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if hrp and humanoid and humanoid.Health > 0 then
                 local health = humanoid.Health
                 local maxHealth = humanoid.MaxHealth
                 local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
 
-                -- Positions
-                local namePos3D = head.Position + Vector3.new(0, 2, 0)
-                local barPos3D = head.Position + Vector3.new(0, 1.8, 0)
-                local healthTextPos3D = head.Position + Vector3.new(0, 1.6, 0)
+                local headPos = hrp.Position + Vector3.new(0,3,0)
+                local usernameDistPos = headPos + Vector3.new(0,2,0)
+                local healthbarPos = headPos + Vector3.new(0,1.5,0)
 
-                local namePos, onScreen1 = Camera:WorldToViewportPoint(namePos3D)
-                local barPos, onScreen2 = Camera:WorldToViewportPoint(barPos3D)
-                local healthTextPos, onScreen3 = Camera:WorldToViewportPoint(healthTextPos3D)
+                -- Labels toggle
+                if Toggles.PlayerESPLabels.Value then
+                    -- Username + Distance
+                    local up1, vis1 = Camera:WorldToViewportPoint(usernameDistPos)
+                    if vis1 then
+                        drawings.NameText.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
+                        drawings.NameText.Position = Vector2.new(up1.X, up1.Y)
+                        drawings.NameText.Color = Color3.fromRGB(255,255,255)
+                        drawings.NameText.Visible = true
+                    else drawings.NameText.Visible = false end
 
-                local onScreen = onScreen1 and onScreen2 and onScreen3 and health > 0
+                    -- Health bar
+                    local up2, vis2 = Camera:WorldToViewportPoint(healthbarPos)
+                    if vis2 then
+                        local healthPercent = math.clamp(health/maxHealth,0,1)
+                        local barWidth, barHeight = 50, 5
+                        drawings.HealthBarBG.Position = Vector2.new(up2.X - barWidth/2, up2.Y)
+                        drawings.HealthBarBG.Size = Vector2.new(barWidth, barHeight)
+                        drawings.HealthBarBG.Visible = true
 
-                if onScreen then
-                    -- Name/Distance text
-                    tbl.Name.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
-                    tbl.Name.Position = Vector2.new(namePos.X, namePos.Y)
-                    tbl.Name.Visible = true
-
-                    -- Health bar background
-                    local barWidth = 40
-                    local barHeight = 3
-                    local leftX = barPos.X - barWidth / 2
-                    local rightX = barPos.X + barWidth / 2
-
-                    tbl.HealthBarBG.From = Vector2.new(leftX, barPos.Y)
-                    tbl.HealthBarBG.To = Vector2.new(rightX, barPos.Y)
-                    tbl.HealthBarBG.Visible = true
-
-                    -- Health bar foreground
-                    local healthPercent = math.clamp(health / maxHealth, 0, 1)
-                    tbl.HealthBarFG.From = Vector2.new(leftX, barPos.Y)
-                    tbl.HealthBarFG.To = Vector2.new(leftX + (barWidth * healthPercent), barPos.Y)
-                    tbl.HealthBarFG.Color = Color3.fromRGB(
-                        math.floor(255 - 255 * healthPercent),
-                        math.floor(255 * healthPercent),
-                        0
-                    )
-                    tbl.HealthBarFG.Visible = true
+                        drawings.HealthBarFill.Position = Vector2.new(up2.X - barWidth/2, up2.Y)
+                        drawings.HealthBarFill.Size = Vector2.new(barWidth*healthPercent, barHeight)
+                        drawings.HealthBarFill.Color = Color3.fromRGB(
+                            math.floor(255-255*healthPercent),
+                            math.floor(255*healthPercent),
+                            0
+                        )
+                        drawings.HealthBarFill.Visible = true
+                    else
+                        drawings.HealthBarBG.Visible = false
+                        drawings.HealthBarFill.Visible = false
+                    end
 
                     -- Health text
-                    tbl.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
-                    tbl.HealthText.Position = Vector2.new(healthTextPos.X, healthTextPos.Y)
-                    tbl.HealthText.Color = tbl.HealthBarFG.Color
-                    tbl.HealthText.Visible = true
-
-                    -- Ensure highlight exists
-                    tbl.AddHighlight()
+                    local up3, vis3 = Camera:WorldToViewportPoint(headPos)
+                    if vis3 then
+                        drawings.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
+                        drawings.HealthText.Position = Vector2.new(up3.X, up3.Y)
+                        drawings.HealthText.Color = Color3.fromRGB(
+                            math.floor(255 - 255*(health/maxHealth)),
+                            math.floor(255*(health/maxHealth)),
+                            0
+                        )
+                        drawings.HealthText.Visible = true
+                    else drawings.HealthText.Visible = false end
                 else
-                    tbl.Name.Visible = false
-                    tbl.HealthBarBG.Visible = false
-                    tbl.HealthBarFG.Visible = false
-                    tbl.HealthText.Visible = false
+                    drawings.NameText.Visible = false
+                    drawings.HealthText.Visible = false
+                    drawings.HealthBarBG.Visible = false
+                    drawings.HealthBarFill.Visible = false
+                end
+
+                -- Highlight toggle
+                if Toggles.PlayerESP.Value then
+                    addHighlight(player)
+                else
+                    removeHighlight(player)
                 end
             else
-                tbl.Name.Visible = false
-                tbl.HealthBarBG.Visible = false
-                tbl.HealthBarFG.Visible = false
-                tbl.HealthText.Visible = false
+                drawings.NameText.Visible = false
+                drawings.HealthText.Visible = false
+                drawings.HealthBarBG.Visible = false
+                drawings.HealthBarFill.Visible = false
+                removeHighlight(player)
             end
-        else
-            tbl.Name.Visible = false
-            tbl.HealthBarBG.Visible = false
-            tbl.HealthBarFG.Visible = false
-            tbl.HealthText.Visible = false
-        end
-    end
-end)
-
---// Handle toggle changes
-Toggles.PlayerESP:OnChanged(function(value)
-    for _, player in pairs(Players:GetPlayers()) do
-        if value then
-            if not ESPObjects[player] then
-                createESP(player)
-            else
-                ESPObjects[player].AddHighlight()
-            end
-        else
-            removeESP(player)
-        end
-    end
-end)
-
---// Player events
-Players.PlayerAdded:Connect(function(player)
-    createESP(player)
-    player.CharacterAdded:Connect(function()
-        if Toggles.PlayerESP.Value and ESPObjects[player] then
-            ESPObjects[player].AddHighlight()
         end
     end)
+
+    -- Toggles changed
+    Toggles.PlayerESP:OnChanged(function(val)
+        for _, p in pairs(Players:GetPlayers()) do
+            if val then addHighlight(p) else removeHighlight(p) end
+        end
+    end)
+    Toggles.PlayerESPLabels:OnChanged(function(val)
+        for _, p in pairs(Players:GetPlayers()) do
+            if val and not espData[p] then createESP(p) end
+        end
+    end)
+
+    -- Player join/leave
+    Players.PlayerAdded:Connect(function(plr)
+        createESP(plr)
+        plr.CharacterAdded:Connect(function() if Toggles.PlayerESP.Value then addHighlight(plr) end end)
+    end)
+    Players.PlayerRemoving:Connect(function(plr)
+        removeESP(plr)
+        removeHighlight(plr)
+    end)
+
+    -- Initialize
+    for _, plr in ipairs(Players:GetPlayers()) do
+        createESP(plr)
+        if Toggles.PlayerESP.Value then addHighlight(plr) end
+    end
 end)
 
-Players.PlayerRemoving:Connect(removeESP)
-
--- Initialize for existing players
-for _, plr in ipairs(Players:GetPlayers()) do
-    createESP(plr)
-end
 
 -- Universal Tween & Location
 pcall(function()
