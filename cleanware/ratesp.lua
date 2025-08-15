@@ -21,6 +21,10 @@ local Window = Library:CreateWindow({
     TabPadding = 8,
     MenuFadeTime = 0.2
 })
+
+-- put this near the top, before VisualsGroup UI
+local espData = {}
+
 local Tabs = {
     Visuals = Window:AddTab("Visual"),
     UI = Window:AddTab("UI Settings")
@@ -92,8 +96,6 @@ pcall(function()
         end
         return obj
     end
-
-    local espData = {}
 
     local function addHighlight(player)
         if player == LocalPlayer or not player.Character then return end
