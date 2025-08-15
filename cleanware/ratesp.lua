@@ -1,8 +1,19 @@
---GUI
+--Custom Linoria Fork 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ratwarexe/LinoriaLib/refs/heads/main/addons/SaveManager.lua"))()
 
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+--GUI
 local Window = Library:CreateWindow({
     Title = "Ratware.esp - 100% Made By ChatGPT [Press 'Insert' To Hide]",
     Center = true,
@@ -66,16 +77,6 @@ VisualsGroup:AddToggle("PlayerESPHealthText", {
     Text = "Show Health Text",
     Default = false
 })
-
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
 
 --Player ESP Module
 pcall(function()
