@@ -24,6 +24,7 @@ VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
     Title = 'Player Highlight',
     Transparency = 0.5, -- initial transparency
     Callback = function(Value)
+        -- Update all existing highlights with new color and transparency
         for _, p in pairs(Players:GetPlayers()) do
             if p.Character and p.Character:FindFirstChild("Player_ESP") then
                 local highlight = p.Character.Player_ESP
@@ -33,6 +34,15 @@ VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
         end
     end
 })
+Options.PlayerESPColor:OnChanged(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("Player_ESP") then
+            local highlight = p.Character.Player_ESP
+            highlight.FillColor = Options.PlayerESPColor.Value
+            highlight.FillTransparency = Options.PlayerESPColor.Transparency
+        end
+    end
+end)
 VisualsGroup:AddToggle("PlayerESPName", {
     Text = "Username & Distance",
     Default = false
