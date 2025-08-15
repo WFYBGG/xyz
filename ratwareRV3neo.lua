@@ -787,16 +787,18 @@ pcall(function()
     -- ESP storage
     local espData = {}
 
-    -- Highlight
+    -- Highlight functions (managed outside RenderStepped)
     local function addHighlight(player)
         if player == LocalPlayer or not player.Character then return end
         pcall(function()
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "Player_ESP"
-            highlight.FillTransparency = 0.5
-            highlight.OutlineTransparency = 0
-            highlight.FillColor = Color3.fromRGB(255, 130, 0)
-            highlight.Parent = player.Character
+            if not player.Character:FindFirstChild("Player_ESP") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "Player_ESP"
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0
+                highlight.FillColor = Color3.fromRGB(255, 130, 0)
+                highlight.Parent = player.Character
+            end
         end)
     end
 
@@ -815,8 +817,8 @@ pcall(function()
         if espData[player] then return end
 
         espData[player] = {
-            NameText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
-            HealthText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            NameText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
+            HealthText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
             HealthBarBG = createDrawing("Square", {Filled=true, Visible=false, Color=Color3.fromRGB(0,0,0)}),
             HealthBarFill = createDrawing("Square", {Filled=true, Visible=false})
         }
@@ -831,7 +833,7 @@ pcall(function()
         end
     end
 
-    -- ESP update loop
+    -- RenderStepped: labels, healthbar, health text
     game:GetService("RunService").RenderStepped:Connect(function()
         for player, drawings in pairs(espData) do
             local char = player.Character
@@ -842,11 +844,10 @@ pcall(function()
                 local maxHealth = humanoid.MaxHealth
                 local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
 
-                local headPos = hrp.Position + Vector3.new(0,3,0)
-                local usernameDistPos = headPos + Vector3.new(0,2,0)
-                local healthbarPos = headPos + Vector3.new(0,1.5,0)
+                local headPos = hrp.Position + Vector3.new(0,5,0)
+                local usernameDistPos = headPos + Vector3.new(0,4,0)
+                local healthbarPos = headPos + Vector3.new(0,2,0)
 
-                -- Labels toggle
                 if Toggles.PlayerESPLabels.Value then
                     -- Username + Distance
                     local up1, vis1 = Camera:WorldToViewportPoint(usernameDistPos)
@@ -857,7 +858,7 @@ pcall(function()
                         drawings.NameText.Visible = true
                     else drawings.NameText.Visible = false end
 
-                    -- Health bar
+                    -- Healthbar
                     local up2, vis2 = Camera:WorldToViewportPoint(healthbarPos)
                     if vis2 then
                         local healthPercent = math.clamp(health/maxHealth,0,1)
@@ -897,29 +898,23 @@ pcall(function()
                     drawings.HealthBarBG.Visible = false
                     drawings.HealthBarFill.Visible = false
                 end
-
-                -- Highlight toggle
-                if Toggles.PlayerESP.Value then
-                    addHighlight(player)
-                else
-                    removeHighlight(player)
-                end
             else
                 drawings.NameText.Visible = false
                 drawings.HealthText.Visible = false
                 drawings.HealthBarBG.Visible = false
                 drawings.HealthBarFill.Visible = false
-                removeHighlight(player)
             end
         end
     end)
 
-    -- Toggles changed
+    -- Toggle highlight
     Toggles.PlayerESP:OnChanged(function(val)
         for _, p in pairs(Players:GetPlayers()) do
             if val then addHighlight(p) else removeHighlight(p) end
         end
     end)
+
+    -- Toggle labels/healthbar
     Toggles.PlayerESPLabels:OnChanged(function(val)
         for _, p in pairs(Players:GetPlayers()) do
             if val and not espData[p] then createESP(p) end
@@ -929,20 +924,21 @@ pcall(function()
     -- Player join/leave
     Players.PlayerAdded:Connect(function(plr)
         createESP(plr)
-        plr.CharacterAdded:Connect(function() if Toggles.PlayerESP.Value then addHighlight(plr) end end)
+        plr.CharacterAdded:Connect(function() 
+            if Toggles.PlayerESP.Value then addHighlight(plr) end
+        end)
     end)
     Players.PlayerRemoving:Connect(function(plr)
         removeESP(plr)
         removeHighlight(plr)
     end)
 
-    -- Initialize
+    -- Initialize for existing players
     for _, plr in ipairs(Players:GetPlayers()) do
         createESP(plr)
         if Toggles.PlayerESP.Value then addHighlight(plr) end
     end
 end)
-
 
 -- Universal Tween & Location
 pcall(function()
