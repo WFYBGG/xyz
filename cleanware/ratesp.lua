@@ -14,18 +14,6 @@ local Tabs = {
     Visuals = Window:AddTab("Visual"),
     UI = Window:AddTab("UI Settings")
 }
-VisualsGroup:AddLabel('Name/Distance Color'):AddColorPicker('PlayerESPNameColor', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Name & Distance',
-    Callback = function(Value)
-        -- Apply text color immediately
-        for _, data in pairs(espData) do
-            if data.NameText then
-                data.NameText.Color = Value
-            end
-        end
-    end
-})
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
 VisualsGroup:AddToggle("PlayerESP", {
     Text = "Player ESP",
@@ -34,11 +22,13 @@ VisualsGroup:AddToggle("PlayerESP", {
 VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
     Default = Color3.fromRGB(255, 130, 0),
     Title = 'Player Highlight',
+    Transparency = 0.5, -- initial transparency
     Callback = function(Value)
-        -- Apply highlight color immediately
         for _, p in pairs(Players:GetPlayers()) do
             if p.Character and p.Character:FindFirstChild("Player_ESP") then
-                p.Character.Player_ESP.FillColor = Value
+                local highlight = p.Character.Player_ESP
+                highlight.FillColor = Value
+                highlight.FillTransparency = Options.PlayerESPColor.Transparency
             end
         end
     end
@@ -51,7 +41,6 @@ VisualsGroup:AddLabel('Name/Distance Color'):AddColorPicker('PlayerESPNameColor'
     Default = Color3.fromRGB(255, 255, 255),
     Title = 'Name & Distance',
     Callback = function(Value)
-        -- Apply text color immediately
         for _, data in pairs(espData) do
             if data.NameText then
                 data.NameText.Color = Value
@@ -101,9 +90,9 @@ pcall(function()
             if not player.Character:FindFirstChild("Player_ESP") then
                 local highlight = Instance.new("Highlight")
                 highlight.Name = "Player_ESP"
-                highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0
                 highlight.FillColor = Options.PlayerESPColor.Value
+                highlight.FillTransparency = Options.PlayerESPColor.Transparency
+                highlight.OutlineTransparency = 0
                 highlight.Parent = player.Character
             end
         end)
