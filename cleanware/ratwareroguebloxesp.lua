@@ -139,8 +139,13 @@ pcall(function()
                     local healthTextHeight = drawings.HealthText.TextBounds.Y
                     local totalHeight = usernameHeight + buffer + drawings.HealthBarHeight + buffer + healthTextHeight
                     local verticalOffset = 30
-                    local health = humanoid.Health
-                    local maxHealth = humanoid.MaxHealth
+                    local health = tonumber(humanoid.Health) or 0
+                    local maxHealth = tonumber(humanoid.MaxHealth) or 100
+                    if maxHealth <= 0 then
+                        maxHealth = 100
+                    end
+                    local ratio = math.clamp(health / maxHealth, 0, 1)
+                    local dist = (head.Position - Camera.CFrame.Position).Magnitude
                     local ratio = math.clamp(maxHealth > 0 and (health / maxHealth) or 0, 0, 1)
                     local dist = (head.Position - Camera.CFrame.Position).Magnitude
                     if Toggles.PlayerESPName.Value then
