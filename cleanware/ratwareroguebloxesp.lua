@@ -138,7 +138,7 @@ pcall(function()
                     local usernameHeight = drawings.NameText.TextBounds.Y
                     local healthTextHeight = drawings.HealthText.TextBounds.Y
                     local totalHeight = usernameHeight + buffer + drawings.HealthBarHeight + buffer + healthTextHeight
-                    local verticalOffset = 35
+                    local verticalOffset = 30
                     local health = humanoid.Health
                     local maxHealth = humanoid.MaxHealth
                     local ratio = math.clamp(maxHealth > 0 and (health / maxHealth) or 0, 0, 1)
