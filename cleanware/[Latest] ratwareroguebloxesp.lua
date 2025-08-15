@@ -194,10 +194,14 @@ pcall(function()
 
                     -- Health bar
                     if Toggles.PlayerESPHealthbar.Value then
+                        local safeMaxHealth = humanoid.MaxHealth > 0 and humanoid.MaxHealth or 1
+                        local safeHealth = math.clamp(humanoid.Health, 0, safeMaxHealth)
+                        local ratio = safeHealth / safeMaxHealth
+                    
                         drawings.HealthBarBG.Position = Vector2.new(pos2D.X - drawings.HealthBarWidth/2, pos2D.Y - totalHeight/2 + usernameHeight + buffer - verticalOffset)
                         drawings.HealthBarBG.Size = Vector2.new(drawings.HealthBarWidth, drawings.HealthBarHeight)
                         drawings.HealthBarBG.Visible = true
-
+                    
                         drawings.HealthBarFill.Position = drawings.HealthBarBG.Position
                         drawings.HealthBarFill.Size = Vector2.new(drawings.HealthBarWidth * ratio, drawings.HealthBarHeight)
                         drawings.HealthBarFill.Color = Color3.fromRGB(
