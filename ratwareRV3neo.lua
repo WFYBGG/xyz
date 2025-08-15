@@ -772,6 +772,7 @@ end)
 --Player ESP Module
 pcall(function()
     local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
@@ -787,7 +788,7 @@ pcall(function()
     -- ESP storage
     local espData = {}
 
-    -- Highlight functions (managed outside RenderStepped)
+    -- Highlight functions
     local function addHighlight(player)
         if player == LocalPlayer or not player.Character then return end
         pcall(function()
@@ -811,98 +812,122 @@ pcall(function()
         end)
     end
 
+    -- Ensure highlight reapplies on respawn
+    local function monitorCharacter(player)
+        if not player then return end
+        player.CharacterAdded:Connect(function()
+            if Toggles.PlayerESP.Value then
+                addHighlight(player)
+            end
+        end)
+    end
+
     -- Create ESP drawings
     local function createESP(player)
         if player == LocalPlayer then return end
         if espData[player] then return end
 
+        local healthbarWidth = 50
+        local healthbarHeight = 5
+
         espData[player] = {
-            NameText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
-            HealthText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
-            HealthBarBG = createDrawing("Square", {Filled=true, Visible=false, Color=Color3.fromRGB(0,0,0)}),
-            HealthBarFill = createDrawing("Square", {Filled=true, Visible=false})
+            NameText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            HealthText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            HealthBarBG = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,0,0), Visible=false}),
+            HealthBarFill = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,255,0), Visible=false}),
+            HealthBarWidth = healthbarWidth,
+            HealthBarHeight = healthbarHeight
         }
+
+        -- Monitor respawn for highlights
+        monitorCharacter(player)
     end
 
     local function removeESP(player)
         if espData[player] then
             for _, obj in pairs(espData[player]) do
-                obj:Remove()
+                pcall(function() obj:Remove() end)
             end
             espData[player] = nil
         end
     end
 
-    -- RenderStepped: labels, healthbar, health text
-    game:GetService("RunService").RenderStepped:Connect(function()
+    -- RenderStepped: head-anchored ESP with dynamic spacing
+    RunService.RenderStepped:Connect(function()
         for player, drawings in pairs(espData) do
             local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local head = char and char:FindFirstChild("Head")
             local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-            if hrp and humanoid and humanoid.Health > 0 then
-                local health = humanoid.Health
-                local maxHealth = humanoid.MaxHealth
-                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
 
-                local headPos = hrp.Position + Vector3.new(0,5,0)
-                local usernameDistPos = headPos + Vector3.new(0,4,0)
-                local healthbarPos = headPos + Vector3.new(0,2,0)
-
-                if Toggles.PlayerESPLabels.Value then
-                    -- Username + Distance
-                    local up1, vis1 = Camera:WorldToViewportPoint(usernameDistPos)
-                    if vis1 then
-                        drawings.NameText.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
-                        drawings.NameText.Position = Vector2.new(up1.X, up1.Y)
-                        drawings.NameText.Color = Color3.fromRGB(255,255,255)
-                        drawings.NameText.Visible = true
-                    else drawings.NameText.Visible = false end
-
-                    -- Healthbar
-                    local up2, vis2 = Camera:WorldToViewportPoint(healthbarPos)
-                    if vis2 then
-                        local healthPercent = math.clamp(health/maxHealth,0,1)
-                        local barWidth, barHeight = 50, 5
-                        drawings.HealthBarBG.Position = Vector2.new(up2.X - barWidth/2, up2.Y)
-                        drawings.HealthBarBG.Size = Vector2.new(barWidth, barHeight)
-                        drawings.HealthBarBG.Visible = true
-
-                        drawings.HealthBarFill.Position = Vector2.new(up2.X - barWidth/2, up2.Y)
-                        drawings.HealthBarFill.Size = Vector2.new(barWidth*healthPercent, barHeight)
-                        drawings.HealthBarFill.Color = Color3.fromRGB(
-                            math.floor(255-255*healthPercent),
-                            math.floor(255*healthPercent),
-                            0
-                        )
-                        drawings.HealthBarFill.Visible = true
-                    else
-                        drawings.HealthBarBG.Visible = false
-                        drawings.HealthBarFill.Visible = false
-                    end
-
-                    -- Health text
-                    local up3, vis3 = Camera:WorldToViewportPoint(headPos)
-                    if vis3 then
-                        drawings.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
-                        drawings.HealthText.Position = Vector2.new(up3.X, up3.Y)
-                        drawings.HealthText.Color = Color3.fromRGB(
-                            math.floor(255 - 255*(health/maxHealth)),
-                            math.floor(255*(health/maxHealth)),
-                            0
-                        )
-                        drawings.HealthText.Visible = true
-                    else drawings.HealthText.Visible = false end
-                else
-                    drawings.NameText.Visible = false
-                    drawings.HealthText.Visible = false
-                    drawings.HealthBarBG.Visible = false
-                    drawings.HealthBarFill.Visible = false
-                end
-            else
+            -- Hide if character missing or dead
+            if not char or not head or not humanoid or humanoid.Health <= 0 then
                 drawings.NameText.Visible = false
-                drawings.HealthText.Visible = false
                 drawings.HealthBarBG.Visible = false
                 drawings.HealthBarFill.Visible = false
+                drawings.HealthText.Visible = false
+                continue
+            end
+
+            -- Attempt safe projection to screen
+            local success, pos2D, onScreen = pcall(function()
+                return Camera:WorldToViewportPoint(head.Position)
+            end)
+            if not success or not onScreen then
+                drawings.NameText.Visible = false
+                drawings.HealthBarBG.Visible = false
+                drawings.HealthBarFill.Visible = false
+                drawings.HealthText.Visible = false
+                continue
+            end
+
+            -- Dynamic spacing
+            local buffer = 4
+            local usernameHeight = drawings.NameText.TextBounds.Y
+            local healthTextHeight = drawings.HealthText.TextBounds.Y
+            local healthbarHeight = drawings.HealthBarHeight
+            local healthbarWidth = drawings.HealthBarWidth
+            local totalHeight = usernameHeight + buffer + healthbarHeight + buffer + healthTextHeight
+            local verticalOffset = 20
+
+            local health = humanoid.Health
+            local maxHealth = humanoid.MaxHealth
+            local dist = (head.Position - Camera.CFrame.Position).Magnitude
+
+            if Toggles.PlayerESPLabels.Value then
+                -- Username + Distance (top)
+                drawings.NameText.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
+                drawings.NameText.Position = Vector2.new(pos2D.X, pos2D.Y - totalHeight/2 - verticalOffset)
+                drawings.NameText.Color = Color3.fromRGB(255,255,255)
+                drawings.NameText.Visible = true
+
+                -- Health bar (middle)
+                drawings.HealthBarBG.Position = Vector2.new(pos2D.X - healthbarWidth/2, pos2D.Y - totalHeight/2 + usernameHeight + buffer - verticalOffset)
+                drawings.HealthBarBG.Size = Vector2.new(healthbarWidth, healthbarHeight)
+                drawings.HealthBarBG.Visible = true
+
+                drawings.HealthBarFill.Position = drawings.HealthBarBG.Position
+                drawings.HealthBarFill.Size = Vector2.new(healthbarWidth * math.clamp(health/maxHealth,0,1), healthbarHeight)
+                drawings.HealthBarFill.Color = Color3.fromRGB(
+                    math.floor(255 - 255*(health/maxHealth)),
+                    math.floor(255*(health/maxHealth)),
+                    0
+                )
+                drawings.HealthBarFill.Visible = true
+
+                -- Health text (bottom)
+                drawings.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
+                drawings.HealthText.Position = Vector2.new(pos2D.X, pos2D.Y - totalHeight/2 + usernameHeight + buffer + healthbarHeight + buffer - verticalOffset)
+                drawings.HealthText.Color = Color3.fromRGB(
+                    math.floor(255 - 255*(health/maxHealth)),
+                    math.floor(255*(health/maxHealth)),
+                    0
+                )
+                drawings.HealthText.Visible = true
+            else
+                drawings.NameText.Visible = false
+                drawings.HealthBarBG.Visible = false
+                drawings.HealthBarFill.Visible = false
+                drawings.HealthText.Visible = false
             end
         end
     end)
@@ -924,7 +949,7 @@ pcall(function()
     -- Player join/leave
     Players.PlayerAdded:Connect(function(plr)
         createESP(plr)
-        plr.CharacterAdded:Connect(function() 
+        plr.CharacterAdded:Connect(function()
             if Toggles.PlayerESP.Value then addHighlight(plr) end
         end)
     end)
