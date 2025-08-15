@@ -775,11 +775,12 @@ local LocalPlayer = Players.LocalPlayer
 --// Storage
 local ESPObjects = {}
 
---// Create ESP for player
+--// Create Drawing + Highlight ESP
 local function createESP(player)
     if player == LocalPlayer then return end
     if ESPObjects[player] then return end
 
+    -- Name/Distance text
     local nameText = Drawing.new("Text")
     nameText.Size = 14
     nameText.Center = true
@@ -787,67 +788,186 @@ local function createESP(player)
     nameText.Color = Color3.fromRGB(255, 255, 255)
     nameText.Visible = false
 
+    -- Health bar
+    local healthBarBG = Drawing.new("Line")
+    healthBarBG.Thickness = 3
+    healthBarBG.Color = Color3.fromRGB(0, 0, 0)
+    healthBarBG.Visible = false
+
+    local healthBarFG = Drawing.new("Line")
+    healthBarFG.Thickness = 3
+    healthBarFG.Color = Color3.fromRGB(0, 255, 0)
+    healthBarFG.Visible = false
+
+    -- Health text
+    local healthText = Drawing.new("Text")
+    healthText.Size = 14
+    healthText.Center = true
+    healthText.Outline = true
+    healthText.Visible = false
+
+    -- Highlight object
+    local function addHighlight()
+        if not player.Character then return end
+        if player.Character:FindFirstChild("Player_ESP") then return end
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "Player_ESP"
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.FillColor = Color3.fromRGB(255, 130, 0)
+        highlight.Parent = player.Character
+    end
+
     ESPObjects[player] = {
         Name = nameText,
-        Skeleton = {} -- Keep skeleton array if you still use bone drawing
+        HealthBarBG = healthBarBG,
+        HealthBarFG = healthBarFG,
+        HealthText = healthText,
+        AddHighlight = addHighlight
     }
+
+    if Toggles.PlayerESP.Value then
+        addHighlight()
+    end
 end
 
---// Cleanup ESP
+--// Cleanup Drawing + Highlight
 local function removeESP(player)
     if ESPObjects[player] then
-        if ESPObjects[player].Name then ESPObjects[player].Name:Remove() end
-        for _, line in ipairs(ESPObjects[player].Skeleton or {}) do
-            if line then line:Remove() end
+        for _, obj in pairs(ESPObjects[player]) do
+            if typeof(obj) == "table" and obj.Remove then
+                obj:Remove()
+            elseif typeof(obj) ~= "function" and obj then
+                pcall(function() obj:Remove() end)
+            end
+        end
+        if player.Character then
+            local hl = player.Character:FindFirstChild("Player_ESP")
+            if hl then hl:Destroy() end
         end
         ESPObjects[player] = nil
     end
 end
 
---// Update ESP every frame
+--// Update loop
 RunService.Heartbeat:Connect(function()
+    if not Toggles.PlayerESP.Value then
+        for _, obj in pairs(ESPObjects) do
+            obj.Name.Visible = false
+            obj.HealthBarBG.Visible = false
+            obj.HealthBarFG.Visible = false
+            obj.HealthText.Visible = false
+        end
+        return
+    end
+
     for player, tbl in pairs(ESPObjects) do
-        local char = workspace:FindFirstChild("Living") and workspace.Living:FindFirstChild(player.Name)
-        if char and char:FindFirstChild("HumanoidRootPart") then
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
             local hrp = char.HumanoidRootPart
-            local extents = char:GetExtentsSize()
-
             local humanoid = char:FindFirstChildOfClass("Humanoid")
-            local health = humanoid and humanoid.Health or 0
-            local maxHealth = humanoid and humanoid.MaxHealth or 100
+            local head = char:FindFirstChild("Head")
 
-            local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
+            if head then
+                local health = humanoid.Health
+                local maxHealth = humanoid.MaxHealth
+                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
 
-            -- Position 2 studs above head
-            local headOffset = Vector3.new(0, extents.Y/2 + 2, 0)
-            local abovePos, onScreen = Camera:WorldToViewportPoint(hrp.Position + headOffset)
+                -- Positions
+                local namePos3D = head.Position + Vector3.new(0, 2, 0)
+                local barPos3D = head.Position + Vector3.new(0, 1.8, 0)
+                local healthTextPos3D = head.Position + Vector3.new(0, 1.6, 0)
 
-            if onScreen and health > 0 then
-                local r = math.floor(255 - 255 * (health / maxHealth))
-                local g = math.floor(255 * (health / maxHealth))
+                local namePos, onScreen1 = Camera:WorldToViewportPoint(namePos3D)
+                local barPos, onScreen2 = Camera:WorldToViewportPoint(barPos3D)
+                local healthTextPos, onScreen3 = Camera:WorldToViewportPoint(healthTextPos3D)
 
-                tbl.Name.Text = string.format("[%s] [%d/%d] [%dm]",
-                    player.Name,
-                    math.floor(health),
-                    math.floor(maxHealth),
-                    math.floor(dist)
-                )
+                local onScreen = onScreen1 and onScreen2 and onScreen3 and health > 0
 
-                tbl.Name.Position = Vector2.new(abovePos.X, abovePos.Y)
-                tbl.Name.Color = Color3.fromRGB(r, g, 0)
-                tbl.Name.Visible = true
+                if onScreen then
+                    -- Name/Distance text
+                    tbl.Name.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
+                    tbl.Name.Position = Vector2.new(namePos.X, namePos.Y)
+                    tbl.Name.Visible = true
+
+                    -- Health bar background
+                    local barWidth = 40
+                    local barHeight = 3
+                    local leftX = barPos.X - barWidth / 2
+                    local rightX = barPos.X + barWidth / 2
+
+                    tbl.HealthBarBG.From = Vector2.new(leftX, barPos.Y)
+                    tbl.HealthBarBG.To = Vector2.new(rightX, barPos.Y)
+                    tbl.HealthBarBG.Visible = true
+
+                    -- Health bar foreground
+                    local healthPercent = math.clamp(health / maxHealth, 0, 1)
+                    tbl.HealthBarFG.From = Vector2.new(leftX, barPos.Y)
+                    tbl.HealthBarFG.To = Vector2.new(leftX + (barWidth * healthPercent), barPos.Y)
+                    tbl.HealthBarFG.Color = Color3.fromRGB(
+                        math.floor(255 - 255 * healthPercent),
+                        math.floor(255 * healthPercent),
+                        0
+                    )
+                    tbl.HealthBarFG.Visible = true
+
+                    -- Health text
+                    tbl.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
+                    tbl.HealthText.Position = Vector2.new(healthTextPos.X, healthTextPos.Y)
+                    tbl.HealthText.Color = tbl.HealthBarFG.Color
+                    tbl.HealthText.Visible = true
+
+                    -- Ensure highlight exists
+                    tbl.AddHighlight()
+                else
+                    tbl.Name.Visible = false
+                    tbl.HealthBarBG.Visible = false
+                    tbl.HealthBarFG.Visible = false
+                    tbl.HealthText.Visible = false
+                end
             else
                 tbl.Name.Visible = false
+                tbl.HealthBarBG.Visible = false
+                tbl.HealthBarFG.Visible = false
+                tbl.HealthText.Visible = false
             end
         else
             tbl.Name.Visible = false
+            tbl.HealthBarBG.Visible = false
+            tbl.HealthBarFG.Visible = false
+            tbl.HealthText.Visible = false
+        end
+    end
+end)
+
+--// Handle toggle changes
+Toggles.PlayerESP:OnChanged(function(value)
+    for _, player in pairs(Players:GetPlayers()) do
+        if value then
+            if not ESPObjects[player] then
+                createESP(player)
+            else
+                ESPObjects[player].AddHighlight()
+            end
+        else
+            removeESP(player)
         end
     end
 end)
 
 --// Player events
-Players.PlayerAdded:Connect(createESP)
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+    player.CharacterAdded:Connect(function()
+        if Toggles.PlayerESP.Value and ESPObjects[player] then
+            ESPObjects[player].AddHighlight()
+        end
+    end)
+end)
+
 Players.PlayerRemoving:Connect(removeESP)
+
+-- Initialize for existing players
 for _, plr in ipairs(Players:GetPlayers()) do
     createESP(plr)
 end
