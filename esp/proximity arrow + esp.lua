@@ -4,8 +4,6 @@
 
 -- Tables & Variables
 local espData = {}
--- Store arrows here
-local proximityArrows = {}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
@@ -359,92 +357,142 @@ end)
 -- ========================
 -- Proximity Arrows
 -- ========================
--- Create arrow drawing object
 pcall(function()
-    -- Create arrow drawing object
-    local function createArrow()
-        return Drawing.new("Triangle")
+    local ArrowShape = {}
+
+    function ArrowShape.CreateArrow(center, angle, size, radius, color)
+        local arrow = Drawing.new("Triangle")
+        arrow.Filled = true
+        arrow.Thickness = 1
+        arrow.Color = color
+
+        local tip = Vector2.new(center.X + math.cos(angle) * (radius + size), center.Y + math.sin(angle) * (radius + size))
+        local base1 = Vector2.new(tip.X + math.cos(angle + math.pi*0.75) * size, tip.Y + math.sin(angle + math.pi*0.75) * size)
+        local base2 = Vector2.new(tip.X + math.cos(angle - math.pi*0.75) * size, tip.Y + math.sin(angle - math.pi*0.75) * size)
+
+        arrow.PointA = tip
+        arrow.PointB = base1
+        arrow.PointC = base2
+        arrow.Visible = true
+
+        return arrow
     end
 
-    -- Clears all current arrows
-    local function clearProximityArrows()
-        for _, arrow in ipairs(proximityArrows) do
-            arrow:Remove()
+    local arrows = {}
+    local radarCircle
+    local arrowSize = 28 -- doubled from 14
+    local arrowRadius = 240 -- doubled from 120
+    local minTransparency = 0.9
+
+    local function createCircle()
+        local circ = Drawing.new("Circle")
+        circ.Thickness = 1
+        circ.NumSides = 64
+        circ.Radius = arrowRadius
+        circ.Color = Color3.fromRGB(255, 255, 255)
+        circ.Filled = false
+        circ.Visible = false
+        return circ
+    end
+
+    radarCircle = createCircle()
+
+    local function ensureArrow(player)
+        if player ~= LocalPlayer and not arrows[player] then
+            arrows[player] = Drawing.new("Triangle")
+            arrows[player].Visible = false
         end
-        proximityArrows = {}
     end
 
-    -- Draw arrows for off-screen players
-    local function drawProximityArrows()
-        -- Wrap the draw in pcall so one bad frame won't break it
-        local success, err = pcall(function()
-            clearProximityArrows()
+    local function removeArrow(player)
+        if arrows[player] then
+            pcall(function() arrows[player]:Remove() end)
+            arrows[player] = nil
+        end
+    end
 
-            if not Toggles.ProximityArrows.Value then return end
+    Players.PlayerAdded:Connect(ensureArrow)
+    Players.PlayerRemoving:Connect(removeArrow)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        ensureArrow(plr)
+    end
 
-            local maxDist = Options.ProximityRange.Value
-            local camCF = Camera.CFrame
-            local camPos = camCF.Position
+    local function renderArrows()
+        if not Toggles.ProximityArrows.Value then
+            radarCircle.Visible = false
+            for _, arrow in pairs(arrows) do arrow.Visible = false end
+            return
+        end
 
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer then -- Removed teammate check as requested
-                    local char = player.Character
-                    local head = char and char:FindFirstChild("Head")
-                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local anyVisible = false
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        local maxDist = Options.ProximityRange.Value
 
-                    if head and hum and hum.Health > 0 then
-                        local dist = (head.Position - camPos).Magnitude
-                        if dist <= maxDist then
-                            local _, onScreen = Camera:WorldToViewportPoint(head.Position)
-                            if not onScreen then
-                                local dir = (head.Position - camPos).Unit
-                                local relative = camCF:VectorToObjectSpace(dir)
-                                local angle = math.atan2(-relative.X, -relative.Z)
+        for player, arrow in pairs(arrows) do
+            local char = player.Character
+            local head = char and char:FindFirstChild("Head")
+            if head then
+                local dist = (head.Position - Camera.CFrame.Position).Magnitude
+                if dist <= maxDist then
+                    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if not onScreen then
+                        anyVisible = true
 
-                                local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                                local arrowLength = 20 -- Fixed size
-                                local arrowWidth = 8
-                                local offset = 100 -- Distance from center
+                        local dir = (head.Position - Camera.CFrame.Position).Unit
+                        local camCF = Camera.CFrame
+                        local relative = camCF:VectorToObjectSpace(dir)
+                        local angle = math.atan2(-relative.X, -relative.Z) + math.pi
 
-                                local arrowPos = screenCenter + Vector2.new(math.sin(angle), math.cos(angle)) * offset
-                                local baseLeft = arrowPos + Vector2.new(math.sin(angle + math.rad(150)), math.cos(angle + math.rad(150))) * arrowWidth
-                                local baseRight = arrowPos + Vector2.new(math.sin(angle - math.rad(150)), math.cos(angle - math.rad(150))) * arrowWidth
-                                local tip = arrowPos + Vector2.new(math.sin(angle), math.cos(angle)) * arrowLength
+                        local ratio = math.clamp(dist / maxDist, 0, 1)
+                        local color = Color3.fromRGB(
+                            math.floor(255 - 255 * ratio),
+                            math.floor(255 * ratio),
+                            0
+                        )
 
-                                local arrow = createArrow()
-                                arrow.PointA = tip
-                                arrow.PointB = baseLeft
-                                arrow.PointC = baseRight
+                        local tri = ArrowShape.CreateArrow(screenCenter, angle, arrowSize, arrowRadius, color)
+                        tri.Transparency = math.max(minTransparency, ratio)
 
-                                -- Color fade from green → red, closer is red
-                                local t = 1 - math.clamp(dist / maxDist, 0, 1)
-                                arrow.Color = Color3.fromRGB(255 * t, 255 * (1 - t), 0)
-                                arrow.Transparency = 0.3 + 0.7 * t
-                                arrow.Filled = true
-                                arrow.Visible = true
-
-                                table.insert(proximityArrows, arrow)
-                            end
-                        end
+                        arrow.PointA = tri.PointA
+                        arrow.PointB = tri.PointB
+                        arrow.PointC = tri.PointC
+                        arrow.Color = tri.Color
+                        arrow.Transparency = tri.Transparency
+                        arrow.Visible = true
+                        tri:Remove()
+                    else
+                        arrow.Visible = false
                     end
+                else
+                    arrow.Visible = false
                 end
+            else
+                arrow.Visible = false
             end
-        end)
-
-        if not success then
-            warn("[ProximityArrows] Error:", err)
         end
+
+        radarCircle.Position = screenCenter
+        radarCircle.Visible = anyVisible
     end
 
-    -- Run drawing each frame
-    RunService.RenderStepped:Connect(drawProximityArrows)
-
-    -- Remove arrows when toggle is disabled
+    local renderConn
     Toggles.ProximityArrows:OnChanged(function(val)
-        if not val then
-            clearProximityArrows()
+        if val then
+            if not renderConn then
+                renderConn = RunService.RenderStepped:Connect(renderArrows)
+            end
+        else
+            if renderConn then
+                renderConn:Disconnect()
+                renderConn = nil
+            end
+            radarCircle.Visible = false
+            for _, arrow in pairs(arrows) do arrow.Visible = false end
         end
     end)
+
+    radarCircle.Visible = false
+    for _, arrow in pairs(arrows) do arrow.Visible = false end
 end)
 
 -- ========================
