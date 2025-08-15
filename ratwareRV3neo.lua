@@ -543,8 +543,16 @@ VisualsGroup:AddToggle("PlayerESP", {
     Text = "Player ESP",
     Default = false
 })
-VisualsGroup:AddToggle("PlayerESPLabels", {
-    Text = "Health & Distance",
+VisualsGroup:AddToggle("PlayerESPName", {
+    Text = "Username & Distance",
+    Default = false
+})
+VisualsGroup:AddToggle("PlayerESPHealthbar", {
+    Text = "Show Health Bar",
+    Default = false
+})
+VisualsGroup:AddToggle("PlayerESPHealthText", {
+    Text = "Show Health Text",
     Default = false
 })
 
@@ -776,7 +784,6 @@ pcall(function()
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
-    -- Create Drawing utility
     local function createDrawing(type, props)
         local obj = Drawing.new(type)
         for k, v in pairs(props) do
@@ -785,10 +792,8 @@ pcall(function()
         return obj
     end
 
-    -- ESP storage
     local espData = {}
 
-    -- Highlight functions
     local function addHighlight(player)
         if player == LocalPlayer or not player.Character then return end
         pcall(function()
@@ -812,7 +817,6 @@ pcall(function()
         end)
     end
 
-    -- Ensure highlight reapplies on respawn
     local function monitorCharacter(player)
         if not player then return end
         player.CharacterAdded:Connect(function()
@@ -822,10 +826,8 @@ pcall(function()
         end)
     end
 
-    -- Create ESP drawings
     local function createESP(player)
-        if player == LocalPlayer then return end
-        if espData[player] then return end
+        if player == LocalPlayer or espData[player] then return end
 
         local healthbarWidth = 50
         local healthbarHeight = 5
@@ -839,7 +841,6 @@ pcall(function()
             HealthBarHeight = healthbarHeight
         }
 
-        -- Monitor respawn for highlights
         monitorCharacter(player)
     end
 
@@ -852,14 +853,12 @@ pcall(function()
         end
     end
 
-    -- RenderStepped: head-anchored ESP with dynamic spacing
     RunService.RenderStepped:Connect(function()
         for player, drawings in pairs(espData) do
             local char = player.Character
             local head = char and char:FindFirstChild("Head")
             local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 
-            -- Hide if character missing or dead
             if not char or not head or not humanoid or humanoid.Health <= 0 then
                 drawings.NameText.Visible = false
                 drawings.HealthBarBG.Visible = false
@@ -868,7 +867,6 @@ pcall(function()
                 continue
             end
 
-            -- Attempt safe projection to screen
             local success, pos2D, onScreen = pcall(function()
                 return Camera:WorldToViewportPoint(head.Position)
             end)
@@ -880,7 +878,6 @@ pcall(function()
                 continue
             end
 
-            -- Dynamic spacing
             local buffer = 4
             local usernameHeight = drawings.NameText.TextBounds.Y
             local healthTextHeight = drawings.HealthText.TextBounds.Y
@@ -893,14 +890,18 @@ pcall(function()
             local maxHealth = humanoid.MaxHealth
             local dist = (head.Position - Camera.CFrame.Position).Magnitude
 
-            if Toggles.PlayerESPLabels.Value then
-                -- Username + Distance (top)
+            -- Name + Distance
+            if Toggles.PlayerESPName.Value then
                 drawings.NameText.Text = string.format("[%s] [%dm]", player.Name, math.floor(dist))
                 drawings.NameText.Position = Vector2.new(pos2D.X, pos2D.Y - totalHeight/2 - verticalOffset)
                 drawings.NameText.Color = Color3.fromRGB(255,255,255)
                 drawings.NameText.Visible = true
+            else
+                drawings.NameText.Visible = false
+            end
 
-                -- Health bar (middle)
+            -- Health bar
+            if Toggles.PlayerESPHealthbar.Value then
                 drawings.HealthBarBG.Position = Vector2.new(pos2D.X - healthbarWidth/2, pos2D.Y - totalHeight/2 + usernameHeight + buffer - verticalOffset)
                 drawings.HealthBarBG.Size = Vector2.new(healthbarWidth, healthbarHeight)
                 drawings.HealthBarBG.Visible = true
@@ -913,8 +914,13 @@ pcall(function()
                     0
                 )
                 drawings.HealthBarFill.Visible = true
+            else
+                drawings.HealthBarBG.Visible = false
+                drawings.HealthBarFill.Visible = false
+            end
 
-                -- Health text (bottom)
+            -- Health text
+            if Toggles.PlayerESPHealthText.Value then
                 drawings.HealthText.Text = string.format("[%d/%d]", math.floor(health), math.floor(maxHealth))
                 drawings.HealthText.Position = Vector2.new(pos2D.X, pos2D.Y - totalHeight/2 + usernameHeight + buffer + healthbarHeight + buffer - verticalOffset)
                 drawings.HealthText.Color = Color3.fromRGB(
@@ -924,29 +930,36 @@ pcall(function()
                 )
                 drawings.HealthText.Visible = true
             else
-                drawings.NameText.Visible = false
-                drawings.HealthBarBG.Visible = false
-                drawings.HealthBarFill.Visible = false
                 drawings.HealthText.Visible = false
             end
         end
     end)
 
-    -- Toggle highlight
+    -- Toggles
     Toggles.PlayerESP:OnChanged(function(val)
         for _, p in pairs(Players:GetPlayers()) do
             if val then addHighlight(p) else removeHighlight(p) end
         end
     end)
 
-    -- Toggle labels/healthbar
-    Toggles.PlayerESPLabels:OnChanged(function(val)
+    Toggles.PlayerESPName:OnChanged(function(val)
         for _, p in pairs(Players:GetPlayers()) do
             if val and not espData[p] then createESP(p) end
         end
     end)
 
-    -- Player join/leave
+    Toggles.PlayerESPHealthbar:OnChanged(function(val)
+        for _, p in pairs(Players:GetPlayers()) do
+            if val and not espData[p] then createESP(p) end
+        end
+    end)
+
+    Toggles.PlayerESPHealthText:OnChanged(function(val)
+        for _, p in pairs(Players:GetPlayers()) do
+            if val and not espData[p] then createESP(p) end
+        end
+    end)
+
     Players.PlayerAdded:Connect(function(plr)
         createESP(plr)
         plr.CharacterAdded:Connect(function()
@@ -958,7 +971,6 @@ pcall(function()
         removeHighlight(plr)
     end)
 
-    -- Initialize for existing players
     for _, plr in ipairs(Players:GetPlayers()) do
         createESP(plr)
         if Toggles.PlayerESP.Value then addHighlight(plr) end
