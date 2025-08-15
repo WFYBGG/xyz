@@ -28,16 +28,16 @@ local Tabs = {
 -- Player ESP UI
 local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Player ESP")
 VisualsGroup:AddToggle("PlayerESP", { Text = "Highlight", Default = false })
-VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
-    Default = Color3.fromRGB(255, 130, 0),
-    Title = 'Player Highlight',
-    Transparency = 0.5,
-})
+    :AddColorPicker("PlayerESPColor", {
+        Default = Color3.fromRGB(255, 130, 0),
+        Title = "Highlight Color",
+        Transparency = 0.5,
+    })
 VisualsGroup:AddToggle("PlayerESPName", { Text = "Username & Distance", Default = false })
-VisualsGroup:AddLabel('Username & Distance Color'):AddColorPicker('PlayerESPNameColor', {
-    Default = Color3.fromRGB(255, 255, 255),
-    Title = 'Name & Distance'
-})
+    :AddColorPicker("PlayerESPNameColor", {
+        Default = Color3.fromRGB(255, 255, 255),
+        Title = "Name & Distance Color",
+    })
 VisualsGroup:AddToggle("PlayerESPHealthbar", { Text = "Show Health Bar", Default = false })
 VisualsGroup:AddToggle("PlayerESPHealthText", { Text = "Show Health Text", Default = false })
 
