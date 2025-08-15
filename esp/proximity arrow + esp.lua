@@ -353,7 +353,6 @@ pcall(function()
     checkAllToggles()
 end)
 
-
 -- ========================
 -- Proximity Arrows
 -- ========================
@@ -366,9 +365,19 @@ pcall(function()
         arrow.Thickness = 1
         arrow.Color = color
 
-        local tip = Vector2.new(center.X + math.cos(angle) * (radius + size), center.Y + math.sin(angle) * (radius + size))
-        local base1 = Vector2.new(tip.X + math.cos(angle + math.pi*0.75) * size, tip.Y + math.sin(angle + math.pi*0.75) * size)
-        local base2 = Vector2.new(tip.X + math.cos(angle - math.pi*0.75) * size, tip.Y + math.sin(angle - math.pi*0.75) * size)
+        -- Tip outside the circle
+        local tip = Vector2.new(
+            center.X + math.cos(angle) * (radius + size),
+            center.Y + math.sin(angle) * (radius + size)
+        )
+        local base1 = Vector2.new(
+            tip.X + math.cos(angle + math.pi * 0.75) * size,
+            tip.Y + math.sin(angle + math.pi * 0.75) * size
+        )
+        local base2 = Vector2.new(
+            tip.X + math.cos(angle - math.pi * 0.75) * size,
+            tip.Y + math.sin(angle - math.pi * 0.75) * size
+        )
 
         arrow.PointA = tip
         arrow.PointB = base1
@@ -380,8 +389,8 @@ pcall(function()
 
     local arrows = {}
     local radarCircle
-    local arrowSize = 28 -- doubled from 14
-    local arrowRadius = 240 -- doubled from 120
+    local arrowSize = 28
+    local arrowRadius = 240
     local minTransparency = 0.9
 
     local function createCircle()
@@ -430,18 +439,22 @@ pcall(function()
 
         for player, arrow in pairs(arrows) do
             local char = player.Character
-            local head = char and char:FindFirstChild("Head")
-            if head then
-                local dist = (head.Position - Camera.CFrame.Position).Magnitude
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
                 if dist <= maxDist then
-                    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                     if not onScreen then
                         anyVisible = true
 
-                        local dir = (head.Position - Camera.CFrame.Position).Unit
-                        local camCF = Camera.CFrame
-                        local relative = camCF:VectorToObjectSpace(dir)
-                        local angle = math.atan2(-relative.X, -relative.Z) + math.pi
+                        -- Your math, adjusted for camera facing
+                        local lpPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position
+                        local targetPos = hrp.Position
+                        local dir = Vector2.new(targetPos.X - lpPos.X, targetPos.Z - lpPos.Z)
+
+                        local worldAngle = math.atan2(dir.Y, dir.X) -- 0 = +X
+                        local camYaw = math.atan2(Camera.CFrame.LookVector.Z, Camera.CFrame.LookVector.X)
+                        local relAngle = worldAngle - camYaw - math.pi/2 -- +π/2 so forward is up
 
                         local ratio = math.clamp(dist / maxDist, 0, 1)
                         local color = Color3.fromRGB(
@@ -450,7 +463,7 @@ pcall(function()
                             0
                         )
 
-                        local tri = ArrowShape.CreateArrow(screenCenter, angle, arrowSize, arrowRadius, color)
+                        local tri = ArrowShape.CreateArrow(screenCenter, relAngle, arrowSize, arrowRadius, color)
                         tri.Transparency = math.max(minTransparency, ratio)
 
                         arrow.PointA = tri.PointA
