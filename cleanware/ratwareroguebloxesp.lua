@@ -1,5 +1,4 @@
 -- Ratware.exe, Rogueblox ESP Script 
-
 -- Pre-load Tables & Roblox Services
 local espData = {}
 local Players = game:GetService("Players")
