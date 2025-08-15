@@ -26,15 +26,15 @@ local Tabs = {
 }
 
 -- Player ESP UI
-local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
-VisualsGroup:AddToggle("PlayerESP", { Text = "Player ESP", Default = false })
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("Player ESP")
+VisualsGroup:AddToggle("PlayerESP", { Text = "Highlight", Default = false })
 VisualsGroup:AddLabel('Highlight Color'):AddColorPicker('PlayerESPColor', {
     Default = Color3.fromRGB(255, 130, 0),
     Title = 'Player Highlight',
     Transparency = 0.5,
 })
 VisualsGroup:AddToggle("PlayerESPName", { Text = "Username & Distance", Default = false })
-VisualsGroup:AddLabel('Name/Distance Color'):AddColorPicker('PlayerESPNameColor', {
+VisualsGroup:AddLabel('Username & Distance Color'):AddColorPicker('PlayerESPNameColor', {
     Default = Color3.fromRGB(255, 255, 255),
     Title = 'Name & Distance'
 })
@@ -86,8 +86,8 @@ pcall(function()
     local function createESP(player)
         if player == LocalPlayer or espData[player] then return end
         espData[player] = {
-            NameText = createDrawing("Text",   {Size=14, Center=true, Outline=true, Visible=false}),
-            HealthText = createDrawing("Text", {Size=14, Center=true, Outline=true, Visible=false}),
+            NameText = createDrawing("Text",   {Size=12, Center=true, Outline=true, Visible=false}),
+            HealthText = createDrawing("Text", {Size=12, Center=true, Outline=true, Visible=false}),
             HealthBarBG = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,0,0), Visible=false}),
             HealthBarFill = createDrawing("Square", {Filled=true, Color=Color3.fromRGB(0,255,0), Visible=false}),
             HealthBarWidth = 50,
@@ -138,7 +138,7 @@ pcall(function()
                     local usernameHeight = drawings.NameText.TextBounds.Y
                     local healthTextHeight = drawings.HealthText.TextBounds.Y
                     local totalHeight = usernameHeight + buffer + drawings.HealthBarHeight + buffer + healthTextHeight
-                    local verticalOffset = 20
+                    local verticalOffset = 35
                     local health = humanoid.Health
                     local maxHealth = humanoid.MaxHealth
                     local ratio = math.clamp(maxHealth > 0 and (health / maxHealth) or 0, 0, 1)
